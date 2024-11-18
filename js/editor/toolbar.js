@@ -55,10 +55,10 @@ export class Toolbar {
             .replace(/\r\n/g, "\n")
             .replace(/\r/g, "\n");
 
-          console.log("Cleaned input:", cleanInput);
+          console.debug("Cleaned input:", cleanInput);
 
           const flowConfig = JSON.parse(cleanInput);
-          console.log("Parsed config:", flowConfig);
+          console.debug("Parsed config:", flowConfig);
 
           // Validate imported flow
           const validation = validateFlow(flowConfig);
@@ -72,7 +72,7 @@ export class Toolbar {
           }
 
           createFlowFromConfig(this.graph, flowConfig);
-          console.log("Successfully imported flow configuration");
+          console.debug("Successfully imported flow configuration");
         } catch (error) {
           console.error("Error importing flow:", error);
           console.error("Error details:", {
@@ -104,8 +104,8 @@ export class Toolbar {
         }
       }
 
-      console.log("Generated Flow Configuration:");
-      console.log(JSON.stringify(flowConfig, null, 2));
+      console.debug("Generated Flow Configuration:");
+      console.debug(JSON.stringify(flowConfig, null, 2));
 
       // Generate timestamp
       const timestamp = new Date()

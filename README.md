@@ -1,25 +1,91 @@
 # Pipecat Flow Editor
 
-## Setup
+A visual editor for creating and managing Pipecat conversation flows.
+
+## Features
+
+- Visual flow creation and editing
+- Import/export of flow configurations
+- Support for terminal and transitional functions
+- Merge node support for complex flows
+- Real-time validation
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v14 or higher)
+- npm (v6 or higher)
+
+### Installation
+
+Clone the repository
 
 ```bash
-# Install dependencies
-npm install
+git clone git@github.com:pipecat-ai/pipecat-flows.git
+```
 
-# Start development server
+Navigate to project directory
+
+```bash
+cd pipecat-flows
+```
+
+Install dependencies
+
+```bash
+npm install
+```
+
+Start development server
+
+```bash
 npm run dev
 ```
 
-Open http://localhost:8080 in your browser.
+Open the page in your browser at http://localhost:8080.
+
+### Usage
+
+1. Create a new flow using the toolbar buttons
+2. Add nodes by right-clicking in the canvas
+3. Connect nodes by dragging from outputs to inputs
+4. Edit node properties in the side panel
+5. Export your flow configuration using the toolbar
 
 ## Development
 
-This project uses ES modules. Make sure your development environment supports:
+### Project Structure
 
-- ES6+ JavaScript
-- JavaScript modules
-- Modern browser features
+```
+pipecat-flows/
+├── js/
+│   ├── nodes/        # Node type definitions
+│   ├── editor/       # Editor components
+│   └── utils/        # Utility functions
+├── css/             # Styles
+└── examples/        # Example flows
+```
 
-## Building
+### Available Scripts
 
-No build step is required. The project uses native ES modules.
+- `npm start` - Start production server
+- `npm run dev` - Start development server
+- `npm run lint` - Check for linting issues
+- `npm run lint:fix` - Fix linting issues
+- `npm run format` - Format code with Prettier
+- `npm run format:check` - Check code formatting
+
+### Adding New Node Types
+
+TBD
+
+### Contributing
+
+TBD
+
+## Getting help
+
+➡️ [Join our Discord](https://discord.gg/pipecat)
+
+➡️ [Reach us on X](https://x.com/pipecat_ai)
