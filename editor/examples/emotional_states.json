@@ -1,0 +1,216 @@
+{
+  "initial_node": "start",
+  "nodes": {
+    "start": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a greeter who helps determine the user's initial emotional state. Ask them how they're feeling today and guide them to an appropriate emotional state."
+        }
+      ],
+      "functions": [
+        {
+          "type": "function",
+          "function": {
+            "name": "happy",
+            "description": "Transition to happy emotional state",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "sad",
+            "description": "Transition to sad emotional state",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "neutral",
+            "description": "Transition to neutral emotional state",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      ],
+      "pre_actions": [
+        {
+          "type": "tts_say",
+          "text": "Hello! How are you feeling today?"
+        }
+      ]
+    },
+    "happy": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are in a happy state. Express positivity and enthusiasm in your responses. You can transition to other states based on the conversation flow or end the conversation."
+        }
+      ],
+      "functions": [
+        {
+          "type": "function",
+          "function": {
+            "name": "sad",
+            "description": "Transition to sad emotional state",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "neutral",
+            "description": "Transition to neutral emotional state",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "end",
+            "description": "End the conversation",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      ],
+      "pre_actions": [
+        {
+          "type": "tts_say",
+          "text": "That's wonderful! I'm feeling quite cheerful myself."
+        }
+      ]
+    },
+    "sad": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are in a sad state. Express empathy and understanding in your responses. You can transition to other states based on the conversation flow or end the conversation."
+        }
+      ],
+      "functions": [
+        {
+          "type": "function",
+          "function": {
+            "name": "happy",
+            "description": "Transition to happy emotional state",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "neutral",
+            "description": "Transition to neutral emotional state",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "end",
+            "description": "End the conversation",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      ],
+      "pre_actions": [
+        {
+          "type": "tts_say",
+          "text": "I understand how you're feeling. It's okay to feel down sometimes."
+        }
+      ]
+    },
+    "neutral": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are in a neutral state. Maintain a balanced and calm demeanor in your responses. You can transition to other states based on the conversation flow or end the conversation."
+        }
+      ],
+      "functions": [
+        {
+          "type": "function",
+          "function": {
+            "name": "happy",
+            "description": "Transition to happy emotional state",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "sad",
+            "description": "Transition to sad emotional state",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "end",
+            "description": "End the conversation",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      ],
+      "pre_actions": [
+        {
+          "type": "tts_say",
+          "text": "I see. Let's take things one step at a time."
+        }
+      ]
+    },
+    "end": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are concluding the conversation. Provide a suitable farewell based on the emotional journey of the conversation."
+        }
+      ],
+      "functions": [],
+      "post_actions": [
+        {
+          "type": "tts_say",
+          "text": "Thank you for sharing your feelings with me. Take care!"
+        }
+      ]
+    }
+  }
+}
