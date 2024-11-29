@@ -7,6 +7,7 @@
 import asyncio
 import os
 import sys
+from pathlib import Path
 
 import aiohttp
 from dotenv import load_dotenv
@@ -19,9 +20,11 @@ from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.services.deepgram import DeepgramSTTService, DeepgramTTSService
 from pipecat.services.openai import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
+
+sys.path.append(str(Path(__file__).parent.parent))
 from runner import configure
 
-from pipecat_flows import FlowManager
+from pipecat_flows import FlowArgs, FlowConfig, FlowManager, FlowResult
 
 load_dotenv(override=True)
 
@@ -57,7 +60,21 @@ logger.add(sys.stderr, level="DEBUG")
 #    - Pre-action: Farewell message
 #    - Post-action: Ends conversation
 
-flow_config = {
+
+# Function handlers
+async def select_pizza_size(args: FlowArgs) -> FlowResult:
+    """Handle pizza size selection."""
+    size = args["size"]
+    return {"status": "success", "size": size}
+
+
+async def select_roll_count(args: FlowArgs) -> FlowResult:
+    """Handle sushi roll count selection."""
+    count = args["count"]
+    return {"status": "success", "count": count}
+
+
+flow_config: FlowConfig = {
     "initial_node": "start",
     "nodes": {
         "start": {
@@ -98,6 +115,7 @@ flow_config = {
                     "type": "function",
                     "function": {
                         "name": "select_pizza_size",
+                        "handler": select_pizza_size,
                         "description": "Record the selected pizza size",
                         "parameters": {
                             "type": "object",
@@ -137,6 +155,7 @@ flow_config = {
                     "type": "function",
                     "function": {
                         "name": "select_roll_count",
+                        "handler": select_roll_count,
                         "description": "Record the number of sushi rolls",
                         "parameters": {
                             "type": "object",
@@ -180,28 +199,12 @@ flow_config = {
 }
 
 
-# Node function handlers
-async def select_pizza_size_handler(
-    function_name, tool_call_id, args, llm, context, result_callback
-):
-    size = args["size"]
-    # In a real app, this would store the selection
-    await result_callback({"status": "success", "size": size})
-
-
-async def select_roll_count_handler(
-    function_name, tool_call_id, args, llm, context, result_callback
-):
-    count = args["count"]
-    # In a real app, this would store the selection
-    await result_callback({"status": "success", "count": count})
-
-
 async def main():
     """Main function to set up and run the food ordering bot."""
     async with aiohttp.ClientSession() as session:
         (room_url, _) = await configure(session)
 
+        # Initialize services
         transport = DailyTransport(
             room_url,
             None,
@@ -218,13 +221,6 @@ async def main():
         tts = DeepgramTTSService(api_key=os.getenv("DEEPGRAM_API_KEY"), voice="aura-helios-en")
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
 
-        # Register node function handlers with LLM
-        llm.register_function("select_pizza_size", select_pizza_size_handler)
-        llm.register_function("select_roll_count", select_roll_count_handler)
-
-        # Get initial tools from the first node
-        initial_tools = flow_config["nodes"]["start"]["functions"]
-
         # Create initial context
         messages = [
             {
@@ -233,32 +229,33 @@ async def main():
             }
         ]
 
-        context = OpenAILLMContext(messages, initial_tools)
+        context = OpenAILLMContext(messages, flow_config["nodes"]["start"]["functions"])
         context_aggregator = llm.create_context_aggregator(context)
 
+        # Create pipeline
         pipeline = Pipeline(
             [
-                transport.input(),  # Transport user input
-                stt,  # STT
-                context_aggregator.user(),  # User responses
-                llm,  # LLM
-                tts,  # TTS
-                transport.output(),  # Transport bot output
-                context_aggregator.assistant(),  # Assistant spoken responses
+                transport.input(),
+                stt,
+                context_aggregator.user(),
+                llm,
+                tts,
+                transport.output(),
+                context_aggregator.assistant(),
             ]
         )
 
         task = PipelineTask(pipeline, PipelineParams(allow_interruptions=True))
 
-        # Initialize flow manager with LLM
-        flow_manager = FlowManager(flow_config, task, llm, tts)
+        # Initialize flow manager in static mode
+        flow_manager = FlowManager(task, llm, tts, flow_config=flow_config)
 
         @transport.event_handler("on_first_participant_joined")
         async def on_first_participant_joined(transport, participant):
             await transport.capture_participant_transcription(participant["id"])
-            # Initialize the flow processor
+            logger.debug("Initializing flow")
             await flow_manager.initialize(messages)
-            # Kick off the conversation using the context aggregator
+            logger.debug("Starting conversation")
             await task.queue_frames([context_aggregator.user().get_context_frame()])
 
         runner = PipelineRunner()

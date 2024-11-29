@@ -134,7 +134,7 @@ class TestLLMAdapters(unittest.TestCase):
 
         # Test function name extraction from function declarations
         self.assertEqual(
-            adapter.get_function_name(self.gemini_function["function_declarations"][0]),
+            adapter.get_function_name(self.gemini_function),  # Pass the full function object
             "test_function",
         )
 
@@ -235,3 +235,111 @@ class TestLLMAdapters(unittest.TestCase):
         for adapter in adapters:
             formatted = adapter.format_functions([minimal_function])
             self.assertTrue(len(formatted) > 0)
+
+    def test_abstract_methods_implementation(self):
+        """Test that abstract methods raise NotImplementedError."""
+
+        class TestAdapter(LLMAdapter):
+            pass  # No implementations
+
+        with self.assertRaises(TypeError):
+            TestAdapter()
+
+        # Test partial implementation
+        class PartialAdapter(LLMAdapter):
+            def get_function_name(self, function_def):
+                return ""
+
+            # Missing other methods
+
+        with self.assertRaises(TypeError):
+            PartialAdapter()
+
+    def test_anthropic_format_functions_passthrough(self):
+        """Test Anthropic adapter passing through already formatted functions."""
+        adapter = AnthropicAdapter()
+
+        # Test with already formatted Anthropic function
+        anthropic_formatted = {"name": "test", "description": "test", "input_schema": {}}
+
+        result = adapter.format_functions([anthropic_formatted])
+        self.assertEqual(result[0], anthropic_formatted)
+
+    def test_gemini_adapter_empty_declarations(self):
+        """Test Gemini adapter with empty or invalid declarations."""
+        adapter = GeminiAdapter()
+
+        # Test empty function declarations
+        empty_decl = {"function_declarations": []}
+        self.assertEqual(adapter.get_function_name(empty_decl), "")
+
+        # Test invalid function declarations
+        invalid_decl = {"function_declarations": None}
+        self.assertEqual(adapter.get_function_name(invalid_decl), "")
+
+        # Test missing function declarations
+        missing_decl = {}
+        self.assertEqual(adapter.get_function_name(missing_decl), "")
+
+    def test_gemini_format_functions_full_schema(self):
+        """Test Gemini adapter formatting with full schema."""
+        adapter = GeminiAdapter()
+
+        # Test with complete function declarations
+        functions = [
+            {
+                "function_declarations": [
+                    {
+                        "name": "test1",
+                        "description": "Test function 1",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {"param1": {"type": "string"}},
+                        },
+                    },
+                    {
+                        "name": "test2",
+                        "description": "Test function 2",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {"param2": {"type": "number"}},
+                        },
+                    },
+                ]
+            }
+        ]
+
+        formatted = adapter.format_functions(functions)
+
+        # Verify all declarations were formatted
+        declarations = formatted[0]["function_declarations"]
+        self.assertEqual(len(declarations), 2)
+
+        # Verify first declaration
+        self.assertEqual(declarations[0]["name"], "test1")
+        self.assertEqual(declarations[0]["description"], "Test function 1")
+        self.assertIn("parameters", declarations[0])
+
+        # Verify second declaration
+        self.assertEqual(declarations[1]["name"], "test2")
+        self.assertEqual(declarations[1]["description"], "Test function 2")
+        self.assertIn("parameters", declarations[1])
+
+        # Test with minimal declarations (missing optional fields)
+        minimal_functions = [
+            {
+                "function_declarations": [
+                    {
+                        "name": "test",
+                        # Missing description and parameters
+                    }
+                ]
+            }
+        ]
+
+        minimal_formatted = adapter.format_functions(minimal_functions)
+        minimal_decl = minimal_formatted[0]["function_declarations"][0]
+
+        # Verify defaults for missing fields
+        self.assertEqual(minimal_decl["description"], "")
+        self.assertEqual(minimal_decl["parameters"], {"type": "object", "properties": {}})

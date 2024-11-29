@@ -5,24 +5,26 @@
 #
 
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import Any, Dict, List
 
+from loguru import logger
 from pipecat.services.anthropic import AnthropicLLMService
 from pipecat.services.google import GoogleLLMService
 from pipecat.services.openai import OpenAILLMService
 
 
-class LLMProvider(Enum):
-    """Supported LLM providers."""
-
-    ANTHROPIC = "anthropic"
-    GEMINI = "gemini"
-    OPENAI = "openai"
-
-
 class LLMAdapter(ABC):
-    """Base adapter for LLM-specific format handling."""
+    """Base adapter for LLM-specific format handling.
+
+    Adapters normalize differences between LLM providers:
+    - OpenAI: Uses function calling format
+    - Anthropic: Uses native function format
+    - Google: Uses function declarations format
+
+    This allows the flow system to work consistently across
+    different LLM providers while handling format differences
+    internally.
+    """
 
     @abstractmethod
     def get_function_name(self, function_def: Dict[str, Any]) -> str:
@@ -98,8 +100,12 @@ class GeminiAdapter(LLMAdapter):
 
     def get_function_name(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from provider-specific function definition."""
-        if "name" in function_def:
-            return function_def["name"]
+        logger.debug(f"Getting function name from: {function_def}")
+        if "function_declarations" in function_def:
+            declarations = function_def["function_declarations"]
+            if declarations and isinstance(declarations, list):
+                # Return name of current function being processed
+                return declarations[0]["name"]
         return ""
 
     def get_function_args(self, function_call: Dict[str, Any]) -> dict:
@@ -115,21 +121,20 @@ class GeminiAdapter(LLMAdapter):
         all_declarations = []
         for func in functions:
             if "function_declarations" in func:
-                all_declarations.extend(func["function_declarations"])
+                # Process each declaration separately
+                for decl in func["function_declarations"]:
+                    formatted_decl = {
+                        "name": decl["name"],
+                        "description": decl.get("description", ""),
+                        "parameters": decl.get("parameters", {"type": "object", "properties": {}}),
+                    }
+                    all_declarations.append(formatted_decl)
             elif "function" in func:
                 all_declarations.append(
                     {
                         "name": func["function"]["name"],
                         "description": func["function"].get("description", ""),
                         "parameters": func["function"].get("parameters", {}),
-                    }
-                )
-            else:
-                all_declarations.append(
-                    {
-                        "name": func["name"],
-                        "description": func.get("description", ""),
-                        "parameters": func.get("parameters", {}),
                     }
                 )
         return [{"function_declarations": all_declarations}] if all_declarations else []

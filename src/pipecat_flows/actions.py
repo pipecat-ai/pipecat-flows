@@ -18,7 +18,20 @@ from .exceptions import ActionError
 
 
 class ActionManager:
-    """Manages the registration and execution of flow actions."""
+    """Manages the registration and execution of flow actions.
+
+    Actions are executed during state transitions and can include:
+    - Text-to-speech output
+    - Database updates
+    - External API calls
+    - Custom user-defined actions
+
+    Built-in actions:
+    - tts_say: Speak text using TTS
+    - end_conversation: End the current conversation
+
+    Custom actions can be registered using register_action().
+    """
 
     def __init__(self, task: PipelineTask, tts=None):
         """Initialize the action manager.
