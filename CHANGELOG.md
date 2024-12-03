@@ -5,6 +5,20 @@ All notable changes to **Pipecat Flows** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Extended the FlowManager to support both static and dynamic conversation
+  flows
+- Added new dynamic flow examples for OpenAI, Anthropic, and Gemini
+- New type system with FlowArgs and FlowResult for better type safety
+
+### Changed
+
+- Simplified function handler registration process
+- Updated all examples to use the new unified FlowManager
+
 ## [0.0.5] - 2024-11-27
 
 ### Added

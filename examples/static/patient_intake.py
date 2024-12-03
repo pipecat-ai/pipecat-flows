@@ -7,6 +7,7 @@
 import asyncio
 import os
 import sys
+from pathlib import Path
 
 import aiohttp
 from dotenv import load_dotenv
@@ -19,9 +20,11 @@ from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.services.deepgram import DeepgramSTTService, DeepgramTTSService
 from pipecat.services.openai import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
+
+sys.path.append(str(Path(__file__).parent.parent))
 from runner import configure
 
-from pipecat_flows import FlowManager
+from pipecat_flows import FlowArgs, FlowConfig, FlowManager, FlowResult
 
 load_dotenv(override=True)
 
@@ -81,7 +84,44 @@ logger.add(sys.stderr, level="DEBUG")
 #    - Pre-action: Thank you message
 #    - Post-action: Ends conversation
 
-flow_config = {
+
+async def verify_birthday(args: FlowArgs) -> FlowResult:
+    """Handler for birthday verification."""
+    birthday = args["birthday"]
+    # In a real app, this would verify against patient records
+    is_valid = birthday == "1983-01-01"
+    return {"status": "success", "verified": is_valid}
+
+
+async def record_prescriptions(args: FlowArgs) -> FlowResult:
+    """Handler for recording prescriptions."""
+    prescriptions = args["prescriptions"]
+    # In a real app, this would store in patient records
+    return {"status": "success", "count": len(prescriptions)}
+
+
+async def record_allergies(args: FlowArgs) -> FlowResult:
+    """Handler for recording allergies."""
+    allergies = args["allergies"]
+    # In a real app, this would store in patient records
+    return {"status": "success", "count": len(allergies)}
+
+
+async def record_conditions(args: FlowArgs) -> FlowResult:
+    """Handler for recording medical conditions."""
+    conditions = args["conditions"]
+    # In a real app, this would store in patient records
+    return {"status": "success", "count": len(conditions)}
+
+
+async def record_visit_reasons(args: FlowArgs) -> FlowResult:
+    """Handler for recording visit reasons."""
+    visit_reasons = args["visit_reasons"]
+    # In a real app, this would store in patient records
+    return {"status": "success", "count": len(visit_reasons)}
+
+
+flow_config: FlowConfig = {
     "initial_node": "start",
     "nodes": {
         "start": {
@@ -96,6 +136,7 @@ flow_config = {
                     "type": "function",
                     "function": {
                         "name": "verify_birthday",
+                        "handler": verify_birthday,
                         "description": "Verify the user has provided their correct birthday",
                         "parameters": {
                             "type": "object",
@@ -118,9 +159,6 @@ flow_config = {
                     },
                 },
             ],
-            "pre_actions": [
-                {"type": "tts_say", "text": "Hello, I'm Jessica from Tri-County Health Services."}
-            ],
         },
         "get_prescriptions": {
             "messages": [
@@ -134,6 +172,7 @@ flow_config = {
                     "type": "function",
                     "function": {
                         "name": "record_prescriptions",
+                        "handler": record_prescriptions,
                         "description": "Record the user's prescriptions",
                         "parameters": {
                             "type": "object",
@@ -182,6 +221,7 @@ flow_config = {
                     "type": "function",
                     "function": {
                         "name": "record_allergies",
+                        "handler": record_allergies,
                         "description": "Record the user's allergies",
                         "parameters": {
                             "type": "object",
@@ -226,6 +266,7 @@ flow_config = {
                     "type": "function",
                     "function": {
                         "name": "record_conditions",
+                        "handler": record_conditions,
                         "description": "Record the user's medical conditions",
                         "parameters": {
                             "type": "object",
@@ -270,6 +311,7 @@ flow_config = {
                     "type": "function",
                     "function": {
                         "name": "record_visit_reasons",
+                        "handler": record_visit_reasons,
                         "description": "Record the reasons for their visit",
                         "parameters": {
                             "type": "object",
@@ -372,51 +414,6 @@ flow_config = {
 }
 
 
-# Node function handlers
-async def verify_birthday_handler(function_name, tool_call_id, args, llm, context, result_callback):
-    """Handler for birthday verification."""
-    birthday = args["birthday"]
-    # In a real app, this would verify against patient records
-    is_valid = birthday == "1983-01-01"
-    await result_callback({"verified": is_valid})
-
-
-async def record_prescriptions_handler(
-    function_name, tool_call_id, args, llm, context, result_callback
-):
-    """Handler for recording prescriptions."""
-    prescriptions = args["prescriptions"]
-    # In a real app, this would store in patient records
-    await result_callback({"status": "recorded", "count": len(prescriptions)})
-
-
-async def record_allergies_handler(
-    function_name, tool_call_id, args, llm, context, result_callback
-):
-    """Handler for recording allergies."""
-    allergies = args["allergies"]
-    # In a real app, this would store in patient records
-    await result_callback({"status": "recorded", "count": len(allergies)})
-
-
-async def record_conditions_handler(
-    function_name, tool_call_id, args, llm, context, result_callback
-):
-    """Handler for recording medical conditions."""
-    conditions = args["conditions"]
-    # In a real app, this would store in patient records
-    await result_callback({"status": "recorded", "count": len(conditions)})
-
-
-async def record_visit_reasons_handler(
-    function_name, tool_call_id, args, llm, context, result_callback
-):
-    """Handler for recording visit reasons."""
-    visit_reasons = args["visit_reasons"]
-    # In a real app, this would store in patient records
-    await result_callback({"status": "recorded", "count": len(visit_reasons)})
-
-
 async def main():
     """Main function to set up and run the patient intake bot."""
     async with aiohttp.ClientSession() as session:
@@ -437,13 +434,6 @@ async def main():
         stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
         tts = DeepgramTTSService(api_key=os.getenv("DEEPGRAM_API_KEY"), voice="aura-asteria-en")
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
-
-        # Register node function handlers with LLM
-        llm.register_function("verify_birthday", verify_birthday_handler)
-        llm.register_function("record_prescriptions", record_prescriptions_handler)
-        llm.register_function("record_allergies", record_allergies_handler)
-        llm.register_function("record_conditions", record_conditions_handler)
-        llm.register_function("record_visit_reasons", record_visit_reasons_handler)
 
         # Get initial tools from the first node
         initial_tools = flow_config["nodes"]["start"]["functions"]
@@ -474,7 +464,7 @@ async def main():
         task = PipelineTask(pipeline, PipelineParams(allow_interruptions=True))
 
         # Initialize flow manager with LLM
-        flow_manager = FlowManager(flow_config, task, llm, tts)
+        flow_manager = FlowManager(task, llm, tts, flow_config)
 
         @transport.event_handler("on_first_participant_joined")
         async def on_first_participant_joined(transport, participant):

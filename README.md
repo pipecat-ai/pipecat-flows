@@ -4,20 +4,19 @@
 
 [![PyPI](https://img.shields.io/pypi/v/pipecat-ai-flows)](https://pypi.org/project/pipecat-ai-flows) [![Discord](https://img.shields.io/discord/1239284677165056021)](https://discord.gg/pipecat)
 
-Pipecat's conversation flow system allows you to create structured, multi-turn conversations by defining your flow in JSON and processing it through the `FlowManager`. The system treats conversations as a series of connected nodes, where each node represents a distinct state with specific behaviors and options.
+Pipecat Flows provides a framework for building structured conversations in your AI applications. It enables you to create both predefined conversation paths and dynamically generated flows while handling the complexities of state management and LLM interactions.
 
-Pipecat Flows is comprised of:
+The framework consists of:
 
-- A [python module](#pipecat-flows-package) for building conversation flows with Pipecat
-- A [visual editor](#pipecat-flows-editor) for visualizing conversations and exporting into flow_configs
+- A Python module for building conversation flows with Pipecat
+- A visual editor for designing and exporting flow configurations
 
-To learn more about building with Pipecat Flows, [check out the guide](https://docs.pipecat.ai/guides/pipecat-flows).
+### When to Use Pipecat Flows
 
-## Pipecat Flows Package
+- **Static Flows**: When your conversation structure is known upfront and follows predefined paths. Perfect for customer service scripts, intake forms, or guided experiences.
+- **Dynamic Flows**: When conversation paths need to be determined at runtime based on user input, external data, or business logic. Ideal for personalized experiences or complex decision trees.
 
-A Python package for managing conversation flows in Pipecat applications.
-
-### Installation
+## Installation
 
 If you're already using Pipecat:
 
@@ -31,67 +30,203 @@ If you're starting fresh:
 # Basic installation
 pip install pipecat-ai-flows
 
-# Install Pipecat with required options
-# For example, to use Daily, OpenAI, and Deepgram:
-pip install "pipecat-ai[daily, openai,deepgram]"
+# Install Pipecat with specific LLM provider options:
+pip install "pipecat-ai[daily,openai,deepgram]"     # For OpenAI
+pip install "pipecat-ai[daily,anthropic,deepgram]"  # For Anthropic
+pip install "pipecat-ai[daily,google,deepgram]"     # For Google
 ```
 
-Learn more about the available options with [Pipecat](https://github.com/pipecat-ai/pipecat).
+## Quick Start
 
-### Basic Usage
+Here's a basic example of setting up a conversation flow:
 
 ```python
-from pipecat_flows import FlowManager  # When developing with the repository
-# or
-from pipecat.flows import FlowManager  # When installed via pip
+from pipecat_flows import FlowManager
 
-# Initialize context and tools
-initial_tools = flow_config["nodes"]["start"]["functions"]  # Available functions for starting state
-context = OpenAILLMContext(messages, initial_tools)        # Create LLM context with initial state
-context_aggregator = llm.create_context_aggregator(context)
+# Initialize flow manager with static configuration
+flow_manager = FlowManager(task, llm, tts, flow_config=flow_config)
 
-# Create your pipeline: No new processors are required
-pipeline = Pipeline(
-    [
-        transport.input(),               # Transport user input
-        stt,                             # STT
-        context_aggregator.user(),  # User responses
-        llm,                             # LLM
-        tts,                             # TTS
-        transport.output(),              # Transport bot output
-        context_aggregator.assistant(),  # Assistant spoken responses
-    ]
+# Or with dynamic flow handling
+flow_manager = FlowManager(
+    task,
+    llm,
+    tts,
+    transition_callback=handle_transitions
 )
 
-# Create the Pipecat task
-task = PipelineTask(pipeline, PipelineParams(allow_interruptions=True))
-
-# Initialize flow management
-flow_manager = FlowManager(flow_config, task, llm, tts)  # Create flow manager
-
-# Initialize with starting messages
 @transport.event_handler("on_first_participant_joined")
 async def on_first_participant_joined(transport, participant):
     await transport.capture_participant_transcription(participant["id"])
-    # Initialize the flow processor
     await flow_manager.initialize(messages)
-    # Kick off the conversation using the context aggregator
     await task.queue_frames([context_aggregator.user().get_context_frame()])
 ```
 
-### Running Examples
+For more detailed examples and guides, visit our [documentation](https://docs.pipecat.ai/guides/pipecat-flows).
 
-The repository includes several complete example implementations in the `examples/` directory:
+## Core Concepts
+
+### Flow Configuration
+
+Each conversation flow consists of nodes that define the conversation structure. A node includes:
+
+#### Messages
+
+Messages set the context for the LLM at each state:
+
+```python
+"messages": [
+    {
+        "role": "system",
+        "content": "You are handling pizza orders. Ask for size selection."
+    }
+]
+```
+
+#### Functions
+
+Functions come in two types:
+
+1. **Node Functions**: Execute operations within the current state
+
+```python
+{
+    "type": "function",
+    "function": {
+        "name": "select_size",
+        "handler": select_size_handler,  # Required for node functions
+        "description": "Select pizza size",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "size": {"type": "string", "enum": ["small", "medium", "large"]}
+            }
+        }
+    }
+}
+```
+
+2. **Edge Functions**: Create transitions between states
+
+```python
+{
+    "type": "function",
+    "function": {
+        "name": "next_node",  # Must match a node name
+        "description": "Move to next state",
+        "parameters": {"type": "object", "properties": {}}
+    }
+}
+```
+
+#### Actions
+
+Actions execute during state transitions:
+
+```python
+"pre_actions": [
+    {
+        "type": "tts_say",
+        "text": "Processing your order..."
+    }
+]
+```
+
+#### Provider-Specific Formats
+
+Pipecat Flows automatically handles format differences between LLM providers:
+
+**OpenAI Format**
+
+```python
+"functions": [{
+    "type": "function",
+    "function": {
+        "name": "function_name",
+        "description": "description",
+        "parameters": {...}
+    }
+}]
+```
+
+**Anthropic Format**
+
+```python
+"functions": [{
+    "name": "function_name",
+    "description": "description",
+    "input_schema": {...}
+}]
+```
+
+**Google (Gemini) Format**
+
+```python
+"functions": [{
+    "function_declarations": [{
+        "name": "function_name",
+        "description": "description",
+        "parameters": {...}
+    }]
+}]
+```
+
+### Flow Management
+
+The FlowManager handles both static and dynamic flows through a unified interface:
+
+#### Static Flows
+
+```python
+# Define flow configuration upfront
+flow_config = {
+    "initial_node": "greeting",
+    "nodes": {
+        "greeting": {
+            "messages": [...],
+            "functions": [...]
+        }
+    }
+}
+
+# Initialize with static configuration
+flow_manager = FlowManager(task, llm, tts, flow_config=flow_config)
+```
+
+#### Dynamic Flows
+
+```python
+# Define transition handling
+async def handle_transitions(function_name: str, args: Dict, flow_manager):
+    if function_name == "collect_age":
+        await flow_manager.set_node("next_step", create_next_node())
+
+# Initialize with transition callback
+flow_manager = FlowManager(task, llm, tts, transition_callback=handle_transitions)
+```
+
+## Examples
+
+The repository includes several complete example implementations in the `examples/` directory.
+
+### Static
+
+In the `examples/static` directory, you'll find these examples:
 
 - `food_ordering.py` - A restaurant order flow demonstrating node and edge functions
-- `movie_booking.py` - A movie ticket booking system with date-based branching
-- `movie_explorer.py` - Movie information bot demonstrating real API integration with TMDB
-- `movie_explorer_anthropic.py` - The `movie_explorer.py` example but using an Anthropic LLM
-- `movie_explorer_gemini.py` - The `movie_explorer.py` example but using a Google Gemini LLM
+- `movie_explorer_openai.py` - Movie information bot demonstrating real API integration with TMDB
+- `movie_explorer_anthropic.py` - The same movie information demo adapted for Anthropic's format
+- `movie_explorer_gemini.py` - The same movie explorer demo adapted for Google Gemini's format
 - `patient_intake.py` - A medical intake system showing complex state management
 - `restaurant_reservation.py` - A reservation system with availability checking
 - `travel_planner.py` - A vacation planning assistant with parallel paths
-- `travel_planner_gemini.py` - The `travel_planner.py` example but using a Google Gemini LLM
+
+### Dynamic
+
+In the `examples/dynamic` directory, you'll find these examples:
+
+- `insurance_openai.py` - An insurance quote system using OpenAI's format
+- `insurance_anthropic.py` - The same insurance system adapted for Anthropic's format
+- `insurance_gemini.py` - The insurance system implemented with Google's format
 
 Each LLM provider (OpenAI, Anthropic, Google) has slightly different function calling formats, but Pipecat Flows handles these differences internally while maintaining a consistent API for developers.
 
@@ -140,22 +275,24 @@ To run these examples:
    - DEEPGRAM_API_KEY
    - OPENAI_API_KEY
    - ANTHROPIC_API_KEY
+   - GOOGLE_API_KEY
    - DAILY_API_KEY
 
    Looking for a Daily API key and room URL? Sign up on the [Daily Dashboard](https://dashboard.daily.co).
 
 4. **Running**:
    ```bash
-   python examples/food_ordering.py -u YOUR_DAILY_ROOM_URL
+   python examples/static/food_ordering.py -u YOUR_DAILY_ROOM_URL
    ```
 
-### Running Tests
+## Tests
 
 The package includes a comprehensive test suite covering the core functionality.
 
-#### Setup Test Environment
+### Setup Test Environment
 
 1. **Create Virtual Environment**:
+
    ```bash
    python3 -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -168,24 +305,28 @@ The package includes a comprehensive test suite covering the core functionality.
    pip install -e .
    ```
 
-#### Running Tests
+### Running Tests
 
 Run all tests:
+
 ```bash
 pytest tests/
 ```
 
 Run specific test file:
+
 ```bash
 pytest tests/test_state.py
 ```
 
 Run specific test:
+
 ```bash
 pytest tests/test_state.py -k test_initialization
 ```
 
 Run with coverage report:
+
 ```bash
 pytest tests/ --cov=pipecat_flows
 ```

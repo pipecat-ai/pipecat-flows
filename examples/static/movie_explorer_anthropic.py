@@ -19,12 +19,13 @@
 # Requirements:
 # - TMDB API key (https://www.themoviedb.org/documentation/api)
 # - Daily room URL
-# - Google API key (also, pip install pipecat-ai[google])
+# - Anthropic API key (also, pip install pipecat-ai[anthropic])
 # - Deepgram API key
 
 import asyncio
 import os
 import sys
+from pathlib import Path
 from typing import List, TypedDict
 
 import aiohttp
@@ -35,12 +36,14 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.services.anthropic import AnthropicLLMService
 from pipecat.services.deepgram import DeepgramSTTService, DeepgramTTSService
-from pipecat.services.google import GoogleLLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
+
+sys.path.append(str(Path(__file__).parent.parent))
 from runner import configure
 
-from pipecat_flows import FlowManager
+from pipecat_flows import FlowArgs, FlowConfig, FlowManager, FlowResult
 
 load_dotenv(override=True)
 
@@ -192,22 +195,22 @@ tmdb_api = TMDBApi(TMDB_API_KEY)
 
 # Function handlers for the LLM
 # These are node functions that perform operations without changing conversation state
-async def get_movies_handler(function_name, tool_call_id, args, llm, context, result_callback):
+# Function handlers for the LLM
+# These are node functions that perform operations without changing conversation state
+async def get_movies() -> FlowResult:
     """Handler for fetching current movies."""
     logger.debug("Calling TMDB API: get_movies")
     async with aiohttp.ClientSession() as session:
         try:
             movies = await tmdb_api.fetch_current_movies(session)
             logger.debug(f"TMDB API Response: {movies}")
-            await result_callback({"movies": movies})
+            return {"movies": movies}
         except Exception as e:
             logger.error(f"TMDB API Error: {e}")
-            await result_callback({"error": "Failed to fetch movies"})
+            return {"error": "Failed to fetch movies"}
 
 
-async def get_movie_details_handler(
-    function_name, tool_call_id, args, llm, context, result_callback
-):
+async def get_movie_details(args: FlowArgs) -> FlowResult:
     """Handler for fetching movie details including cast."""
     movie_id = args["movie_id"]
     logger.debug(f"Calling TMDB API: get_movie_details for ID {movie_id}")
@@ -215,15 +218,13 @@ async def get_movie_details_handler(
         try:
             details = await tmdb_api.fetch_movie_details(session, movie_id)
             logger.debug(f"TMDB API Response: {details}")
-            await result_callback(details)
+            return details
         except Exception as e:
             logger.error(f"TMDB API Error: {e}")
-            await result_callback({"error": f"Failed to fetch details for movie {movie_id}"})
+            return {"error": f"Failed to fetch details for movie {movie_id}"}
 
 
-async def get_similar_movies_handler(
-    function_name, tool_call_id, args, llm, context, result_callback
-):
+async def get_similar_movies(args: FlowArgs) -> FlowResult:
     """Handler for fetching similar movies."""
     movie_id = args["movie_id"]
     logger.debug(f"Calling TMDB API: get_similar_movies for ID {movie_id}")
@@ -231,30 +232,40 @@ async def get_similar_movies_handler(
         try:
             similar = await tmdb_api.fetch_similar_movies(session, movie_id)
             logger.debug(f"TMDB API Response: {similar}")
-            await result_callback({"movies": similar})
+            return {"movies": similar}
         except Exception as e:
             logger.error(f"TMDB API Error: {e}")
-            await result_callback({"error": f"Failed to fetch similar movies for {movie_id}"})
+            return {"error": f"Failed to fetch similar movies for {movie_id}"}
 
 
 # Flow configuration
-flow_config = {
+flow_config: FlowConfig = {
     "initial_node": "greeting",
     "nodes": {
         "greeting": {
             "messages": [
                 {
-                    "role": "system",
-                    "content": "You are a helpful movie expert. Start by greeting the user and asking if they'd like to know what movies are currently playing in theaters. Use get_movies to fetch the current movies when they're interested.  Then move to explore_movie to help them learn more about a specific movie.",
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "You are a helpful movie expert. Start by greeting the user and asking if they'd like to know what movies are currently playing in theaters. Use get_movies to fetch the current movies when they're interested.",
+                        }
+                    ],
                 }
             ],
             "functions": [
                 {
-                    "function_declarations": [
-                        {"name": "get_movies", "description": "Fetch currently playing movies"},
-                        {"name": "explore_movie", "description": "Move to movie exploration"},
-                    ]
-                }
+                    "name": "get_movies",
+                    "handler": get_movies,
+                    "description": "Fetch currently playing movies",
+                    "input_schema": {"type": "object", "properties": {}},
+                },
+                {
+                    "name": "explore_movie",
+                    "description": "Move to movie exploration",
+                    "input_schema": {"type": "object", "properties": {}},
+                },
             ],
             "pre_actions": [
                 {
@@ -266,43 +277,61 @@ flow_config = {
         "explore_movie": {
             "messages": [
                 {
-                    "role": "system",
-                    "content": "Help the user learn more about movies. Use get_movie_details when they express interest in a specific movie - this will show details including cast, runtime, and rating. After showing details, you can use get_similar_movies if they want recommendations. Ask if they'd like to explore another movie (use explore_movie) or end the conversation (use end) if they're finished.",
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Help the user learn more about movies. Use get_movie_details when they express interest in a specific movie - this will show details including cast, runtime, and rating. After showing details, you can use get_similar_movies if they want recommendations. Ask if they'd like to explore another movie (use explore_movie) or end the conversation.",
+                        }
+                    ],
                 }
             ],
             "functions": [
                 {
-                    "function_declarations": [
-                        {
-                            "name": "get_movie_details",
-                            "description": "Get details about a specific movie including cast",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "movie_id": {"type": "integer", "description": "TMDB movie ID"}
-                                },
-                                "required": ["movie_id"],
-                            },
+                    "name": "get_movie_details",
+                    "handler": get_movie_details,
+                    "description": "Get details about a specific movie including cast",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "movie_id": {"type": "integer", "description": "TMDB movie ID"}
                         },
-                        {
-                            "name": "get_similar_movies",
-                            "description": "Get similar movies as recommendations",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "movie_id": {"type": "integer", "description": "TMDB movie ID"}
-                                },
-                                "required": ["movie_id"],
-                            },
+                        "required": ["movie_id"],
+                    },
+                },
+                {
+                    "name": "get_similar_movies",
+                    "handler": get_similar_movies,
+                    "description": "Get similar movies as recommendations",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "movie_id": {"type": "integer", "description": "TMDB movie ID"}
                         },
-                        {"name": "explore_movie", "description": "Return to current movies list"},
-                        {"name": "end", "description": "End the conversation"},
-                    ]
-                }
+                        "required": ["movie_id"],
+                    },
+                },
+                {
+                    "name": "explore_movie",
+                    "description": "Return to current movies list",
+                    "input_schema": {"type": "object", "properties": {}},
+                },
+                {
+                    "name": "end",
+                    "description": "End the conversation",
+                    "input_schema": {"type": "object", "properties": {}},
+                },
             ],
         },
         "end": {
-            "messages": [{"role": "system", "content": "Thank the user and end the conversation."}],
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Thank the user and end the conversation."}
+                    ],
+                }
+            ],
             "functions": [],
             "pre_actions": [
                 {"type": "tts_say", "text": "Thanks for exploring movies with me! Goodbye!"}
@@ -332,29 +361,23 @@ async def main():
 
         stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
         tts = DeepgramTTSService(api_key=os.getenv("DEEPGRAM_API_KEY"), voice="aura-helios-en")
-        llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"), model="gemini-1.5-flash-latest")
+        llm = AnthropicLLMService(
+            api_key=os.getenv("ANTHROPIC_API_KEY"), model="claude-3-5-sonnet-latest"
+        )
 
-        # Register node function handlers first
-        llm.register_function("get_movies", get_movies_handler)
-        llm.register_function("get_movie_details", get_movie_details_handler)
-        llm.register_function("get_similar_movies", get_similar_movies_handler)
-
-        # Get initial tools
-        initial_tools = [
-            {
-                "function_declarations": [
-                    # Extract each function from the first node's functions array
-                    func["function_declarations"][0]
-                    for func in flow_config["nodes"]["greeting"]["functions"]
-                ]
-            }
-        ]
+        # Get initial tools from the first node
+        initial_tools = flow_config["nodes"]["greeting"]["functions"]
 
         # Create initial context
         messages = [
             {
                 "role": "system",
-                "content": "You are a friendly movie expert. Your responses will be converted to audio, so avoid special characters. Always use the available functions to progress the conversation naturally.",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "You are a friendly movie expert. Your responses will be converted to audio, so avoid special characters. Always use the available functions to progress the conversation naturally.",
+                    }
+                ],
             }
         ]
 
@@ -376,7 +399,7 @@ async def main():
         task = PipelineTask(pipeline, PipelineParams(allow_interruptions=True))
 
         # Initialize flow manager
-        flow_manager = FlowManager(flow_config, task, llm, tts)
+        flow_manager = FlowManager(task, llm, tts, flow_config)
 
         @transport.event_handler("on_first_participant_joined")
         async def on_first_participant_joined(transport, participant):

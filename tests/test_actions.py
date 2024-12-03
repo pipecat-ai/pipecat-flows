@@ -177,3 +177,20 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
 
         # Verify action was still marked as executed (doesn't raise)
         self.mock_tts.say.assert_called_once()
+
+    async def test_action_execution_error_handling(self):
+        """Test error handling during action execution"""
+        action_manager = ActionManager(self.mock_task, self.mock_tts)
+
+        # Test action with missing handler
+        with self.assertRaises(ActionError):
+            await action_manager.execute_actions([{"type": "nonexistent_action"}])
+
+        # Test action handler that raises an exception
+        async def failing_handler(action):
+            raise Exception("Handler error")
+
+        action_manager._register_action("failing_action", failing_handler)
+
+        with self.assertRaises(ActionError):
+            await action_manager.execute_actions([{"type": "failing_action"}])

@@ -25,6 +25,7 @@
 import asyncio
 import os
 import sys
+from pathlib import Path
 from typing import List, TypedDict
 
 import aiohttp
@@ -38,9 +39,11 @@ from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.services.deepgram import DeepgramSTTService, DeepgramTTSService
 from pipecat.services.openai import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
+
+sys.path.append(str(Path(__file__).parent.parent))
 from runner import configure
 
-from pipecat_flows import FlowManager
+from pipecat_flows import FlowArgs, FlowConfig, FlowManager, FlowResult
 
 load_dotenv(override=True)
 
@@ -192,22 +195,20 @@ tmdb_api = TMDBApi(TMDB_API_KEY)
 
 # Function handlers for the LLM
 # These are node functions that perform operations without changing conversation state
-async def get_movies_handler(function_name, tool_call_id, args, llm, context, result_callback):
+async def get_movies() -> FlowResult:
     """Handler for fetching current movies."""
     logger.debug("Calling TMDB API: get_movies")
     async with aiohttp.ClientSession() as session:
         try:
             movies = await tmdb_api.fetch_current_movies(session)
             logger.debug(f"TMDB API Response: {movies}")
-            await result_callback({"movies": movies})
+            return {"movies": movies}
         except Exception as e:
             logger.error(f"TMDB API Error: {e}")
-            await result_callback({"error": "Failed to fetch movies"})
+            return {"error": "Failed to fetch movies"}
 
 
-async def get_movie_details_handler(
-    function_name, tool_call_id, args, llm, context, result_callback
-):
+async def get_movie_details(args: FlowArgs) -> FlowResult:
     """Handler for fetching movie details including cast."""
     movie_id = args["movie_id"]
     logger.debug(f"Calling TMDB API: get_movie_details for ID {movie_id}")
@@ -215,15 +216,13 @@ async def get_movie_details_handler(
         try:
             details = await tmdb_api.fetch_movie_details(session, movie_id)
             logger.debug(f"TMDB API Response: {details}")
-            await result_callback(details)
+            return details
         except Exception as e:
             logger.error(f"TMDB API Error: {e}")
-            await result_callback({"error": f"Failed to fetch details for movie {movie_id}"})
+            return {"error": f"Failed to fetch details for movie {movie_id}"}
 
 
-async def get_similar_movies_handler(
-    function_name, tool_call_id, args, llm, context, result_callback
-):
+async def get_similar_movies(args: FlowArgs) -> FlowResult:
     """Handler for fetching similar movies."""
     movie_id = args["movie_id"]
     logger.debug(f"Calling TMDB API: get_similar_movies for ID {movie_id}")
@@ -231,14 +230,14 @@ async def get_similar_movies_handler(
         try:
             similar = await tmdb_api.fetch_similar_movies(session, movie_id)
             logger.debug(f"TMDB API Response: {similar}")
-            await result_callback({"movies": similar})
+            return {"movies": similar}
         except Exception as e:
             logger.error(f"TMDB API Error: {e}")
-            await result_callback({"error": f"Failed to fetch similar movies for {movie_id}"})
+            return {"error": f"Failed to fetch similar movies for {movie_id}"}
 
 
 # Flow configuration
-flow_config = {
+flow_config: FlowConfig = {
     "initial_node": "greeting",
     "nodes": {
         "greeting": {
@@ -253,6 +252,7 @@ flow_config = {
                     "type": "function",
                     "function": {
                         "name": "get_movies",
+                        "handler": get_movies,
                         "description": "Fetch currently playing movies",
                         "parameters": {"type": "object", "properties": {}},
                     },
@@ -285,6 +285,7 @@ flow_config = {
                     "type": "function",
                     "function": {
                         "name": "get_movie_details",
+                        "handler": get_movie_details,
                         "description": "Get details about a specific movie including cast",
                         "parameters": {
                             "type": "object",
@@ -299,6 +300,7 @@ flow_config = {
                     "type": "function",
                     "function": {
                         "name": "get_similar_movies",
+                        "handler": get_similar_movies,
                         "description": "Get similar movies as recommendations",
                         "parameters": {
                             "type": "object",
@@ -360,11 +362,6 @@ async def main():
         tts = DeepgramTTSService(api_key=os.getenv("DEEPGRAM_API_KEY"), voice="aura-helios-en")
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
 
-        # Register node function handlers first
-        llm.register_function("get_movies", get_movies_handler)
-        llm.register_function("get_movie_details", get_movie_details_handler)
-        llm.register_function("get_similar_movies", get_similar_movies_handler)
-
         # Get initial tools from the first node
         initial_tools = flow_config["nodes"]["greeting"]["functions"]
 
@@ -394,7 +391,7 @@ async def main():
         task = PipelineTask(pipeline, PipelineParams(allow_interruptions=True))
 
         # Initialize flow manager
-        flow_manager = FlowManager(flow_config, task, llm, tts)
+        flow_manager = FlowManager(task, llm, tts, flow_config)
 
         @transport.event_handler("on_first_participant_joined")
         async def on_first_participant_joined(transport, participant):

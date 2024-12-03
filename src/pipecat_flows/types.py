@@ -7,6 +7,33 @@
 from typing import Any, Dict, List, Optional, TypedDict
 
 
+class FlowResult(TypedDict, total=False):
+    """Base type for function results.
+
+    Example:
+        {
+            "status": "success",
+            "data": {"processed": True},
+            "error": None  # Optional error message
+        }
+    """
+
+    status: str
+    error: str
+
+
+FlowArgs = Dict[str, Any]
+"""Type alias for function handler arguments.
+
+Example:
+    {
+        "user_name": "John",
+        "age": 25,
+        "preferences": {"color": "blue"}
+    }
+"""
+
+
 class NodeConfig(TypedDict):
     """Configuration for a single node in the flow.
 
