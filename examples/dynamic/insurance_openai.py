@@ -49,7 +49,7 @@ from pipecat_flows import FlowArgs, FlowManager, FlowResult, NodeConfig
 sys.path.append(str(Path(__file__).parent.parent))
 from runner import configure
 
-load_dotenv(override=True)
+load_dotenv(override=False)
 
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
