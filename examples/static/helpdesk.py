@@ -32,44 +32,6 @@ load_dotenv(override=False)
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
 
-# Flow Configuration - Food ordering
-#
-# This configuration defines a food ordering system with the following states:
-#
-# 1. start
-#    - Initial state where user chooses between pizza or sushi
-#    - Functions:
-#      * choose_pizza (transitions to choose_pizza)
-#      * choose_sushi (transitions to choose_sushi)
-#
-# 2. choose_pizza
-#    - Handles pizza order details
-#    - Functions:
-#      * select_pizza_order (node function with size and type)
-#      * confirm_order (transitions to confirm)
-#    - Pricing:
-#      * Small: $10
-#      * Medium: $15
-#      * Large: $20
-#
-# 3. choose_sushi
-#    - Handles sushi order details
-#    - Functions:
-#      * select_sushi_order (node function with count and type)
-#      * confirm_order (transitions to confirm)
-#    - Pricing:
-#      * $8 per roll
-#
-# 4. confirm
-#    - Reviews order details with the user
-#    - Functions:
-#      * complete_order (transitions to end)
-#
-# 5. end
-#    - Final state that closes the conversation
-#    - No functions available
-#    - Post-action: Ends conversation
-
 
 # Type definitions
 class TechnicalAnswerResult(FlowResult):
@@ -78,13 +40,6 @@ class TechnicalAnswerResult(FlowResult):
 # Function handlers
 async def look_up_answer(args: FlowArgs) -> TechnicalAnswerResult:
     """Look up the answer from Zendesk."""
-    logger.debug(f"Looking up answer: {args}")
-    size = args["size"]
-    pizza_type = args["type"]
-
-    # Simple pricing
-    base_price = {"small": 10.00, "medium": 15.00, "large": 20.00}
-    price = base_price[size]
 
     return {"answer": "To fix this problem, turn your computer off and on again."}
 
@@ -231,7 +186,7 @@ flow_config: FlowConfig = {
 }
 
 async def main():
-    """Main function to set up and run the food ordering bot."""
+    """Main function to set up and run the helpdesk bot."""
     async with aiohttp.ClientSession() as session:
         (room_url, _) = await configure(session)
 
@@ -239,7 +194,7 @@ async def main():
         transport = DailyTransport(
             room_url,
             None,
-            "Food Ordering Bot",
+            "Helpdesk Bot",
             DailyParams(
                 audio_out_enabled=True,
                 vad_enabled=True,
@@ -259,7 +214,7 @@ async def main():
         messages = [
             {
                 "role": "system",
-                "content": "You are an order-taking assistant. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
+                "content": "You are a customer support bot. You must ALWAYS use the available functions to progress the conversation. Your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
             }
         ]
 
