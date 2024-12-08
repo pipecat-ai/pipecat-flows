@@ -36,40 +36,27 @@ logger.add(sys.stderr, level="DEBUG")
 # Type definitions
 class TechnicalAnswerResult(FlowResult):
     answer: str
+    
+class PricingResult(FlowResult):
+    price: int
 
 # Function handlers
 async def look_up_answer(args: FlowArgs) -> TechnicalAnswerResult:
     """Look up the answer from Zendesk."""
+    logger.debug(f"look_up_answer: {args}")
+
 
     return {"answer": "To fix this problem, turn your computer off and on again."}
 
+async def look_up_pricing(args: FlowArgs) -> PricingResult:
+    """Look up the answer from Zendesk."""
+    logger.debug(f"look_up_pricing: {args}")
 
+    return {"price": 42}
 
 flow_config: FlowConfig = {
   "initial_node": "start",
   "nodes": {
-    "confirm": {
-      "messages": [
-        {
-          "role": "system",
-          "content": "Read back the complete question details and ask the user for confirmation. Use the available functions: - Use complete_conversation when the user confirms - Use revise_question if they want to change something. Be friendly and clear when reading back the order details."
-        }
-      ],
-      "functions": [
-        {
-          "type": "function",
-          "function": {
-            "name": "complete_conversation",
-            "description": "User confirms the question is correct",
-            "parameters": {
-              "type": "object",
-              "properties": {}
-            },
-            "transition_to": "end"
-          }
-        }
-      ]
-    },
     "choose_technical_question": {
       "messages": [
         {
@@ -82,7 +69,7 @@ flow_config: FlowConfig = {
           "type": "function",
           "function": {
             "name": "look_up_answer",
-            "handler": "look_up_answer",
+            "handler": look_up_answer,
             "description": "Look up the answer to the user's question in the Zendesk knowledge base.",
             "parameters": {
               "type": "object",
@@ -164,7 +151,7 @@ flow_config: FlowConfig = {
       "messages": [
         {
           "role": "system",
-          "content": "You are handling a pricing question. Our pricing is the following: - We charge $0.02 per minute per participant. - The first 10000 minutes per month are free. - We offer a 10% discount if you pay yearly instead of monthly. Use this information to calculate the price. For example, if the user writes: \"How much would it cost to have 1000 monthly meetings that last an hour with two people on the call each time?\" Respond with:\"That would be 120000 minutes per month. You receive 10000 minutes for free each month, meaning you only pay for 110000 minutes. Your total cost would be $2200 per month, or $23,760 per year with our 10% yearly discount.\" Only use the end function after the user confirms their question is answered. Explain your logic in detail. If you're unsure about your answer, tell the user and encourage them to check www.daily.co/pricing for up-to-date pricing information. Start by acknowledging the user's choice. Remember to be friendly and professional."
+          "content": "You are handling a pricing question. Ask the user how many minutes they expect to use per month, and use the look_up_pricing function to get the answer. Only use the end function after the user confirms that their question has been answered. Explain your logic in detail. If you're unsure about your answer, tell the user and encourage them to check www.daily.co/pricing for up-to-date pricing information. Start by acknowledging the user's choice. Remember to be friendly and professional."
         }
       ],
       "functions": [
@@ -178,6 +165,48 @@ flow_config: FlowConfig = {
               "properties": {}
             },
             "transition_to": "confirm"
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "look_up_pricing",
+            "handler": look_up_pricing,
+            "description": "Determines the pricing by using the estimated number of minutes per month a customer expects to use.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "number_of_minutes": {
+                  "type": "number",
+                  "description": "Number of minutes expected to use per month."
+                }
+              },
+              "required": [
+                "number_of_minutes"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "confirm": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Read the complete question details and ask the user for confirmation. Use the available functions: - Use complete_conversation when the user confirms. - Use revise_question if they want to change something. Be friendly and clear when reading back the order details."
+        }
+      ],
+      "functions": [
+        {
+          "type": "function",
+          "function": {
+            "name": "complete_conversation",
+            "description": "User confirms the question is correct",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "transition_to": "end"
           }
         }
       ]
