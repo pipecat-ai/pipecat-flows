@@ -17,14 +17,15 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
-from pipecat.services.deepgram import DeepgramSTTService, DeepgramTTSService
+from pipecat.services.cartesia import CartesiaTTSService
+from pipecat.services.deepgram import DeepgramSTTService
 from pipecat.services.openai import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 
+from pipecat_flows import FlowArgs, FlowConfig, FlowManager, FlowResult
+
 sys.path.append(str(Path(__file__).parent.parent))
 from runner import configure
-
-from pipecat_flows import FlowArgs, FlowConfig, FlowManager, FlowResult
 
 load_dotenv(override=False)
 
@@ -33,180 +34,201 @@ logger.add(sys.stderr, level="DEBUG")
 
 # Flow Configuration - Food ordering
 #
-# This configuration defines a simple food ordering system with the following states:
+# This configuration defines a food ordering system with the following states:
 #
 # 1. start
 #    - Initial state where user chooses between pizza or sushi
-#    - Functions: choose_pizza, choose_sushi
-#    - Transitions to: choose_pizza or choose_sushi
+#    - Functions:
+#      * choose_pizza (transitions to choose_pizza)
+#      * choose_sushi (transitions to choose_sushi)
 #
 # 2. choose_pizza
-#    - Handles pizza size selection and order confirmation
+#    - Handles pizza order details
 #    - Functions:
-#      * select_pizza_size (node function, can be called multiple times)
-#      * end (transitions to end node after order confirmation)
-#    - Pre-action: Immediate TTS acknowledgment
+#      * select_pizza_order (node function with size and type)
+#      * confirm_order (transitions to confirm)
+#    - Pricing:
+#      * Small: $10
+#      * Medium: $15
+#      * Large: $20
 #
 # 3. choose_sushi
-#    - Handles sushi roll count selection and order confirmation
+#    - Handles sushi order details
 #    - Functions:
-#      * select_roll_count (node function, can be called multiple times)
-#      * end (transitions to end node after order confirmation)
-#    - Pre-action: Immediate TTS acknowledgment
+#      * select_sushi_order (node function with count and type)
+#      * confirm_order (transitions to confirm)
+#    - Pricing:
+#      * $8 per roll
 #
-# 4. end
+# 4. confirm
+#    - Reviews order details with the user
+#    - Functions:
+#      * complete_order (transitions to end)
+#
+# 5. end
 #    - Final state that closes the conversation
 #    - No functions available
-#    - Pre-action: Farewell message
 #    - Post-action: Ends conversation
 
 
 # Type definitions
-class PizzaSizeResult(FlowResult):
-    size: str
-
-
-class RollCountResult(FlowResult):
-    count: int
-
+class TechnicalAnswerResult(FlowResult):
+    answer: str
 
 # Function handlers
-async def select_pizza_size(args: FlowArgs) -> PizzaSizeResult:
-    """Handle pizza size selection."""
+async def look_up_answer(args: FlowArgs) -> TechnicalAnswerResult:
+    """Look up the answer from Zendesk."""
+    logger.debug(f"Looking up answer: {args}")
     size = args["size"]
-    return {"size": size}
+    pizza_type = args["type"]
 
+    # Simple pricing
+    base_price = {"small": 10.00, "medium": 15.00, "large": 20.00}
+    price = base_price[size]
 
-async def select_roll_count(args: FlowArgs) -> RollCountResult:
-    """Handle sushi roll count selection."""
-    count = args["count"]
-    return {"count": count}
+    return {"answer": "To fix this problem, turn your computer off and on again."}
+
 
 
 flow_config: FlowConfig = {
-    "initial_node": "start",
-    "nodes": {
-        "start": {
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "For this step, ask the user if they want pizza or sushi, and wait for them to use a function to choose. Start off by greeting them. Be friendly and casual; you're taking an order for food over the phone.",
-                }
-            ],
-            "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "choose_pizza",
-                        "description": "User wants to order pizza",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "choose_sushi",
-                        "description": "User wants to order sushi",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-            ],
-        },
-        "choose_pizza": {
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are handling a pizza order. Use the available functions:\n - Use select_pizza_size when the user specifies a size (can be used multiple times if they change their mind or want to order multiple pizzas)\n - Use the end function ONLY when the user confirms they are done with their order\n\nAfter each size selection, confirm the selection and ask if they want to change it or complete their order. Only use the end function after the user confirms they are satisfied with their order.\n\nStart off by acknowledging the user's choice. Once they've chosen a size, ask if they'd like anything else. Remember to be friendly and casual.",
-                }
-            ],
-            "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "select_pizza_size",
-                        "handler": select_pizza_size,
-                        "description": "Record the selected pizza size",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "size": {
-                                    "type": "string",
-                                    "enum": ["small", "medium", "large"],
-                                    "description": "Size of the pizza",
-                                }
-                            },
-                            "required": ["size"],
-                        },
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "end",
-                        "description": "Complete the order (use only after user confirms)",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-            ],
-            "pre_actions": [
-                {"type": "tts_say", "text": "Ok, let me help you with your pizza order..."}
-            ],
-        },
-        "choose_sushi": {
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are handling a sushi order. Use the available functions:\n - Use select_roll_count when the user specifies how many rolls (can be used multiple times if they change their mind or if they want to order multiple sushi rolls)\n - Use the end function ONLY when the user confirms they are done with their order\n\nAfter each roll count selection, confirm the count and ask if they want to change it or complete their order. Only use the end function after the user confirms they are satisfied with their order.\n\nStart off by acknowledging the user's choice. Once they've chosen a size, ask if they'd like anything else. Remember to be friendly and casual.",
-                }
-            ],
-            "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "select_roll_count",
-                        "handler": select_roll_count,
-                        "description": "Record the number of sushi rolls",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "count": {
-                                    "type": "integer",
-                                    "minimum": 1,
-                                    "maximum": 10,
-                                    "description": "Number of rolls to order",
-                                }
-                            },
-                            "required": ["count"],
-                        },
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "end",
-                        "description": "Complete the order (use only after user confirms)",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-            ],
-            "pre_actions": [
-                {"type": "tts_say", "text": "Ok, let me help you with your sushi order..."}
-            ],
-        },
-        "end": {
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "The order is complete. Thank the user and end the conversation.",
-                }
-            ],
-            "functions": [],
-            "pre_actions": [{"type": "tts_say", "text": "Thank you for your order! Goodbye!"}],
-            "post_actions": [{"type": "end_conversation"}],
-        },
+  "initial_node": "start",
+  "nodes": {
+    "confirm": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Read back the complete question details and ask the user for confirmation. Use the available functions: - Use complete_conversation when the user confirms - Use revise_question if they want to change something. Be friendly and clear when reading back the order details."
+        }
+      ],
+      "functions": [
+        {
+          "type": "function",
+          "function": {
+            "name": "complete_conversation",
+            "description": "User confirms the question is correct",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "transition_to": "end"
+          }
+        }
+      ]
     },
+    "choose_technical_question": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are handling a technical question. Use the available function: - Use the look_up_answer function when someone asks a question. - Use the end function ONLY when the user confirms you have answered their question. - Use the transfer_to_person function if the user wants to talk to a real person or you cannot provide an answer. Only use the end function after the user confirms their question is answered. Start by acknowledging the user's choice. Remember to be friendly and professional."
+        }
+      ],
+      "functions": [
+        {
+          "type": "function",
+          "function": {
+            "name": "look_up_answer",
+            "handler": "look_up_answer",
+            "description": "Look up the answer to the user's question in the Zendesk knowledge base.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "question": {
+                  "type": "string",
+                  "description": "The user's question."
+                }
+              },
+              "required": [
+                "question"
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "confirm_conversation",
+            "description": "Proceed to end conversation",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "transition_to": "confirm"
+          }
+        }
+      ]
+    },
+    "end": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Concisely end the conversation—1-3 words is appropriate. Just say 'Bye' or something similarly short."
+        }
+      ],
+      "functions": [],
+      "post_actions": [
+        {
+          "type": "end_conversation"
+        }
+      ]
+    },
+    "start": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a customer service bot for Daily. For this step, ask them if they have a technical or a pricing question, and wait for them to use a function to choose. Start by greeting them. Be brief, friendly, and professional."
+        }
+      ],
+      "functions": [
+        {
+          "type": "function",
+          "function": {
+            "name": "choose_technical_question",
+            "description": "User has a question related to the product and needs help resolving.",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "transition_to": "choose_technical_question"
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "choose_pricing_question",
+            "description": "User has a question about pricing.",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "transition_to": "choose_pricing_question"
+          }
+        }
+      ]
+    },
+    "choose_pricing_question": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are handling a pricing question. Our pricing is the following: - We charge $0.02 per minute per participant. - The first 10000 minutes per month are free. - We offer a 10% discount if you pay yearly instead of monthly. Use this information to calculate the price. For example, if the user writes: \"How much would it cost to have 1000 monthly meetings that last an hour with two people on the call each time?\" Respond with:\"That would be 120000 minutes per month. You receive 10000 minutes for free each month, meaning you only pay for 110000 minutes. Your total cost would be $2200 per month, or $23,760 per year with our 10% yearly discount.\" Only use the end function after the user confirms their question is answered. Explain your logic in detail. If you're unsure about your answer, tell the user and encourage them to check www.daily.co/pricing for up-to-date pricing information. Start by acknowledging the user's choice. Remember to be friendly and professional."
+        }
+      ],
+      "functions": [
+        {
+          "type": "function",
+          "function": {
+            "name": "confirm_conversation",
+            "description": "Proceed to end conversation",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "transition_to": "confirm"
+          }
+        }
+      ]
+    }
+  }
 }
-
 
 async def main():
     """Main function to set up and run the food ordering bot."""
@@ -227,14 +249,17 @@ async def main():
         )
 
         stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-        tts = DeepgramTTSService(api_key=os.getenv("DEEPGRAM_API_KEY"), voice="aura-helios-en")
+        tts = CartesiaTTSService(
+            api_key=os.getenv("CARTESIA_API_KEY"),
+            voice_id="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
+        )
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
 
         # Create initial context
         messages = [
             {
                 "role": "system",
-                "content": "You are an order-taking assistant. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Avoid outputting special characters and emojis.",
+                "content": "You are an order-taking assistant. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
             }
         ]
 
@@ -257,7 +282,7 @@ async def main():
         task = PipelineTask(pipeline, PipelineParams(allow_interruptions=True))
 
         # Initialize flow manager in static mode
-        flow_manager = FlowManager(task, llm, tts, flow_config=flow_config)
+        flow_manager = FlowManager(task=task, llm=llm, tts=tts, flow_config=flow_config)
 
         @transport.event_handler("on_first_participant_joined")
         async def on_first_participant_joined(transport, participant):
