@@ -149,6 +149,7 @@ flow_config: FlowConfig = {
           "type": "function",
           "function": {
             "name": "choose_pricing_question",
+            "handler": look_up_pricing, # TODO: We shouldn't need this
             "description": "User has a question about Daily's pricing. Let's get started understanding their question.",
             "parameters": {
               "type": "object",
@@ -171,7 +172,7 @@ flow_config: FlowConfig = {
           "type": "function",
           "function": {
             "name": "look_up_pricing",
-            "handler": "__function__:look_up_pricing",
+            "handler": look_up_pricing,
             "description": "Calculate pricing based on product and volume.",
             "parameters": {
               "type": "object",
@@ -216,7 +217,7 @@ flow_config: FlowConfig = {
           "type": "function",
           "function": {
             "name": "look_up_answer",
-            "handler": "__function__:look_up_answer",
+            "handler": look_up_answer,
             "description": "Look up the answer to the user's technical question.",
             "parameters": {
               "type": "object",
