@@ -4,6 +4,24 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
+"""
+Basic Food Ordering Example (without state)
+
+This example demonstrates:
+- Basic static flow configuration
+- Simple node transitions
+- Function handlers
+- LLM interactions
+
+A simpler starting point for learning Pipecat Flows.
+
+Requirements:
+- Daily room URL
+- OpenAI API key
+- Deepgram API key
+- Cartesia API key
+"""
+
 import asyncio
 import os
 import sys

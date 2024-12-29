@@ -157,6 +157,31 @@ There are two types of actions available:
 
 Learn more about built-in actions and defining your own action in the docs.
 
+#### State Management
+
+Flows can maintain state across nodes using two approaches:
+
+1. **Static Flows with State References**
+
+```python
+"task_messages": [
+    {
+        "role": "system",
+        "content": "Current order: $state.orders"  # Access state in messages
+    }
+]
+```
+
+2. **Dynamic Flows with State Management**
+
+```python
+async def handle_order(args: Dict, flow_manager: FlowManager):
+    flow_manager.state["orders"].append(args)  # Manage state in transitions
+    await flow_manager.set_node("confirm", create_confirm_node())
+```
+
+State can be used to track conversation progress, store user data, or maintain context across nodes.
+
 #### Provider-Specific Formats
 
 Pipecat Flows automatically handles format differences between LLM providers:
@@ -295,7 +320,8 @@ The repository includes several complete example implementations in the `example
 
 In the `examples/static` directory, you'll find these examples:
 
-- `food_ordering.py` - A restaurant order flow demonstrating node and edge functions
+- `food_ordering_basic.py` - A simple restaurant order flow demonstrating node and edge functions
+- `food_ordering_state.py` - The same flow enhanced with state management for tracking orders
 - `movie_explorer_openai.py` - Movie information bot demonstrating real API integration with TMDB
 - `movie_explorer_anthropic.py` - The same movie information demo adapted for Anthropic's format
 - `movie_explorer_gemini.py` - The same movie explorer demo adapted for Google Gemini's format

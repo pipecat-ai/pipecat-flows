@@ -14,6 +14,7 @@ across different LLM providers. It supports:
 - Function registration and execution
 - Action handling
 - Cross-provider compatibility
+- State references in message content ($state.key)
 
 The flow manager coordinates all aspects of a conversation, including:
 - LLM context management
@@ -21,10 +22,12 @@ The flow manager coordinates all aspects of a conversation, including:
 - State transitions
 - Action execution
 - Error handling
+- State injection into messages
 """
 
 import copy
 import inspect
+import re
 import sys
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Set, Union
 
@@ -190,6 +193,10 @@ class FlowManager:
 
         Returns:
             Callable: Async function that handles the tool invocation
+
+        Note:
+            Handlers receive the FlowManager instance in their args dictionary
+            as 'flow_manager', allowing access to state management.
         """
 
         async def transition_func(
@@ -205,7 +212,8 @@ class FlowManager:
             Args:
                 function_name: Name of the called function
                 tool_call_id: Unique identifier for this tool call
-                args: Arguments passed to the function
+                args: Arguments passed to the function, enhanced with:
+                    - flow_manager: FlowManager instance for state access
                 llm: LLM service instance
                 context: Current conversation context
                 result_callback: Function to call with results
@@ -213,7 +221,7 @@ class FlowManager:
             try:
                 if handler:
                     # Execute handler for node functions (e.g., data processing)
-                    result = await self._call_handler(handler, args)
+                    result = await self._call_handler(handler, {**args, "flow_manager": self})
                     await result_callback(result)
                     logger.debug(f"Handler completed for {name}")
                 else:
@@ -297,6 +305,33 @@ class FlowManager:
             except Exception as e:
                 logger.error(f"Failed to register function {name}: {str(e)}")
                 raise FlowError(f"Function registration failed: {str(e)}") from e
+
+    def _process_state_references(self, content: str) -> str:
+        """Replace state placeholders with actual values.
+
+        Replaces $state.key references with values from the state dictionary.
+        Used to inject state data into message content before sending to LLM.
+
+        Args:
+            content: Message content that may contain state references (e.g., "$state.orders")
+
+        Returns:
+            Content with state placeholders replaced with actual values
+
+        Example:
+            >>> flow_manager.state = {"orders": [{"type": "pizza", "price": 20.00}]}
+            >>> _process_state_references("Order details: $state.orders")
+            "Order details: [{'type': 'pizza', 'price': 20.00}]"
+        """
+        if not isinstance(content, str):
+            return content
+
+        for match in re.finditer(r"\$state\.(\w+)", content):
+            key = match.group(1)
+            value = self.state.get(key, f"<no value for {key}>")
+            content = content.replace(f"$state.{key}", str(value))
+
+        return content
 
     def _remove_handlers(self, tool_config: Dict[str, Any]) -> None:
         """Remove handlers from tool configuration.
@@ -424,6 +459,11 @@ class FlowManager:
             FlowError: If context update fails
         """
         try:
+            # Process state references in messages
+            for message in messages:
+                if "content" in message:
+                    message["content"] = self._process_state_references(message["content"])
+
             # Determine frame type based on whether this is the first node
             frame_type = (
                 LLMMessagesUpdateFrame if self.current_node is None else LLMMessagesAppendFrame

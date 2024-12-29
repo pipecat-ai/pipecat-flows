@@ -8,12 +8,12 @@
 
 This module defines the core types used throughout the flow system:
 - FlowResult: Function return type
-- FlowArgs: Function argument type
-- NodeConfig: Node configuration type
+- FlowArgs: Function argument type (includes flow_manager for state access)
+- NodeConfig: Node configuration type (supports $state references in content)
 - FlowConfig: Complete flow configuration type
 
-These types provide structure and validation for flow configurations
-and function interactions.
+These types provide structure and validation for flow configurations,
+function interactions, and state management.
 """
 
 from typing import Any, Dict, List, TypedDict
@@ -41,7 +41,8 @@ Example:
     {
         "user_name": "John",
         "age": 25,
-        "preferences": {"color": "blue"}
+        "preferences": {"color": "blue"},
+        "flow_manager": FlowManager  # Available in all function handlers for state management
     }
 """
 
