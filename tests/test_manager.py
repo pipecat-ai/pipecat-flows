@@ -707,7 +707,9 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         async def test_handler(args):
             nonlocal test_called
             test_called = True
-            return {"status": "success", "args": args}
+            # Remove flow_manager from args before returning
+            args_without_flow_manager = {k: v for k, v in args.items() if k != "flow_manager"}
+            return {"status": "success", "args": args_without_flow_manager}
 
         import sys
 
@@ -834,3 +836,45 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             any(isinstance(f, LLMMessagesUpdateFrame) for f in second_frames),
             "Subsequent nodes should not use UpdateFrame",
         )
+
+    async def test_state_references_in_content(self):
+        """Test state references ($state.key) in message content."""
+        flow_manager = FlowManager(task=self.mock_task, llm=self.mock_llm)
+        await flow_manager.initialize()
+
+        # Set some state data
+        flow_manager.state["orders"] = [{"type": "pizza", "price": 20.00}]
+
+        # Create node with state reference
+        node_config = {
+            "task_messages": [{"role": "system", "content": "Order details: $state.orders"}],
+            "functions": [],
+        }
+
+        await flow_manager.set_node("test", node_config)
+
+        # Verify state was replaced in message
+        calls = self.mock_task.queue_frames.call_args_list[-1]
+        frames = calls[0][0]
+        messages = next(f.messages for f in frames if hasattr(f, "messages"))
+        expected_content = f"Order details: {flow_manager.state['orders']}"
+        self.assertEqual(messages[0]["content"], expected_content)
+
+    async def test_state_references_missing_key(self):
+        """Test handling of missing state keys in content."""
+        flow_manager = FlowManager(task=self.mock_task, llm=self.mock_llm)
+        await flow_manager.initialize()
+
+        # Create node referencing non-existent state
+        node_config = {
+            "task_messages": [{"role": "system", "content": "Data: $state.missing_key"}],
+            "functions": [],
+        }
+
+        await flow_manager.set_node("test", node_config)
+
+        # Verify missing key is handled gracefully
+        calls = self.mock_task.queue_frames.call_args_list[-1]
+        frames = calls[0][0]
+        messages = next(f.messages for f in frames if hasattr(f, "messages"))
+        self.assertEqual(messages[0]["content"], "Data: <no value for missing_key>")
