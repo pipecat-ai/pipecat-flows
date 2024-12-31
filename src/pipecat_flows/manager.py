@@ -324,7 +324,7 @@ class FlowManager:
                 if "transition_to" in decl:
                     del decl["transition_to"]
 
-    async def set_node(self, node_id: str, node_config: NodeConfig) -> None:
+    async def set_node(self, node_id: str, node_config: NodeConfig, reset_llm_context: bool = False) -> None:
         """Set up a new conversation node and transition to it.
 
         Handles the complete node transition process including:
@@ -337,7 +337,7 @@ class FlowManager:
         Args:
             node_id: Identifier for the new node
             node_config: Complete configuration for the node
-
+            reset_llm_context: Whether to reset the LLM context after setting the node
         Raises:
             FlowTransitionError: If manager not initialized
             FlowError: If node setup fails
@@ -396,7 +396,7 @@ class FlowManager:
             formatted_tools = self.adapter.format_functions(tools)
 
             # Update LLM context
-            await self._update_llm_context(messages, formatted_tools)
+            await self._update_llm_context(messages, formatted_tools, reset_llm_context)
             logger.debug("Updated LLM context")
 
             # Execute post-actions if any
@@ -413,20 +413,20 @@ class FlowManager:
             logger.error(f"Error setting node {node_id}: {str(e)}")
             raise FlowError(f"Failed to set node {node_id}: {str(e)}") from e
 
-    async def _update_llm_context(self, messages: List[dict], functions: List[dict]) -> None:
+    async def _update_llm_context(self, messages: List[dict], functions: List[dict], reset_llm_context: bool = False) -> None:
         """Update LLM context with new messages and functions.
 
         Args:
             messages: New messages to add to context
             functions: New functions to make available
-
+            reset_llm_context: Whether to reset the LLM context
         Raises:
             FlowError: If context update fails
         """
         try:
             # Determine frame type based on whether this is the first node
             frame_type = (
-                LLMMessagesUpdateFrame if self.current_node is None else LLMMessagesAppendFrame
+                LLMMessagesUpdateFrame if self.current_node is None or reset_llm_context else LLMMessagesAppendFrame
             )
 
             await self.task.queue_frames(
