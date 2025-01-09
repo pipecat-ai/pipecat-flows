@@ -298,8 +298,9 @@ def create_adapter(llm) -> LLMAdapter:
     # Try Google
     try:
         from pipecat.services.google import GoogleLLMService
+        from pipecat.services.gemini_multimodal_live.gemini import GeminiMultimodalLiveLLMService
 
-        if isinstance(llm, GoogleLLMService):
+        if isinstance(llm, GoogleLLMService) or isinstance(llm, GeminiMultimodalLiveLLMService):
             logger.debug("Creating Google adapter")
             return GeminiAdapter()
     except ImportError as e:

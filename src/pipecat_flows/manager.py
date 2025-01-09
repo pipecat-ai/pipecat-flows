@@ -45,8 +45,9 @@ if TYPE_CHECKING:
     from pipecat.services.anthropic import AnthropicLLMService
     from pipecat.services.google import GoogleLLMService
     from pipecat.services.openai import OpenAILLMService
+    from pipecat.services.gemini_multimodal_live.gemini import GeminiMultimodalLiveLLMService
 
-    LLMService = Union[OpenAILLMService, AnthropicLLMService, GoogleLLMService]
+    LLMService = Union[OpenAILLMService, AnthropicLLMService, GoogleLLMService, GeminiMultimodalLiveLLMService]
 else:
     LLMService = Any
 
