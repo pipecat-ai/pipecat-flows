@@ -1,0 +1,372 @@
+#
+# Copyright (c) 2025, Daily
+#
+# SPDX-License-Identifier: BSD 2-Clause License
+#
+""""Warm Handoff" Example using Pipecat Dynamic Flows with Google Gemini.
+
+This example demonstrates how to create a bot that transfers a customer to a human agent when the bot is unable to fulfill the customers's request.
+This example uses:
+- Pipecat Flows for conversation management
+- Google Gemini as the LLM
+- Daily as the transport service
+
+The bot asks how they could be of assistance, and offers to provide information about store location and hours of operation, or begin placing an order.
+If the customer says they'd like to do the former, the bot provides an answer.
+If the customer says they'd like to do the latter, the bot tries, fails, and transfers the customer to a human agent. 
+The bot then brings the agent up to speed on the customer's issue before connecting them to the customer and dropping out of the call.
+
+Requirements:
+- Daily room URL
+- Daily API key
+- Google API key
+- Deepgram API key
+- Cartesia API key
+"""
+
+import asyncio
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Any, Dict
+
+import aiohttp
+from dotenv import load_dotenv
+from loguru import logger
+
+from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.pipeline.pipeline import Pipeline
+from pipecat.pipeline.runner import PipelineRunner
+from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.services.cartesia import CartesiaTTSService
+from pipecat.services.deepgram import DeepgramSTTService
+from pipecat.services.google import GoogleLLMService
+from pipecat.transports.services.daily import DailyParams, DailyTransport
+
+from pipecat_flows import FlowManager, FlowResult, NodeConfig, ContextStrategyConfig
+from pipecat_flows.types import ActionConfig, ContextStrategy
+
+sys.path.append(str(Path(__file__).parent.parent))
+from runner import configure
+
+load_dotenv(override=True)
+
+logger.remove(0)
+logger.add(sys.stderr, level="DEBUG")
+
+# Flow nodes:
+#
+# 1. customer_interaction
+#    The initial node, where the bot interacts with the customer and tries to help with their requests.
+#    Functions:
+#    - check_store_location_and_hours_of_operation (always succeeds)
+#    - start_order (always fails, causing bot to call transfer_to_human_agent)
+#    - transfer_to_human_agent
+#    - end_customer_conversation
+#
+# 2. transferring_to_human_agent
+#    The customer is asked to please hold while the bot transfers them to a human agent. Hold music plays while the customer waits.
+#    Transition:
+#    - As soon as the agent connects to the room, we transition to human_agent_interaction.
+#
+# 3. human_agent_interaction
+#    The bot fills in the human agent about what the customer was trying to accomplish that the bot was unable to help with, and what went wrong.
+#    The customer continues to hear hold music.
+#    Functions:
+#    - connect_human_agent_and_customer
+#
+# 4a. end_customer_conversation
+#     The bot says goodbye to the customer and ends the conversation. 
+#     This is how a conversation ends when a human agent did not need to be brought in.
+#
+# 4b. end_human_agent_conversation
+#     The bot tells the agent that they're being patched through to the customer and ends the conversation (leaving the customer and agent in the room talking to each other).
+
+# Type definitions
+class StoreLocationAndHoursOfOperationResult(FlowResult):
+    store_location: str
+    hours_of_operation: str
+
+class StartOrderResult(FlowResult):
+    pass
+
+# Function handlers
+async def check_store_location_and_hours_of_operation() -> StoreLocationAndHoursOfOperationResult:
+    """Check store location and hours of operation."""
+    return StoreLocationAndHoursOfOperationResult(
+        status="success",
+        store_location="123 Main St, Anytown, USA",
+        hours_of_operation="9am to 5pm, Monday through Friday"
+    )
+
+async def start_order() -> StartOrderResult:
+    """Start a new order."""
+    return StartOrderResult(status="error")
+
+# Action handlers
+async def configure_customer_audio_for_hold(action: dict, flow_manager: FlowManager):
+    """Configure the customer's audio send permissions and subscriptions for being on hold."""
+    transport: DailyTransport = flow_manager.transport
+    print(f"Configuring customer audio for hold. Transport: {transport}")
+    # TODO: there's no way in Daily to update remote participant's subscriptions :(
+    # Maybe if we had access to the client we could receive an app message asking us to unsubscribe from all and then another re-subscribing to all?
+    # But wait...if the client is connecting just with a phone call...that might not be doable. This needs to be done server-side. Can it be? Need to learn more about dial-in...
+    # Another challenge: how can the bot send different audio to one participant than another? (hold music v talking to human agent)
+    # Maybe the hold music can actually be another bot that connects and simply sends hold music? Or maybe it can be a custom track subscription?
+
+# Transitions
+async def start_customer_interaction(flow_manager: FlowManager):
+    """Transition to the "customer_interaction" node"""
+    await flow_manager.set_node("customer_interaction", create_customer_interaction_node())
+
+async def transfer_to_human_agent(args: Dict, flow_manager: FlowManager):
+    """Transition to the "transferring_to_human_agent" node."""
+    await flow_manager.set_node("transferring_to_human_agent", create_transferring_to_human_agent_node())
+
+async def start_human_agent_interaction(flow_manager: FlowManager):
+    """Transition to the "human_agent_interaction" node."""
+    await flow_manager.set_node("human_agent_interaction", create_human_agent_interaction_node())
+
+async def end_customer_conversation(args: Dict, flow_manager: FlowManager):
+    """Transition to the "end_customer_conversation" node."""
+    await flow_manager.set_node("end_customer_conversation", create_end_customer_conversation_node())
+
+async def end_human_agent_conversation(args: Dict, flow_manager: FlowManager):
+    """Transition to the "end_human_agent_conversation" node."""
+    await flow_manager.set_node("end_human_agent_conversation", create_end_human_agent_conversation_node())
+
+# Node configuration
+def create_customer_interaction_node() -> NodeConfig:
+    """Create the "customer interaction" node.
+    This is the initial node, where the bot interacts with the customer and tries to help with their requests.
+    """
+    return NodeConfig(
+        role_messages=[
+            {
+                "role": "system",
+                "content": "You are an assistant for ABC Widget Company. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis."
+            }
+        ],
+        task_messages=[
+            {
+                "role": "system",
+                "content": """Start off by greeting the customer. Then ask how you could help, offering two choices of what you could help with: you could provide store location and hours of operation, or begin placing an order. Be friendly and casual. 
+                
+                To help the customer:
+                - Use the check_store_location_and_hours_of_operation function to check store location and hours of operation to provide to the customer
+                - Use the start_order function to begin placing an order on the customer's behalf
+
+                If one of the above function calls fails to return a success status, call the transfer_to_human_agent function.
+
+                Otherwise, ask if there's anything else you could help them with today or if they'd like to end the conversation. If they need more help, re-offer the available options.
+
+                If the customer wants to end the conversation, call the end_customer_conversation function.
+                """
+            }
+        ],
+        functions=[
+            {
+                "function_declarations": [
+                    {
+                        "name": "check_store_location_and_hours_of_operation",
+                        "description": "Check store location and hours of operation",
+                        "handler": check_store_location_and_hours_of_operation,
+                        "parameters": None,
+                    },
+                    {
+                        "name": "start_order",
+                        "description": "Start placing an order",
+                        "handler": start_order,
+                        "parameters": None,
+                    },
+                    {
+                        "name": "transfer_to_human_agent",
+                        "description": "Start transferring to a human agent",
+                        "parameters": None,
+                        "transition_callback": transfer_to_human_agent
+                    },
+                    {
+                        "name": "end_customer_conversation",
+                        "description": "End the conversation",
+                        "parameters": None,
+                        "transition_callback": end_customer_conversation
+                    },
+                ]
+            }
+        ]
+    )
+
+def create_transferring_to_human_agent_node() -> NodeConfig:
+    """Create the "transferring_to_human_agent" node.
+    This is the node where the customer is asked to please hold while the bot transfers them to a human agent. Hold music plays while the customer waits.
+    """
+    return NodeConfig(
+        task_messages=[
+            {
+                "role": "system",
+                "content": "Start by apologizing to the customer that there was an issue fulfilling their last request, then inform them that they are being transferred to a human agent. Tell them to please hold while you connect them, and thank them for their patience."
+            }
+        ],
+        functions=[],
+        post_actions=[
+            ActionConfig(
+                type="configure_customer_audio_for_hold", 
+                handler=configure_customer_audio_for_hold
+            )
+        ]
+    )
+
+def create_human_agent_interaction_node() -> NodeConfig:
+    """Create the "human_agent_interaction" node.
+    This is the node where the bot fills in the human agent about what the customer was trying to accomplish that the bot was unable to help with, and what went wrong.
+    The customer continues to hear hold music.
+    """
+    return NodeConfig(
+        task_messages=[
+            {
+                "role": "system",
+                "content": """You're now talking to an agent who has just joined the call. Assume that the customer you were helping up until this point can no longer hear you. Your job is to be as helpful as you can and bring the agent up to speed so that they can assist the customer. Start by greeting the agent politely and explaining what the customer was trying to do that you were unable to help with, and any relevant error details. Ask the agent if they have any questions or whether they're ready to connect to the customer.
+                
+                Once the agent tells you they're ready to connect to the customer, call the connect_human_agent_and_customer function.
+                """
+            }
+        ],
+        context_strategy=ContextStrategyConfig(
+            strategy=ContextStrategy.RESET_WITH_SUMMARY,
+            summary_prompt=(
+                    "Summarize the conversation with the customer, including what they were trying to accomplish and what, if anything, went wrong while trying to fulfill their requests. Include specific error details."
+                ),
+        ),
+        functions=[
+            {
+                "function_declarations": [
+                    {
+                        "name": "connect_human_agent_and_customer",
+                        "description": "Connect the human agent to the customer",
+                        "parameters": None,
+                        "transition_callback": end_human_agent_conversation
+                    },
+                ]
+            }
+        ]
+    )
+
+def create_end_customer_conversation_node() -> NodeConfig:
+    """Create the "end_customer_conversation" node.
+    This is the node where the bot says goodbye to the customer and ends the conversation. 
+    This is how a conversation ends when a human agent did not need to be brought in."""
+    return NodeConfig(
+        task_messages=[
+            {
+                "role": "system",
+                "content": "Thank the customer warmly and mention they can call back anytime if they need more help.",
+            }
+        ],
+        functions=[],
+        post_actions=[ActionConfig(type="end_conversation")]
+    )
+
+def create_end_human_agent_conversation_node() -> NodeConfig:
+    """Create the "end_human_agent_conversation" node.
+    This is the node where the bot tells the agent that they're being patched through to the customer and ends the conversation (leaving the customer and agent in the room talking to each other)."""
+    return NodeConfig(
+        task_messages=[
+            {
+                "role": "system",
+                "content": "Tell the agent that you're patching them through to the customer right now."
+            },
+        ],
+        functions=[],
+        post_actions=[ActionConfig(type="end_conversation")]
+    )
+
+async def main():
+    """Main function to set up and run the bot."""
+
+    async with aiohttp.ClientSession() as session:
+        (room_url, token) = await configure(session)
+
+        # Initialize services
+        transport = DailyTransport(
+            room_url=room_url,
+            token=token,
+            bot_name="ABC Widget Company Bot",
+            params=DailyParams(
+                audio_out_enabled=True,
+                vad_enabled=True,
+                vad_analyzer=SileroVADAnalyzer(),
+                vad_audio_passthrough=True,
+            ),
+        )
+        stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+        tts = CartesiaTTSService(
+            api_key=os.getenv("CARTESIA_API_KEY"),
+            voice_id="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
+        )
+        llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
+
+        # Initialize context
+        context = OpenAILLMContext()
+        context_aggregator = llm.create_context_aggregator(context)
+
+        # Create pipeline
+        pipeline = Pipeline(
+            [
+                transport.input(),
+                stt,
+                context_aggregator.user(),
+                llm,
+                tts,
+                transport.output(),
+                context_aggregator.assistant(),
+            ]
+        )
+        task = PipelineTask(pipeline, PipelineParams(allow_interruptions=True))
+
+        # Initialize flow manager
+        flow_manager = FlowManager(
+            task=task,
+            llm=llm,
+            context_aggregator=context_aggregator,
+            tts=tts,
+            transport=transport,
+        )
+
+        # Set up event handlers
+        @transport.event_handler("on_first_participant_joined")
+        async def on_first_participant_joined(transport: DailyTransport, participant: Dict[str, Any]):
+            """Start the flow.
+            We're assuming the first participant is the customer and not the human agent.
+            """
+            await transport.capture_participant_transcription(participant["id"])
+            # Initialize flow
+            await flow_manager.initialize()
+            # Set initial node
+            await start_customer_interaction(flow_manager=flow_manager)
+
+        @transport.event_handler("on_participant_joined")
+        async def on_participant_joined(transport: DailyTransport, participant: Dict[str, Any]):
+            """Handle the human agent maybe having joined the call:
+               - If the participant who joined is the human agent and we're currently in the "transferring_to_human_agent" node, go to the "human_agent_interaction" node.
+               - Otherwise...nothing, for the purposes of this demo. We're assuming the human agent won't join while the conversation flow is any other node.
+            """
+            user_id = participant.get("info", {}).get("userId")
+            if user_id == "agent" and flow_manager.current_node == "transferring_to_human_agent":
+                await start_human_agent_interaction(flow_manager=flow_manager)
+
+        @transport.event_handler("on_participant_left")
+        async def on_participant_left(transport: DailyTransport, participant: Dict[str, Any], reason: str):
+            # TODO: update this logic so that if the customer participant has left early while on hold, inform the human agent; will require a new node?
+            """If all non-bot participants have left, stop the bot"""
+            non_bot_participants = {k: v for k, v in transport.participants().items() if not v["info"]["isLocal"]}
+            if not non_bot_participants:
+                await task.cancel()
+
+        # Run the pipeline
+        runner = PipelineRunner()
+        await runner.run(task)
+
+if __name__ == "__main__":
+    asyncio.run(main())
