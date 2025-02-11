@@ -106,15 +106,50 @@ async def start_order() -> StartOrderResult:
     return StartOrderResult(status="error")
 
 # Action handlers
-async def configure_customer_audio_for_hold(action: dict, flow_manager: FlowManager):
-    """Configure the customer's audio send permissions and subscriptions for being on hold."""
+async def configure_customer_audio_for_hold_start(action: dict, flow_manager: FlowManager):
+    """Configure the customer's audio settings (send permissions and subscriptions) for being put on hold."""
     transport: DailyTransport = flow_manager.transport
-    print(f"Configuring customer audio for hold. Transport: {transport}")
+    customer_participant_id = get_customer_participant_id(transport=transport)
+
+    # Revoke customer participant's canSend permissions, causing their mic to mute
+    if customer_participant_id:
+        transport._client._client.update_remote_participants(
+            remote_participants={
+                customer_participant_id: {
+                    "permissions": {
+                        "canSend": [],
+                    }
+                }
+            },
+            completion=lambda error: 
+                print(f"Updated customer's canSend permissions. Error? {error}")
+        )
+
     # TODO: there's no way in Daily to update remote participant's subscriptions :(
     # Maybe if we had access to the client we could receive an app message asking us to unsubscribe from all and then another re-subscribing to all?
     # But wait...if the client is connecting just with a phone call...that might not be doable. This needs to be done server-side. Can it be? Need to learn more about dial-in...
     # Another challenge: how can the bot send different audio to one participant than another? (hold music v talking to human agent)
     # Maybe the hold music can actually be another bot that connects and simply sends hold music? Or maybe it can be a custom track subscription?
+
+async def configure_customer_audio_for_hold_end(action: dict, flow_manager: FlowManager):
+    """Configure the customer's audio settings (send permissions and subscriptions) for being taken off of hold."""
+    transport: DailyTransport = flow_manager.transport
+    customer_participant_id = get_customer_participant_id(transport=transport)
+
+    # Restore customer participant's canSend permissions and re-enable their mic
+    if customer_participant_id:
+        transport._client._client.update_remote_participants(
+            remote_participants={
+                customer_participant_id: {
+                    "permissions": {
+                        "canSend": ["microphone"]
+                    },
+                    "inputsEnabled": {
+                        "microphone": True
+                    }
+                }
+            }
+        )
 
 # Transitions
 async def start_customer_interaction(flow_manager: FlowManager):
@@ -213,7 +248,7 @@ def create_transferring_to_human_agent_node() -> NodeConfig:
         post_actions=[
             ActionConfig(
                 type="configure_customer_audio_for_hold", 
-                handler=configure_customer_audio_for_hold
+                handler=configure_customer_audio_for_hold_start
             )
         ]
     )
@@ -279,8 +314,22 @@ def create_end_human_agent_conversation_node() -> NodeConfig:
             },
         ],
         functions=[],
-        post_actions=[ActionConfig(type="end_conversation")]
+        post_actions=[
+            ActionConfig(
+                type="configure_customer_audio_to_talk_to_human_agent", 
+                handler=configure_customer_audio_for_hold_end
+            ),
+            ActionConfig(type="end_conversation")
+        ]
     )
+
+# Helpers
+def get_customer_participant_id(transport: DailyTransport) -> str:
+    return next(
+        (p["id"] for p in transport.participants().values() if not p["info"]["isLocal"] and p["info"].get("userId") != "agent"),
+        None
+    )
+
 
 async def main():
     """Main function to set up and run the bot."""
