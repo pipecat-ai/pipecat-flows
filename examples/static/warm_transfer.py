@@ -58,30 +58,40 @@ logger.add(sys.stderr, level="DEBUG")
 
 # Flow nodes:
 #
-# 1. customer_interaction
+# 1. initial_customer_interaction
 #    The initial node, where the bot interacts with the customer and tries to help with their requests.
 #    Functions:
 #    - check_store_location_and_hours_of_operation (always succeeds)
-#    - start_order (always fails, causing bot to call transfer_to_human_agent)
-#    - transfer_to_human_agent
+#    - start_order (always fails)
 #    - end_customer_conversation
+#    Transition:
+#    - transition_after_customer_task (to either continued_customer_interaction or transferring_to_human_agent)
 #
-# 2. transferring_to_human_agent
+# 2. continued_customer_interaction
+#    The bot has already helped the customer with something. Now they're helping them with something else.
+#    Functions:
+#    - check_store_location_and_hours_of_operation (always succeeds)
+#    - start_order (always fails)
+#    - end_customer_conversation
+#    Transition:
+#    - transition_after_customer_task (to either continued_customer_interaction or transferring_to_human_agent)
+#
+# 3. transferring_to_human_agent
 #    The customer is asked to please hold while the bot transfers them to a human agent. Hold music plays while the customer waits.
 #    Transition:
 #    - As soon as the agent connects to the room, we transition to human_agent_interaction.
 #
-# 3. human_agent_interaction
+# 4. human_agent_interaction
 #    The bot fills in the human agent about what the customer was trying to accomplish that the bot was unable to help with, and what went wrong.
 #    The customer continues to hear hold music.
 #    Functions:
 #    - connect_human_agent_and_customer
 #
-# 4a. end_customer_conversation
+# 5a. end_customer_conversation
 #     The bot says goodbye to the customer and ends the conversation. 
 #     This is how a conversation ends when a human agent did not need to be brought in.
 #
-# 4b. end_human_agent_conversation
+# 5b. end_human_agent_conversation
 #     The bot tells the agent that they're being patched through to the customer and ends the conversation (leaving the customer and agent in the room talking to each other).
 
 # Type definitions
@@ -152,11 +162,14 @@ async def configure_customer_audio_for_hold_end(action: dict, flow_manager: Flow
 # Transitions
 async def start_customer_interaction(flow_manager: FlowManager):
     """Transition to the "customer_interaction" node"""
-    await flow_manager.set_node("customer_interaction", create_customer_interaction_node())
+    await flow_manager.set_node("customer_interaction", create_initial_customer_interaction_node())
 
-async def transfer_to_human_agent(args: Dict, flow_manager: FlowManager):
-    """Transition to the "transferring_to_human_agent" node."""
-    await flow_manager.set_node("transferring_to_human_agent", create_transferring_to_human_agent_node())
+async def transition_after_customer_task(args: Dict, result: FlowResult, flow_manager: FlowManager):
+    """Transition to either the "continued_customer_interaction" node or "transferring_to_human_agent" node, depending on the outcome of the previous customer task"""
+    if result.get("status") == "success":
+        await flow_manager.set_node("continued_customer_interaction", create_continued_customer_interaction_node())
+    else:
+        await flow_manager.set_node("transferring_to_human_agent", create_transferring_to_human_agent_node())
 
 async def start_human_agent_interaction(flow_manager: FlowManager):
     """Transition to the "human_agent_interaction" node."""
@@ -171,9 +184,9 @@ async def end_human_agent_conversation(args: Dict, flow_manager: FlowManager):
     await flow_manager.set_node("end_human_agent_conversation", create_end_human_agent_conversation_node())
 
 # Node configuration
-def create_customer_interaction_node() -> NodeConfig:
-    """Create the "customer interaction" node.
-    This is the initial node, where the bot interacts with the customer and tries to help with their requests.
+def create_initial_customer_interaction_node() -> NodeConfig:
+    """Create the "initial_customer_interaction" node.
+    This is the initial node where the bot interacts with the customer and tries to help with their requests.
     """
     return NodeConfig(
         role_messages=[
@@ -191,9 +204,52 @@ def create_customer_interaction_node() -> NodeConfig:
                 - Use the check_store_location_and_hours_of_operation function to check store location and hours of operation to provide to the customer
                 - Use the start_order function to begin placing an order on the customer's behalf
 
-                If one of the above function calls fails to return a success status, call the transfer_to_human_agent function.
+                If the customer wants to end the conversation, call the end_customer_conversation function.
+                """
+            }
+        ],
+        functions=[
+            {
+                "function_declarations": [
+                    {
+                        "name": "check_store_location_and_hours_of_operation",
+                        "description": "Check store location and hours of operation",
+                        "handler": check_store_location_and_hours_of_operation,
+                        "transition_callback": transition_after_customer_task,
+                        "parameters": None,
+                    },
+                    {
+                        "name": "start_order",
+                        "description": "Start placing an order",
+                        "handler": start_order,
+                        "transition_callback": transition_after_customer_task,
+                        "parameters": None,
+                    },
+                    {
+                        "name": "end_customer_conversation",
+                        "description": "End the conversation",
+                        "parameters": None,
+                        "transition_callback": end_customer_conversation
+                    },
+                ]
+            }
+        ]
+    )
 
-                Otherwise, ask if there's anything else you could help them with today or if they'd like to end the conversation. If they need more help, re-offer the available options.
+def create_continued_customer_interaction_node() -> NodeConfig:
+    """Create the "continued_customer_interaction" node.
+    This is a node where the bot interacts with the customer and tries to help with their requests. 
+    It assumes that the bot has already previously helped the customer with something.
+    """
+    return NodeConfig(
+        task_messages=[
+            {
+                "role": "system",
+                "content": """Ask the customer there's anything else you could help them with today, or if they'd like to end the conversation. If they need more help, re-offer the two choices you offered before: you could provide store location and hours of operation, or begin placing an order.
+                
+                To help the customer:
+                - Use the check_store_location_and_hours_of_operation function to check store location and hours of operation to provide to the customer
+                - Use the start_order function to begin placing an order on the customer's behalf
 
                 If the customer wants to end the conversation, call the end_customer_conversation function.
                 """
@@ -206,19 +262,15 @@ def create_customer_interaction_node() -> NodeConfig:
                         "name": "check_store_location_and_hours_of_operation",
                         "description": "Check store location and hours of operation",
                         "handler": check_store_location_and_hours_of_operation,
+                        "transition_callback": transition_after_customer_task,
                         "parameters": None,
                     },
                     {
                         "name": "start_order",
                         "description": "Start placing an order",
                         "handler": start_order,
+                        "transition_callback": transition_after_customer_task,
                         "parameters": None,
-                    },
-                    {
-                        "name": "transfer_to_human_agent",
-                        "description": "Start transferring to a human agent",
-                        "parameters": None,
-                        "transition_callback": transfer_to_human_agent
                     },
                     {
                         "name": "end_customer_conversation",
