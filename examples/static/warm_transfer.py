@@ -113,16 +113,14 @@ async def configure_customer_audio_for_hold_start(action: dict, flow_manager: Fl
 
     # Revoke customer participant's canSend permissions, causing their mic to mute
     if customer_participant_id:
-        transport._client._client.update_remote_participants(
+        await transport.update_remote_participants(
             remote_participants={
                 customer_participant_id: {
                     "permissions": {
                         "canSend": [],
                     }
                 }
-            },
-            completion=lambda error: 
-                print(f"Updated customer's canSend permissions. Error? {error}")
+            }
         )
 
     # TODO: there's no way in Daily to update remote participant's subscriptions :(
@@ -138,7 +136,7 @@ async def configure_customer_audio_for_hold_end(action: dict, flow_manager: Flow
 
     # Restore customer participant's canSend permissions and re-enable their mic
     if customer_participant_id:
-        transport._client._client.update_remote_participants(
+        await transport.update_remote_participants(
             remote_participants={
                 customer_participant_id: {
                     "permissions": {
