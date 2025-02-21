@@ -16,6 +16,17 @@ If the customer says they'd like to do the former, the bot provides an answer.
 If the customer says they'd like to do the latter, the bot tries, fails, and transfers the customer to a human agent. 
 The bot then brings the agent up to speed on the customer's issue before connecting them to the customer and dropping out of the call.
 
+The various parties join with the following Daily meeting token properties:
+- bot:
+  - owner: true
+- customer:
+  - user_id: customer
+- human agent:
+  - user_id: agent
+
+The bot joins with a token with the following properties:
+- owner: true
+
 Requirements:
 - Daily room URL
 - Daily API key
@@ -44,6 +55,7 @@ from pipecat.services.cartesia import CartesiaTTSService
 from pipecat.services.deepgram import DeepgramSTTService
 from pipecat.services.google import GoogleLLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
+from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper, DailyMeetingTokenParams, DailyMeetingTokenProperties
 
 from pipecat_flows import FlowManager, FlowResult, NodeConfig, ContextStrategyConfig
 from pipecat_flows.types import ActionConfig, ContextStrategy
@@ -380,6 +392,37 @@ def get_customer_participant_id(transport: DailyTransport) -> str:
         None
     )
 
+async def get_customer_token(daily_rest_helper: DailyRESTHelper, room_url: str) -> str:
+    """Gets a Daily token for the customer, configured with properties:
+
+    { user_id: "customer" }
+    """
+    return await get_token_with_user_id(
+        user_id="customer",
+        daily_rest_helper=daily_rest_helper,
+        room_url=room_url
+    )
+
+async def get_human_agent_token(daily_rest_helper: DailyRESTHelper, room_url: str) -> str:
+    """Gets a Daily token for the human agent, configured with properties:
+
+    { user_id: "agent" }
+    """
+    return await get_token_with_user_id(
+        user_id="agent",
+        daily_rest_helper=daily_rest_helper,
+        room_url=room_url
+    )
+
+async def get_token_with_user_id(user_id: str, daily_rest_helper: DailyRESTHelper, room_url: str) -> str:
+    return await daily_rest_helper.get_token(
+        room_url=room_url,
+        owner=False,
+        params=DailyMeetingTokenParams(properties=DailyMeetingTokenProperties(
+            user_id=user_id,
+        ))
+    )
+
 
 async def main():
     """Main function to set up and run the bot."""
@@ -462,6 +505,18 @@ async def main():
             non_bot_participants = {k: v for k, v in transport.participants().items() if not v["info"]["isLocal"]}
             if not non_bot_participants:
                 await task.cancel()
+
+        # Print URLs for joining as customer and human agent
+        key = os.getenv("DAILY_API_KEY")
+        daily_rest_helper = DailyRESTHelper(
+            daily_api_key=key,
+            daily_api_url=os.getenv("DAILY_API_URL", "https://api.daily.co/v1"),
+            aiohttp_session=session,
+        )
+        customer_token = await get_customer_token(daily_rest_helper=daily_rest_helper, room_url=room_url)
+        human_agent_token = await get_human_agent_token(daily_rest_helper=daily_rest_helper, room_url=room_url)
+        logger.info(f"TO JOIN AS CUSTOMER: {room_url}?t={customer_token}")
+        logger.info(f"TO JOIN AS AGENT: {room_url}?t={human_agent_token}")
 
         # Run the pipeline
         runner = PipelineRunner()
