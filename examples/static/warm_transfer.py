@@ -128,44 +128,74 @@ async def start_order() -> StartOrderResult:
     return StartOrderResult(status="error")
 
 # Action handlers
-async def configure_customer_audio_for_hold_start(action: dict, flow_manager: FlowManager):
-    """Configure the customer's audio settings (send permissions and subscriptions) for being put on hold."""
+async def configure_participants_for_hold_start(action: dict, flow_manager: FlowManager):
+    """Configure the participants' settings (send and receive permissions) for when the customer is put on hold."""
     transport: DailyTransport = flow_manager.transport
     customer_participant_id = get_customer_participant_id(transport=transport)
 
-    # Revoke customer participant's canSend permissions, causing their mic to mute
+    # Update the customer:
+    # - Revoke their canSend permission, causing their mic to mute
+    # - Update their canReceive permission to only be able to hear the bot's hold music; we don't
+    #   want them hearing the bot and the human agent talking
     if customer_participant_id:
         await transport.update_remote_participants(
             remote_participants={
                 customer_participant_id: {
                     "permissions": {
                         "canSend": [],
+                        "canReceive": {
+                            "byUserId": {
+                                "bot": {
+                                    "customAudio": { "hold-music": True },
+                                }
+                            }
+                        }
                     }
                 }
             }
         )
 
-    # TODO: there's no way in Daily to update remote participant's subscriptions :(
-    # Maybe if we had access to the client we could receive an app message asking us to unsubscribe from all and then another re-subscribing to all?
-    # But wait...if the client is connecting just with a phone call...that might not be doable. This needs to be done server-side. Can it be? Need to learn more about dial-in...
-    # Another challenge: how can the bot send different audio to one participant than another? (hold music v talking to human agent)
-    # Maybe the hold music can actually be another bot that connects and simply sends hold music? Or maybe it can be a custom track subscription?
-
-async def configure_customer_audio_for_hold_end(action: dict, flow_manager: FlowManager):
-    """Configure the customer's audio settings (send permissions and subscriptions) for being taken off of hold."""
+async def configure_participants_for_hold_end(action: dict, flow_manager: FlowManager):
+    """Configure the participants' settings (send and receive permissions) for when the customer is taken off of hold."""
     transport: DailyTransport = flow_manager.transport
     customer_participant_id = get_customer_participant_id(transport=transport)
+    agent_participant_id = get_human_agent_participant_id(transport=transport)
 
-    # Restore customer participant's canSend permissions and re-enable their mic
+    # Update the customer:
+    # - Restore their canSend permission, allowing their mic to be unmuted
+    # - Update their canReceive permission, allowing them hear the human agent
+    # - Unmute their mic
     if customer_participant_id:
         await transport.update_remote_participants(
             remote_participants={
                 customer_participant_id: {
                     "permissions": {
-                        "canSend": ["microphone"]
+                        "canSend": ["microphone"],
+                        "canReceive": {
+                            "byUserId": {
+                                "agent": True
+                            }
+                        }
                     },
                     "inputsEnabled": {
                         "microphone": True
+                    }
+                }
+            }
+        )
+
+    # Update the human agent:
+    # - Update their canReceive permission so they can hear the customer
+    if agent_participant_id:
+        await transport.update_remote_participants(
+            remote_participants={
+                agent_participant_id: {
+                    "permissions": {
+                        "canReceive": {
+                            "byUserId": {
+                                "customer": True
+                            }
+                        }
                     }
                 }
             }
@@ -309,8 +339,8 @@ def create_transferring_to_human_agent_node() -> NodeConfig:
         functions=[],
         post_actions=[
             ActionConfig(
-                type="configure_customer_audio_for_hold", 
-                handler=configure_customer_audio_for_hold_start
+                type="configure_participants_for_hold_start", 
+                handler=configure_participants_for_hold_start
             )
         ]
     )
@@ -378,8 +408,8 @@ def create_end_human_agent_conversation_node() -> NodeConfig:
         functions=[],
         post_actions=[
             ActionConfig(
-                type="configure_customer_audio_to_talk_to_human_agent", 
-                handler=configure_customer_audio_for_hold_end
+                type="configure_participants_for_hold_end", 
+                handler=configure_participants_for_hold_end
             ),
             ActionConfig(type="end_conversation")
         ]
@@ -388,17 +418,43 @@ def create_end_human_agent_conversation_node() -> NodeConfig:
 # Helpers
 def get_customer_participant_id(transport: DailyTransport) -> str:
     return next(
-        (p["id"] for p in transport.participants().values() if not p["info"]["isLocal"] and p["info"].get("userId") != "agent"),
+        (p["id"] for p in transport.participants().values() if not p["info"]["isLocal"] and p["info"].get("userId") == "customer"),
+        None
+    )
+
+def get_human_agent_participant_id(transport: DailyTransport) -> str:
+    return next(
+        (p["id"] for p in transport.participants().values() if not p["info"]["isLocal"] and p["info"].get("userId") == "agent"),
         None
     )
 
 async def get_customer_token(daily_rest_helper: DailyRESTHelper, room_url: str) -> str:
     """Gets a Daily token for the customer, configured with properties:
 
-    { user_id: "customer" }
+    { 
+        user_id: "customer",
+        permissions: {
+            canReceive: {
+                base: false,
+                byUserId: {
+                    bot: true
+                }
+            }
+        }
+    }
+
+    Note that they'll join only being able to hear the bot.
     """
-    return await get_token_with_user_id(
+    return await get_token(
         user_id="customer",
+        permissions={
+            "canReceive": {
+                "base": False,
+                "byUserId": {
+                    "bot": True
+                }
+            }
+        },
         daily_rest_helper=daily_rest_helper,
         room_url=room_url
     )
@@ -406,20 +462,47 @@ async def get_customer_token(daily_rest_helper: DailyRESTHelper, room_url: str) 
 async def get_human_agent_token(daily_rest_helper: DailyRESTHelper, room_url: str) -> str:
     """Gets a Daily token for the human agent, configured with properties:
 
-    { user_id: "agent" }
+    { 
+        user_id: "agent",
+        permissions: {
+            canReceive: {
+                base: false,
+                byUserId: {
+                    bot: {
+                        audio: true,
+                        customAudio: { "hold-music": false }
+                    }
+                }
+            }
+        }
+    }
+
+    Note that they'll join only being able to hear the bot's audio (and not the hold music).
     """
-    return await get_token_with_user_id(
+    return await get_token(
         user_id="agent",
+        permissions={
+            "canReceive": {
+                "base": False,
+                "byUserId": {
+                    "bot": {
+                        "audio": True,
+                        "customAudio": { "hold-music": False }
+                    }
+                }
+            }
+        },
         daily_rest_helper=daily_rest_helper,
         room_url=room_url
     )
 
-async def get_token_with_user_id(user_id: str, daily_rest_helper: DailyRESTHelper, room_url: str) -> str:
+async def get_token(user_id: str, permissions: dict, daily_rest_helper: DailyRESTHelper, room_url: str) -> str:
     return await daily_rest_helper.get_token(
         room_url=room_url,
         owner=False,
         params=DailyMeetingTokenParams(properties=DailyMeetingTokenProperties(
             user_id=user_id,
+            permissions=permissions
         ))
     )
 
@@ -428,6 +511,7 @@ async def main():
     """Main function to set up and run the bot."""
 
     async with aiohttp.ClientSession() as session:
+        # TODO: ensure that the bot joins with userId "bot"
         (room_url, token) = await configure(session)
 
         # Initialize services
@@ -515,8 +599,8 @@ async def main():
         )
         customer_token = await get_customer_token(daily_rest_helper=daily_rest_helper, room_url=room_url)
         human_agent_token = await get_human_agent_token(daily_rest_helper=daily_rest_helper, room_url=room_url)
-        logger.info(f"TO JOIN AS CUSTOMER: {room_url}?t={customer_token}")
-        logger.info(f"TO JOIN AS AGENT: {room_url}?t={human_agent_token}")
+        logger.info(f"TO JOIN AS CUSTOMER: {room_url}{'?' if '?' not in room_url else '&'}t={customer_token}")
+        logger.info(f"TO JOIN AS AGENT: {room_url}{'?' if '?' not in room_url else '&'}t={human_agent_token}")
 
         # Run the pipeline
         runner = PipelineRunner()
