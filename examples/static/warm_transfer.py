@@ -337,6 +337,7 @@ def create_transferring_to_human_agent_node() -> NodeConfig:
             }
         ],
         functions=[],
+        # TODO: hmm, the post action runs before the above task_messages audio is spoken. that's not what we want.
         post_actions=[
             ActionConfig(
                 type="configure_participants_for_hold_start", 
@@ -406,6 +407,7 @@ def create_end_human_agent_conversation_node() -> NodeConfig:
             },
         ],
         functions=[],
+        # TODO: hmm, the post action runs before the above task_messages audio is spoken. that's not what we want.
         post_actions=[
             ActionConfig(
                 type="configure_participants_for_hold_end", 
