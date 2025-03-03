@@ -513,7 +513,6 @@ async def main():
     """Main function to set up and run the bot."""
 
     async with aiohttp.ClientSession() as session:
-        # TODO: ensure that the bot joins with userId "bot"
         (room_url, token) = await configure(session)
 
         # Initialize services
