@@ -36,7 +36,7 @@ Requirements:
 """
 
 import asyncio
-import json
+from dataclasses import dataclass
 import os
 import sys
 from pathlib import Path
@@ -47,10 +47,12 @@ from dotenv import load_dotenv
 from loguru import logger
 
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.frames.frames import ControlFrame, EndFrame, Frame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.cartesia import CartesiaTTSService
 from pipecat.services.deepgram import DeepgramSTTService
 from pipecat.services.google import GoogleLLMService
@@ -146,10 +148,14 @@ async def pre_transferring_to_human_agent(action: dict, flow_manager: FlowManage
             }
         )
 
-# TODO: this should only run after LLM "transferring you to agent" speech is spoken
-async def post_transferring_to_human_agent(action: dict, flow_manager: FlowManager):
+async def queue_post_transferring_to_human_agent(action: dict, flow_manager: FlowManager):
+    task = flow_manager.task
+    await task.queue_frame(PostTransferringToHumanAgentFrame())
+
+# NOTE: this isn't a "real" post-action because it needs to run after the "transferring you to a
+# human agent" speech is actually spoken, not just after sending the LLM the instruction to do so.
+async def post_transferring_to_human_agent(transport: DailyTransport):
     """Post-action after starting transferring to the human agent."""
-    transport: DailyTransport = flow_manager.transport
     customer_participant_id = get_customer_participant_id(transport=transport)
 
     # Update the customer:
@@ -172,10 +178,15 @@ async def post_transferring_to_human_agent(action: dict, flow_manager: FlowManag
             }
         )
 
-# TODO: this should only run after LLM "I'm patching you through" speech is spoken
-async def post_end_human_agent_conversation(action: dict, flow_manager: FlowManager):
-    """Configure the participants' settings (send and receive permissions) for when the customer is taken off of hold."""
-    transport: DailyTransport = flow_manager.transport
+async def queue_post_end_human_agent_conversation(action: dict, flow_manager: FlowManager):
+    task = flow_manager.task
+    await task.queue_frame(PostEndHumanAgentConversationFrame())
+
+# NOTE: this isn't a "real" post-action because it needs to run after the "I'm patching you through
+# to the customer" speech is actually spoken, not just after sending the LLM the instruction to do
+# so.
+async def post_end_human_agent_conversation(transport: DailyTransport):
+    """Post-action after starting to end the conversation with the human agent, when the agent is being patched through to the customer."""
     customer_participant_id = get_customer_participant_id(transport=transport)
     agent_participant_id = get_human_agent_participant_id(transport=transport)
 
@@ -361,11 +372,11 @@ def create_transferring_to_human_agent_node() -> NodeConfig:
                 handler=pre_transferring_to_human_agent
             )
         ],
-        # TODO: this should only run after LLM "transferring you to agent" speech is spoken
+        # NOTE: "real" post action (post_transferring_to_human_agent) is triggered by CustomControlProcessor
         post_actions=[
             ActionConfig(
-                type="post_transferring_to_human_agent", 
-                handler=post_transferring_to_human_agent
+                type="queue_post_transferring_to_human_agent",
+                handler=queue_post_transferring_to_human_agent
             )
         ]
     )
@@ -431,13 +442,12 @@ def create_end_human_agent_conversation_node() -> NodeConfig:
             },
         ],
         functions=[],
-        # TODO: this should only run after LLM "I'm patching you through" speech is spoken
+        # NOTE: "real" post action (post_end_human_agent_conversation) is triggered by CustomControlProcessor
         post_actions=[
             ActionConfig(
-                type="post_end_human_agent_conversation", 
-                handler=post_end_human_agent_conversation
-            ),
-            ActionConfig(type="end_conversation")
+                type="queue_post_end_human_agent_conversation",
+                handler=queue_post_end_human_agent_conversation
+            )
         ]
     )
 
@@ -532,6 +542,36 @@ async def get_token(user_id: str, permissions: dict, daily_rest_helper: DailyRES
         ))
     )
 
+@dataclass
+class PostTransferringToHumanAgentFrame(ControlFrame):
+    """
+    Indicates that the bot has finished speaking the "transferring you to human agent" speech.
+    """
+    pass
+
+@dataclass
+class PostEndHumanAgentConversationFrame(ControlFrame):
+    """
+    Indicates that the bot has finished speaking the "I'm patching you through to the customer" speech.
+    """
+    pass
+
+class CustomControlProcessor(FrameProcessor):
+    def __init__(self, transport: DailyTransport):
+        super().__init__()
+        self.__transport = transport
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, PostTransferringToHumanAgentFrame):
+            await post_transferring_to_human_agent(transport=self.__transport)
+        elif isinstance(frame, PostEndHumanAgentConversationFrame):
+            await post_end_human_agent_conversation(transport=self.__transport)
+            # TODO: how to trigger EndFrame() from here? we don't have reference to PipelineTask
+            # await self.queue_frame(EndFrame())
+
+        await self.push_frame(frame, direction)
 
 async def main():
     """Main function to set up and run the bot."""
@@ -557,6 +597,7 @@ async def main():
             voice_id="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
         )
         llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
+        custom_control_processor = CustomControlProcessor(transport=transport)
 
         # Initialize context
         context = OpenAILLMContext()
@@ -572,6 +613,7 @@ async def main():
                 tts,
                 transport.output(),
                 context_aggregator.assistant(),
+                custom_control_processor
             ]
         )
         task = PipelineTask(pipeline=pipeline, params=PipelineParams(allow_interruptions=True))
