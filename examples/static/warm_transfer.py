@@ -666,10 +666,8 @@ async def main():
         )
         customer_token = await get_customer_token(daily_rest_helper=daily_rest_helper, room_url=room_url)
         human_agent_token = await get_human_agent_token(daily_rest_helper=daily_rest_helper, room_url=room_url)
-        # TODO: just for local testing; undo below changes
-        prebuilt_room_url = "https://paulkprebuilt.ngrok.io/hello?domain=paulk&customHost=paulk.ngrok.io&apiHost=paulk.ngrok.io&bypassRegionDetection=true"
-        logger.info(f"TO JOIN AS CUSTOMER: {prebuilt_room_url}{'?' if '?' not in room_url else '&'}t={customer_token}")
-        logger.info(f"TO JOIN AS AGENT: {prebuilt_room_url}{'?' if '?' not in room_url else '&'}t={human_agent_token}")
+        logger.info(f"TO JOIN AS CUSTOMER: {room_url}{'?' if '?' not in room_url else '&'}t={customer_token}")
+        logger.info(f"TO JOIN AS AGENT: {room_url}{'?' if '?' not in room_url else '&'}t={human_agent_token}")
 
         # Run the pipeline
         runner = PipelineRunner()
