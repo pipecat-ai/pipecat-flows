@@ -372,8 +372,8 @@ def create_transferring_to_human_agent_node() -> NodeConfig:
                 handler=pre_transferring_to_human_agent
             )
         ],
-        # NOTE: "real" post action (post_transferring_to_human_agent) is triggered by CustomControlProcessor
         post_actions=[
+            # NOTE: "real" post action (post_transferring_to_human_agent) is triggered by CustomControlProcessor
             ActionConfig(
                 type="queue_post_transferring_to_human_agent",
                 handler=queue_post_transferring_to_human_agent
@@ -442,12 +442,13 @@ def create_end_human_agent_conversation_node() -> NodeConfig:
             },
         ],
         functions=[],
-        # NOTE: "real" post action (post_end_human_agent_conversation) is triggered by CustomControlProcessor
         post_actions=[
+            # NOTE: "real" post action (post_end_human_agent_conversation) is triggered by CustomControlProcessor
             ActionConfig(
                 type="queue_post_end_human_agent_conversation",
                 handler=queue_post_end_human_agent_conversation
-            )
+            ),
+            ActionConfig(type="end_conversation")
         ]
     )
 
@@ -568,8 +569,6 @@ class CustomControlProcessor(FrameProcessor):
             await post_transferring_to_human_agent(transport=self.__transport)
         elif isinstance(frame, PostEndHumanAgentConversationFrame):
             await post_end_human_agent_conversation(transport=self.__transport)
-            # TODO: how to trigger EndFrame() from here? we don't have reference to PipelineTask
-            # await self.queue_frame(EndFrame())
 
         await self.push_frame(frame, direction)
 
