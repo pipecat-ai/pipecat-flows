@@ -128,13 +128,31 @@ async def start_order() -> StartOrderResult:
     return StartOrderResult(status="error")
 
 # Action handlers
-async def configure_participants_for_hold_start(action: dict, flow_manager: FlowManager):
-    """Configure the participants' settings (send and receive permissions) for when the customer is put on hold."""
+async def pre_transferring_to_human_agent(action: dict, flow_manager: FlowManager):
+    """Pre-action before starting transferring to the human agent."""
+    transport: DailyTransport = flow_manager.transport
+    customer_participant_id = get_customer_participant_id(transport=transport)
+    
+    # Update the customer:
+    # - Revoke their canSend permission, causing their mic to mute
+    if customer_participant_id:
+        await transport.update_remote_participants(
+            remote_participants={
+                customer_participant_id: {
+                    "permissions": {
+                        "canSend": [],
+                    }
+                }
+            }
+        )
+
+# TODO: this should only run after LLM "transferring you to agent" speech is spoken
+async def post_transferring_to_human_agent(action: dict, flow_manager: FlowManager):
+    """Post-action after starting transferring to the human agent."""
     transport: DailyTransport = flow_manager.transport
     customer_participant_id = get_customer_participant_id(transport=transport)
 
     # Update the customer:
-    # - Revoke their canSend permission, causing their mic to mute
     # - Update their canReceive permission to only be able to hear the bot's hold music; we don't
     #   want them hearing the bot and the human agent talking
     if customer_participant_id:
@@ -142,7 +160,6 @@ async def configure_participants_for_hold_start(action: dict, flow_manager: Flow
             remote_participants={
                 customer_participant_id: {
                     "permissions": {
-                        "canSend": [],
                         "canReceive": {
                             "byUserId": {
                                 "bot": {
@@ -155,7 +172,8 @@ async def configure_participants_for_hold_start(action: dict, flow_manager: Flow
             }
         )
 
-async def configure_participants_for_hold_end(action: dict, flow_manager: FlowManager):
+# TODO: this should only run after LLM "I'm patching you through" speech is spoken
+async def post_end_human_agent_conversation(action: dict, flow_manager: FlowManager):
     """Configure the participants' settings (send and receive permissions) for when the customer is taken off of hold."""
     transport: DailyTransport = flow_manager.transport
     customer_participant_id = get_customer_participant_id(transport=transport)
@@ -163,7 +181,7 @@ async def configure_participants_for_hold_end(action: dict, flow_manager: FlowMa
 
     # Update the customer:
     # - Restore their canSend permission, allowing their mic to be unmuted
-    # - Update their canReceive permission, allowing them hear the human agent
+    # - Update their canReceive permission, allowing them to hear the human agent
     # - Unmute their mic
     if customer_participant_id:
         await transport.update_remote_participants(
@@ -337,11 +355,17 @@ def create_transferring_to_human_agent_node() -> NodeConfig:
             }
         ],
         functions=[],
-        # TODO: hmm, the post action runs before the above task_messages audio is spoken. that's not what we want.
+        pre_actions=[
+            ActionConfig(
+                type="pre_transferring_to_human_agent",
+                handler=pre_transferring_to_human_agent
+            )
+        ],
+        # TODO: this should only run after LLM "transferring you to agent" speech is spoken
         post_actions=[
             ActionConfig(
-                type="configure_participants_for_hold_start", 
-                handler=configure_participants_for_hold_start
+                type="post_transferring_to_human_agent", 
+                handler=post_transferring_to_human_agent
             )
         ]
     )
@@ -407,11 +431,11 @@ def create_end_human_agent_conversation_node() -> NodeConfig:
             },
         ],
         functions=[],
-        # TODO: hmm, the post action runs before the above task_messages audio is spoken. that's not what we want.
+        # TODO: this should only run after LLM "I'm patching you through" speech is spoken
         post_actions=[
             ActionConfig(
-                type="configure_participants_for_hold_end", 
-                handler=configure_participants_for_hold_end
+                type="post_end_human_agent_conversation", 
+                handler=post_end_human_agent_conversation
             ),
             ActionConfig(type="end_conversation")
         ]
@@ -600,8 +624,10 @@ async def main():
         )
         customer_token = await get_customer_token(daily_rest_helper=daily_rest_helper, room_url=room_url)
         human_agent_token = await get_human_agent_token(daily_rest_helper=daily_rest_helper, room_url=room_url)
-        logger.info(f"TO JOIN AS CUSTOMER: {room_url}{'?' if '?' not in room_url else '&'}t={customer_token}")
-        logger.info(f"TO JOIN AS AGENT: {room_url}{'?' if '?' not in room_url else '&'}t={human_agent_token}")
+        # TODO: just for local testing; undo below changes
+        prebuilt_room_url = "https://paulkprebuilt.ngrok.io/hello?domain=paulk&customHost=paulk.ngrok.io&apiHost=paulk.ngrok.io&bypassRegionDetection=true"
+        logger.info(f"TO JOIN AS CUSTOMER: {prebuilt_room_url}{'?' if '?' not in room_url else '&'}t={customer_token}")
+        logger.info(f"TO JOIN AS AGENT: {prebuilt_room_url}{'?' if '?' not in room_url else '&'}t={human_agent_token}")
 
         # Run the pipeline
         runner = PipelineRunner()
