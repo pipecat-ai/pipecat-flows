@@ -22,6 +22,7 @@ Actions are used to perform side effects during conversations, such as:
 """
 
 import asyncio
+from dataclasses import dataclass
 import inspect
 from typing import Callable, Dict, List, Optional
 
@@ -31,9 +32,16 @@ from pipecat.frames.frames import (
     TTSSpeakFrame,
 )
 from pipecat.pipeline.task import PipelineTask
+from pipecat.frames.frames import ControlFrame
 
 from .exceptions import ActionError
-from .types import ActionConfig
+from .types import ActionConfig, FlowActionHandler
+
+
+@dataclass
+class FunctionActionFrame(ControlFrame):
+    action: dict
+    function: FlowActionHandler
 
 
 class ActionManager:
@@ -68,6 +76,12 @@ class ActionManager:
         # Register built-in actions
         self._register_action("tts_say", self._handle_tts_action)
         self._register_action("end_conversation", self._handle_end_action)
+        self._register_action("function", self._handle_function_action)
+
+        @task.event_handler("on_frame_reached_downstream")
+        async def on_frame_reached_downstream(task, frame):
+            if isinstance(frame, FunctionActionFrame):
+                await frame.function(frame.action, flow_manager)
 
     def _register_action(self, action_type: str, handler: Callable) -> None:
         """Register a handler for a specific action type.
@@ -176,3 +190,19 @@ class ActionManager:
         if action.get("text"):  # Optional goodbye message
             await self.task.queue_frame(TTSSpeakFrame(text=action["text"]))
         await self.task.queue_frame(EndFrame())
+
+    async def _handle_function_action(self, action: dict) -> None:
+        """Built-in handler for queuing functions to run "inline" in the pipeline (i.e. when the pipeline is done with all the work queued before it).
+
+        This handler queues a FunctionFrame.
+        It expects a 'handler' key in the action, containing the function to execute.
+
+        Args:
+            action: Dictionary containing the action configuration.
+                Required 'handler' key containing the function to execute.
+        """
+        handler = action.get("handler")
+        if not handler:
+            logger.error("Function action missing 'handler' field")
+            return
+        await self.task.queue_frame(FunctionActionFrame(action=action, function=handler))
