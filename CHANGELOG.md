@@ -33,6 +33,35 @@ async def before_check_availability(function_name: str, flow_manager: FlowManage
 }
 ```
 
+- Added a new "function" action type, which queues a function to run "inline"
+  in the pipeline (i.e. when the pipeline is done with all the work queued
+  before it).
+
+  This is useful for doing things at the end of the bot's turn.
+
+  Example usage:
+
+  ```python
+  async def after_the_fun_fact(action: dict, flow_manager: FlowManager):
+    print("Done telling the user a fun fact.")
+
+  def create_node() -> NodeConfig:
+    return NodeConfig(
+      task_messages=[
+        {
+          "role": "system",
+          "content": "Greet the user and tell them a fun fact."
+        },
+        post_actions=[
+          ActionConfig(
+            type="function",
+            handler=after_the_fun_fact
+          )
+        ]
+      ]
+    )
+  ```
+
 ### Other
 
 - Updated restaurant_reservation.py example to demonstrate the start callback
