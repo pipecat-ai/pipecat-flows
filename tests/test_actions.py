@@ -21,7 +21,7 @@ mocked dependencies for PipelineTask and TTS service.
 
 import unittest
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from pipecat.frames.frames import EndFrame, TTSSpeakFrame
 
@@ -62,6 +62,7 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
         """
         self.mock_task = AsyncMock()
         self.mock_task.queue_frame = AsyncMock()
+        self.mock_task.event_handler = Mock()
 
         self.mock_tts = AsyncMock()
         self.mock_tts.say = AsyncMock()
