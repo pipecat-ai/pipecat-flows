@@ -72,6 +72,7 @@ class ActionManager:
         self.task = task
         self._flow_manager = flow_manager
         self.tts = tts
+        self.function_finished_event = asyncio.Event()
 
         # Register built-in actions
         self._register_action("tts_say", self._handle_tts_action)
@@ -84,6 +85,7 @@ class ActionManager:
         async def on_frame_reached_downstream(task, frame):
             if isinstance(frame, FunctionActionFrame):
                 await frame.function(frame.action, flow_manager)
+                self.function_finished_event.set()
 
     def _register_action(self, action_type: str, handler: Callable) -> None:
         """Register a handler for a specific action type.
@@ -207,4 +209,8 @@ class ActionManager:
         if not handler:
             logger.error("Function action missing 'handler' field")
             return
+        # the reason we're queueing a frame here is to ensure it happens after bot turn is over in 
+        # post_actions
         await self.task.queue_frame(FunctionActionFrame(action=action, function=handler))
+        await self.function_finished_event.wait()
+        self.function_finished_event.clear()
