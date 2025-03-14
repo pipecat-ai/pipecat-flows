@@ -8,7 +8,7 @@ import argparse
 import os
 
 import aiohttp
-from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper
+from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper, DailyMeetingTokenParams, DailyMeetingTokenProperties
 
 
 async def configure(aiohttp_session: aiohttp.ClientSession):
@@ -57,6 +57,12 @@ async def configure_with_args(
     # the future.
     expiry_time: float = 60 * 60
 
-    token = await daily_rest_helper.get_token(url, expiry_time)
+    token = await daily_rest_helper.get_token(
+        url, 
+        expiry_time, 
+        params=DailyMeetingTokenParams(properties=DailyMeetingTokenProperties(
+            user_id="bot"
+        ))
+    )
 
     return (url, token, args)
