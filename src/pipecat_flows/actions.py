@@ -78,6 +78,8 @@ class ActionManager:
         self._register_action("end_conversation", self._handle_end_action)
         self._register_action("function", self._handle_function_action)
 
+        # Wire up function actions
+        task.set_reached_downstream_filter((FunctionActionFrame,))
         @task.event_handler("on_frame_reached_downstream")
         async def on_frame_reached_downstream(task, frame):
             if isinstance(frame, FunctionActionFrame):
