@@ -581,10 +581,16 @@ class FlowManager:
                 for action in action_list:
                     self._register_action_from_config(action)
 
+            original_node = self.current_node
             # Execute pre-actions if any
             if pre_actions := node_config.get("pre_actions"):
                 await self._execute_actions(pre_actions=pre_actions)
-
+                if original_node != self.current_node:
+                    logger.debug(
+                        f"Node changed during pre-actions from {node_id} to {self.current_node}, exiting current set_node"
+                    )
+                    return
+                
             # Combine role and task messages
             messages = []
             if role_messages := node_config.get("role_messages"):
