@@ -581,7 +581,7 @@ class FlowManager:
                 for action in action_list:
                     self._register_action_from_config(action)
 
-            original_node = self.current_node
+            original_node = self.current_node or node_id
             # Execute pre-actions if any
             if pre_actions := node_config.get("pre_actions"):
                 await self._execute_actions(pre_actions=pre_actions)
