@@ -15,7 +15,7 @@ focusing on:
 """
 
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from pipecat.frames.frames import LLMMessagesAppendFrame, LLMMessagesUpdateFrame
 from pipecat.services.anthropic import AnthropicLLMService
@@ -40,6 +40,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         """Set up test fixtures before each test."""
         self.mock_task = AsyncMock()
+        self.mock_task.event_handler = Mock()
 
         # Set up mock LLM with client
         self.mock_llm = OpenAILLMService(api_key="")

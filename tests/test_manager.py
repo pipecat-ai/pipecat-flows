@@ -20,7 +20,7 @@ include mocked dependencies for PipelineTask, LLM services, and TTS.
 
 import unittest
 from typing import Dict
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from pipecat.frames.frames import LLMMessagesAppendFrame, LLMMessagesUpdateFrame
 from pipecat.services.openai import OpenAILLMService
@@ -45,6 +45,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         """Set up test fixtures before each test."""
         self.mock_task = AsyncMock()
+        self.mock_task.event_handler = Mock()
         self.mock_llm = OpenAILLMService(api_key="")
         self.mock_llm.register_function = MagicMock()
         self.mock_tts = AsyncMock()
