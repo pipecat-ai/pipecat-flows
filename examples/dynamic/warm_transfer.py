@@ -36,11 +36,11 @@ Requirements:
 """
 
 import asyncio
+import atexit
 import os
 import sys
 from pathlib import Path
 from typing import Any, Dict
-import atexit
 
 import aiohttp
 from dotenv import load_dotenv
@@ -642,7 +642,9 @@ async def main():
             # hold, informing the human agent if needed
             """If all human participants have left, stop the bot"""
             human_participants = {
-                k: v for k, v in transport.participants().items() if v.get("info", {}).get("userId") in {"agent", "customer"}
+                k: v
+                for k, v in transport.participants().items()
+                if v.get("info", {}).get("userId") in {"agent", "customer"}
             }
             if not human_participants:
                 await task.cancel()
@@ -686,6 +688,7 @@ async def main():
                 except:
                     # Exception if process already done; we don't care, it didn't hurt to try
                     pass
+
         atexit.register(cleanup_hold_music_process)
 
         # Run the pipeline
