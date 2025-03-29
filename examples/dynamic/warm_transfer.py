@@ -40,6 +40,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any, Dict
+import atexit
 
 import aiohttp
 from dotenv import load_dotenv
@@ -155,6 +156,20 @@ async def mute_customer(action: dict, flow_manager: FlowManager):
         )
 
 
+async def start_hold_music(action: dict, flow_manager: FlowManager):
+    hold_music_args = flow_manager.state["hold_music_args"]
+    flow_manager.state["hold_music_process"] = await asyncio.create_subprocess_exec(
+        sys.executable,
+        str(hold_music_args["script_path"]),
+        "-m",
+        hold_music_args["room_url"],
+        "-t",
+        hold_music_args["token"],
+        "-i",
+        hold_music_args["wav_file_path"],
+    )
+
+
 async def make_customer_hear_only_hold_music(action: dict, flow_manager: FlowManager):
     """Make it so the customer only hears hold music.
 
@@ -167,15 +182,7 @@ async def make_customer_hear_only_hold_music(action: dict, flow_manager: FlowMan
         await transport.update_remote_participants(
             remote_participants={
                 customer_participant_id: {
-                    "permissions": {
-                        "canReceive": {
-                            "byUserId": {
-                                "bot": {
-                                    "customAudio": {"hold-music": True},
-                                }
-                            }
-                        }
-                    }
+                    "permissions": {"canReceive": {"byUserId": {"hold-music": True}}}
                 }
             }
         )
@@ -373,6 +380,7 @@ def create_transferring_to_human_agent_node() -> NodeConfig:
             ActionConfig(type="function", handler=mute_customer),
         ],
         post_actions=[
+            ActionConfig(type="function", handler=start_hold_music),
             ActionConfig(type="function", handler=make_customer_hear_only_hold_music),
             ActionConfig(type="function", handler=print_human_agent_join_url),
         ],
@@ -472,7 +480,6 @@ def get_human_agent_participant_id(transport: DailyTransport) -> str:
 
 async def get_customer_token(daily_rest_helper: DailyRESTHelper, room_url: str) -> str:
     """Gets a Daily token for the customer, configured with properties:
-
     {
         user_id: "customer",
         permissions: {
@@ -484,12 +491,17 @@ async def get_customer_token(daily_rest_helper: DailyRESTHelper, room_url: str) 
             }
         }
     }
-
-    Note that they'll join only being able to hear the bot.
     """
     return await get_token(
         user_id="customer",
-        permissions={"canReceive": {"base": False, "byUserId": {"bot": True}}},
+        permissions={
+            "canReceive": {
+                "base": False,
+                "byUserId": {
+                    "bot": True,
+                },
+            }
+        },
         daily_rest_helper=daily_rest_helper,
         room_url=room_url,
     )
@@ -497,32 +509,38 @@ async def get_customer_token(daily_rest_helper: DailyRESTHelper, room_url: str) 
 
 async def get_human_agent_token(daily_rest_helper: DailyRESTHelper, room_url: str) -> str:
     """Gets a Daily token for the human agent, configured with properties:
-
     {
         user_id: "agent",
         permissions: {
             canReceive: {
                 base: false,
                 byUserId: {
-                    bot: {
-                        audio: true,
-                        customAudio: { "hold-music": false }
-                    }
+                    bot: true
                 }
             }
         }
     }
-
-    Note that they'll join only being able to hear the bot's audio (and not the hold music).
     """
     return await get_token(
         user_id="agent",
         permissions={
             "canReceive": {
                 "base": False,
-                "byUserId": {"bot": {"audio": True, "customAudio": {"hold-music": False}}},
+                "byUserId": {
+                    "bot": True,
+                },
             }
         },
+        daily_rest_helper=daily_rest_helper,
+        room_url=room_url,
+    )
+
+
+async def get_hold_music_player_token(daily_rest_helper: DailyRESTHelper, room_url: str) -> str:
+    """Gets a Daily token for the hold music player"""
+    return await get_token(
+        user_id="hold-music",
+        permissions={},
         daily_rest_helper=daily_rest_helper,
         room_url=room_url,
     )
@@ -622,11 +640,11 @@ async def main():
         ):
             # NOTE: an opportunity for refinement here is to handle the customer leaving while on
             # hold, informing the human agent if needed
-            """If all non-bot participants have left, stop the bot"""
-            non_bot_participants = {
-                k: v for k, v in transport.participants().items() if not v["info"]["isLocal"]
+            """If all human participants have left, stop the bot"""
+            human_participants = {
+                k: v for k, v in transport.participants().items() if v.get("info", {}).get("userId") in {"agent", "customer"}
             }
-            if not non_bot_participants:
+            if not human_participants:
                 await task.cancel()
 
         # Print URL for joining as customer, and store URL for joining as human agent, to be printed later
@@ -648,6 +666,27 @@ async def main():
         flow_manager.state["human_agent_join_url"] = (
             f"{room_url}{'?' if '?' not in room_url else '&'}t={human_agent_token}"
         )
+
+        # Prepare hold music args
+        flow_manager.state["hold_music_args"] = {
+            "script_path": Path(__file__).parent / "hold_music" / "hold_music.py",
+            "wav_file_path": Path(__file__).parent / "hold_music" / "hold_music.wav",
+            "room_url": room_url,
+            "token": await get_hold_music_player_token(
+                daily_rest_helper=daily_rest_helper, room_url=room_url
+            ),
+        }
+
+        # Clean up hold music process at exit, if needed
+        def cleanup_hold_music_process():
+            hold_music_process = flow_manager.state.get("hold_music_process")
+            if hold_music_process:
+                try:
+                    hold_music_process.terminate()
+                except:
+                    # Exception if process already done; we don't care, it didn't hurt to try
+                    pass
+        atexit.register(cleanup_hold_music_process)
 
         # Run the pipeline
         runner = PipelineRunner()
