@@ -7,16 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added support for `AWSBedrockLLMService` by adding an `AWSBedrockAdapter`.
+
 ### Changed
 
-- Added `respond_immediately` to `NodeConfig`. Setting it to `False` has the effect of making the
-  bot wait, after the node is activated, for the user to speak before responding.
+- Added `respond_immediately` to `NodeConfig`. Setting it to `False` has the
+  effect of making the bot wait, after the node is activated, for the user to
+  speak before responding.
 
 - Updated to use `FunctionCallParams` as args for the function handler.
 
 - Updated imports to use the new .stt, .llm, and .tts paths.
 
 ### Other
+
+- Added AWS Bedrock examples for insurance and patient_intake.
 
 - Updated examples to `audio_in_enabled=True` and remove `vad_enabled` and
   `vad_audio_passthrough` to align with the latest Pipecat `TransportParams`.
