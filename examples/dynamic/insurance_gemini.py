@@ -310,6 +310,32 @@ def create_quote_results_node(
     }
 
 
+def create_end_node() -> NodeConfig:
+    """Create the final node."""
+    return {
+        "task_messages": [
+            {
+                "role": "system",
+                "content": (
+                    "Thank the customer for their time and end the conversation. "
+                    "Mention that a representative will contact them about the quote."
+                ),
+            }
+        ],
+        "functions": [
+            FlowsFunctionSchema(
+                name="end_conversation",
+                description="End the conversation",
+                properties={
+                    "input_schema": {"type": "object", "properties": {}},
+                },
+                required=[],
+            ),
+        ],
+        "post_actions": [{"type": "end_conversation"}],
+    }
+
+
 async def main():
     """Main function to set up and run the insurance quote bot."""
     async with aiohttp.ClientSession() as session:
