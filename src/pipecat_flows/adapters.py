@@ -25,9 +25,9 @@ from pipecat.adapters.base_llm_adapter import BaseLLMAdapter
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.adapters.services.anthropic_adapter import AnthropicLLMAdapter
+from pipecat.adapters.services.bedrock_adapter import AWSBedrockLLMAdapter
 from pipecat.adapters.services.gemini_adapter import GeminiLLMAdapter
 from pipecat.adapters.services.open_ai_adapter import OpenAILLMAdapter
-from pipecat.adapters.services.bedrock_adapter import BedrockLLMAdapter
 
 from .types import FlowsFunctionSchema
 
@@ -494,7 +494,7 @@ class GeminiAdapter(LLMAdapter):
         )
 
 
-class BedrockAdapter(LLMAdapter):
+class AWSBedrockAdapter(LLMAdapter):
     """Format adapter for AWS Bedrock.
 
     Handles both Anthropic Claude and Amazon Nova models on AWS Bedrock,
@@ -504,7 +504,7 @@ class BedrockAdapter(LLMAdapter):
     def __init__(self):
         """Initialize the Bedrock adapter."""
         super().__init__()
-        self.provider_adapter = BedrockLLMAdapter()
+        self.provider_adapter = AWSBedrockLLMAdapter()
 
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from Bedrock function definition.
@@ -520,7 +520,10 @@ class BedrockAdapter(LLMAdapter):
 
     def format_summary_message(self, summary: str) -> dict:
         """Format summary as a user message for Bedrock models."""
-        return {"role": "user", "content": [{"text": f"Here's a summary of the conversation:\n{summary}"}]}
+        return {
+            "role": "user",
+            "content": [{"text": f"Here's a summary of the conversation:\n{summary}"}],
+        }
 
     async def generate_summary(
         self, llm: Any, summary_prompt: str, messages: List[dict]
@@ -529,7 +532,7 @@ class BedrockAdapter(LLMAdapter):
         try:
             # Determine if we're using Claude or Nova based on model ID
             model_id = llm.model_name
-            
+
             # Prepare request parameters
             request_params = {
                 "modelId": model_id,
@@ -543,16 +546,20 @@ class BedrockAdapter(LLMAdapter):
                     "maxTokens": 8192,
                     "temperature": 0.7,
                     "topP": 0.9,
-                }
+                },
             }
-            
+
             request_params["system"] = [{"text": summary_prompt}]
-            
+
             # Call Bedrock without streaming
             response = llm._client.converse(**request_params)
-            
+
             # Extract the response text
-            if "output" in response and "message" in response["output"] and "content" in response["output"]["message"]:
+            if (
+                "output" in response
+                and "message" in response["output"]
+                and "content" in response["output"]["message"]
+            ):
                 content = response["output"]["message"]["content"]
                 if isinstance(content, list):
                     for item in content:
@@ -560,7 +567,7 @@ class BedrockAdapter(LLMAdapter):
                             return item["text"]
                 elif isinstance(content, str):
                     return content
-            
+
             return None
 
         except Exception as e:
@@ -579,7 +586,7 @@ class BedrockAdapter(LLMAdapter):
         # Bedrock uses the same format as Anthropic for tools
         name = function_def["name"]
         description = function_def.get("description", "")
-        
+
         # Handle both possible schema formats
         if "input_schema" in function_def:
             input_schema = function_def.get("input_schema", {})
@@ -624,7 +631,7 @@ class BedrockAdapter(LLMAdapter):
             transition_callback=transition_callback,
         )
 
-        
+
 def create_adapter(llm) -> LLMAdapter:
     """Create appropriate adapter based on LLM service type or inheritance.
 
@@ -655,9 +662,9 @@ def create_adapter(llm) -> LLMAdapter:
         logger.debug("Creating Google adapter")
         return GeminiAdapter()
 
-    if llm_type == "BedrockLLMService":
+    if llm_type == "AWSBedrockLLMService":
         logger.debug("Creating Bedrock adapter")
-        return BedrockAdapter()
+        return AWSBedrockAdapter()
 
     # Try to find OpenAILLMService for inheritance check
     try:
@@ -678,7 +685,7 @@ def create_adapter(llm) -> LLMAdapter:
     error_msg += "Make sure you have installed the required dependency:\n"
     error_msg += "- For OpenAI: pip install 'pipecat-ai[openai]'\n"
     error_msg += "- For Anthropic: pip install 'pipecat-ai[anthropic]'\n"
-    error_msg += "- For Google: pip install 'pipecat-ai[google]'"
+    error_msg += "- For Google: pip install 'pipecat-ai[google]'\n"
     error_msg += "- For Bedrock: pip install 'pipecat-ai[aws]'"
 
     raise ValueError(error_msg)
