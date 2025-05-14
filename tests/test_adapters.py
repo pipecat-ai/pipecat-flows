@@ -7,7 +7,7 @@
 """Tests for LLM provider adapters.
 
 This module tests the adapter classes that normalize function formats between
-Pipecat Flows and different LLM providers (OpenAI, Anthropic, and Gemini).
+Pipecat Flows and different LLM providers (OpenAI, Anthropic, Gemini, and AWS Bedrock).
 
 Tests:
     - Native format handling for each provider
@@ -21,7 +21,12 @@ Mocks:
 
 import pytest
 
-from pipecat_flows.adapters import AnthropicAdapter, GeminiAdapter, OpenAIAdapter
+from pipecat_flows.adapters import (
+    AnthropicAdapter,
+    AWSBedrockAdapter,
+    GeminiAdapter,
+    OpenAIAdapter,
+)
 from pipecat_flows.types import FlowsFunctionSchema
 
 
@@ -379,3 +384,170 @@ def test_gemini_adapter_function_schema(gemini_adapter):
     # Verify flow-specific fields not in formatted output
     assert "handler" not in formatted[0]["function_declarations"][0]
     assert "transition_to" not in formatted[0]["function_declarations"][0]
+
+
+# Mock AWS Bedrock adapter to avoid actual network calls
+class MockAWSBedrockLLMAdapter:
+    def to_provider_tools_format(self, tools_schema):
+        # Simple mock that returns standard tools as AWS Bedrock expects them (using Claude format)
+        return [
+            {
+                "name": func.name,
+                "description": func.description,
+                "input_schema": {
+                    "json": {
+                        "type": "object",
+                        "properties": func.properties,
+                        "required": func.required,
+                    }
+                },
+            }
+            for func in tools_schema.standard_tools
+        ]
+
+
+# Fixture for the AWS Bedrock adapter
+@pytest.fixture
+def bedrock_adapter():
+    adapter = AWSBedrockAdapter()
+    adapter.provider_adapter = MockAWSBedrockLLMAdapter()
+    return adapter
+
+
+def test_bedrock_adapter_native_format(bedrock_adapter):
+    """Test AWS Bedrock adapter properly handles native Bedrock format."""
+    # Create a function in Bedrock's native format (Claude-style)
+    bedrock_function = {
+        "name": "get_weather",
+        "description": "Get the current weather in a location",
+        "input_schema": {
+            "json": {
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "The city and state, e.g. San Francisco, CA",
+                    },
+                    "unit": {
+                        "type": "string",
+                        "enum": ["celsius", "fahrenheit"],
+                        "description": "The unit of temperature",
+                    },
+                },
+                "required": ["location"],
+            }
+        },
+        "handler": lambda x: x,
+        "transition_to": "next_step",
+    }
+
+    # Get function name from dictionary
+    function_name = bedrock_adapter.get_function_name(bedrock_function)
+    assert function_name == "get_weather"
+
+    # Convert to FlowsFunctionSchema
+    schema = bedrock_adapter.convert_to_function_schema(bedrock_function)
+    assert isinstance(schema, FlowsFunctionSchema)
+    assert schema.name == "get_weather"
+    assert schema.description == "Get the current weather in a location"
+    assert "location" in schema.properties
+    assert "unit" in schema.properties
+    assert schema.required == ["location"]
+    assert schema.handler is not None
+    assert schema.transition_to == "next_step"
+    assert schema.transition_callback is None
+
+    # Format function for Bedrock
+    formatted = bedrock_adapter.format_functions([bedrock_function])
+    assert len(formatted) == 1
+    assert formatted[0]["name"] == "get_weather"
+    assert formatted[0]["description"] == "Get the current weather in a location"
+    assert "json" in formatted[0]["input_schema"]
+    assert "location" in formatted[0]["input_schema"]["json"]["properties"]
+
+    # Verify flow-specific fields not in formatted output
+    assert "handler" not in formatted[0]
+    assert "transition_to" not in formatted[0]
+
+
+def test_bedrock_adapter_function_schema(bedrock_adapter):
+    """Test AWS Bedrock adapter properly handles FlowsFunctionSchema."""
+    # Create a FlowsFunctionSchema
+    flows_schema = FlowsFunctionSchema(
+        name="get_weather",
+        description="Get the current weather in a location",
+        properties={
+            "location": {
+                "type": "string",
+                "description": "The city and state, e.g. San Francisco, CA",
+            },
+            "unit": {
+                "type": "string",
+                "enum": ["celsius", "fahrenheit"],
+                "description": "The unit of temperature",
+            },
+        },
+        required=["location"],
+        handler=lambda x: x,
+        transition_callback=lambda x, y: None,
+    )
+
+    # Get function name from schema
+    function_name = bedrock_adapter.get_function_name(flows_schema)
+    assert function_name == "get_weather"
+
+    # Format schema for Bedrock
+    formatted = bedrock_adapter.format_functions([flows_schema])
+    assert len(formatted) == 1
+    assert formatted[0]["name"] == "get_weather"
+    assert formatted[0]["description"] == "Get the current weather in a location"
+    assert "json" in formatted[0]["input_schema"]
+    assert "location" in formatted[0]["input_schema"]["json"]["properties"]
+    assert "unit" in formatted[0]["input_schema"]["json"]["properties"]
+    assert formatted[0]["input_schema"]["json"]["required"] == ["location"]
+
+    # Verify flow-specific fields not in formatted output
+    assert "handler" not in formatted[0]
+    assert "transition_callback" not in formatted[0]
+
+
+def test_bedrock_adapter_toolspec_format(bedrock_adapter):
+    """Test AWS Bedrock adapter properly handles the toolSpec format."""
+    # Create a function using the Bedrock toolSpec format (alternative format)
+    bedrock_toolspec_function = {
+        "toolSpec": {
+            "name": "get_weather",
+            "description": "Get the current weather in a location",
+            "inputSchema": {
+                "json": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA",
+                        },
+                        "unit": {
+                            "type": "string",
+                            "enum": ["celsius", "fahrenheit"],
+                            "description": "The unit of temperature",
+                        },
+                    },
+                    "required": ["location"],
+                }
+            },
+        },
+        "handler": lambda x: x,
+        "transition_to": "next_step",
+    }
+
+    # Convert to FlowsFunctionSchema
+    schema = bedrock_adapter.convert_to_function_schema(bedrock_toolspec_function)
+    assert isinstance(schema, FlowsFunctionSchema)
+    assert schema.name == "get_weather"
+    assert schema.description == "Get the current weather in a location"
+    assert "location" in schema.properties
+    assert "unit" in schema.properties
+    assert schema.required == ["location"]
+    assert schema.handler is not None
+    assert schema.transition_to == "next_step"
+    assert schema.transition_callback is None

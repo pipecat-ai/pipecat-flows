@@ -583,38 +583,40 @@ class AWSBedrockAdapter(LLMAdapter):
         Returns:
             FlowsFunctionSchema equivalent with flow-specific fields
         """
-        # Bedrock uses the same format as Anthropic for tools
-        name = function_def["name"]
-        description = function_def.get("description", "")
+        # Initialize with default values
+        name = ""
+        description = ""
+        properties = {}
+        required = []
 
-        # Handle both possible schema formats
-        if "input_schema" in function_def:
-            input_schema = function_def.get("input_schema", {})
-            if "json" in input_schema:
-                # Handle nested json schema format
-                schema = input_schema["json"]
-                properties = schema.get("properties", {})
-                required = schema.get("required", [])
-            else:
-                # Handle direct schema format
-                properties = input_schema.get("properties", {})
-                required = input_schema.get("required", [])
-        elif "toolSpec" in function_def:
+        # Check for toolSpec format first
+        if "toolSpec" in function_def:
             # Handle toolSpec format
             tool_spec = function_def["toolSpec"]
-            name = tool_spec.get("name", name)
-            description = tool_spec.get("description", description)
+            name = tool_spec.get("name", "")
+            description = tool_spec.get("description", "")
             input_schema = tool_spec.get("inputSchema", {})
             if "json" in input_schema:
                 schema = input_schema["json"]
                 properties = schema.get("properties", {})
                 required = schema.get("required", [])
-            else:
-                properties = {}
-                required = []
+        # Handle standard formats
         else:
-            properties = {}
-            required = []
+            name = function_def["name"]  # Now safe to access after checking toolSpec
+            description = function_def.get("description", "")
+
+            # Handle both possible schema formats
+            if "input_schema" in function_def:
+                input_schema = function_def.get("input_schema", {})
+                if "json" in input_schema:
+                    # Handle nested json schema format
+                    schema = input_schema["json"]
+                    properties = schema.get("properties", {})
+                    required = schema.get("required", [])
+                else:
+                    # Handle direct schema format
+                    properties = input_schema.get("properties", {})
+                    required = input_schema.get("required", [])
 
         # Extract Flows-specific fields
         handler = function_def.get("handler")
