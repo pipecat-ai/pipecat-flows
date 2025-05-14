@@ -36,8 +36,36 @@ from pipecat.frames.frames import (
     LLMSetToolsFrame,
 )
 from pipecat.pipeline.task import PipelineTask
-from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.base_transport import BaseTransport
+
+# Try to import new API, fall back to compatibility mode if not available
+try:
+    from pipecat.services.llm_service import FunctionCallParams
+
+    USING_FUNCTION_CALL_PARAMS = True
+except ImportError:
+    USING_FUNCTION_CALL_PARAMS = False
+
+    # Define a placeholder class for backward compatibility
+    class FunctionCallParams:
+        """Temporary compatibility class. Will be removed in future versions."""
+
+        def __init__(
+            self,
+            function_name=None,
+            tool_call_id=None,
+            arguments=None,
+            llm=None,
+            context=None,
+            result_callback=None,
+        ):
+            self.function_name = function_name
+            self.tool_call_id = tool_call_id
+            self.arguments = arguments
+            self.llm = llm
+            self.context = context
+            self.result_callback = result_callback
+
 
 from .actions import ActionError, ActionManager
 from .adapters import create_adapter
@@ -342,44 +370,90 @@ class FlowManager:
             """Handle context updates for node functions without transitions."""
             decrease_pending_function_calls()
 
-        async def transition_func(params: FunctionCallParams) -> None:
-            """Inner function that handles the actual tool invocation."""
-            try:
-                # Track pending function call
-                self._pending_function_calls += 1
-                logger.debug(
-                    f"Function call pending: {name} (total: {self._pending_function_calls})"
-                )
+        if USING_FUNCTION_CALL_PARAMS:
+            # Modern API version
+            async def transition_func(params: FunctionCallParams) -> None:
+                try:
+                    # Track pending function call
+                    self._pending_function_calls += 1
+                    logger.debug(
+                        f"Function call pending: {name} (total: {self._pending_function_calls})"
+                    )
 
-                # Execute handler if present
-                if handler:
-                    result = await self._call_handler(handler, params.arguments)
-                    logger.debug(f"Handler completed for {name}")
-                else:
-                    result = {"status": "acknowledged"}
-                    logger.debug(f"Function called without handler: {name}")
-
-                # For edge functions, prevent LLM completion until transition (run_llm=False)
-                # For node functions, allow immediate completion (run_llm=True)
-                async def on_context_updated() -> None:
-                    if is_edge_function:
-                        await on_context_updated_edge(
-                            params.arguments, result, params.result_callback
-                        )
+                    # Execute handler if present
+                    if handler:
+                        result = await self._call_handler(handler, params.arguments)
+                        logger.debug(f"Handler completed for {name}")
                     else:
-                        await on_context_updated_node()
+                        result = {"status": "acknowledged"}
+                        logger.debug(f"Function called without handler: {name}")
 
-                properties = FunctionCallResultProperties(
-                    run_llm=not is_edge_function,
-                    on_context_updated=on_context_updated,
-                )
-                await params.result_callback(result, properties=properties)
+                    # For edge functions, prevent LLM completion until transition (run_llm=False)
+                    # For node functions, allow immediate completion (run_llm=True)
+                    async def on_context_updated() -> None:
+                        if is_edge_function:
+                            await on_context_updated_edge(
+                                params.arguments, result, params.result_callback
+                            )
+                        else:
+                            await on_context_updated_node()
 
-            except Exception as e:
-                logger.error(f"Error in transition function {name}: {str(e)}")
-                self._pending_function_calls = 0
-                error_result = {"status": "error", "error": str(e)}
-                await params.result_callback(error_result)
+                    properties = FunctionCallResultProperties(
+                        run_llm=not is_edge_function,
+                        on_context_updated=on_context_updated,
+                    )
+                    await params.result_callback(result, properties=properties)
+
+                except Exception as e:
+                    logger.error(f"Error in transition function {name}: {str(e)}")
+                    self._pending_function_calls = 0
+                    error_result = {"status": "error", "error": str(e)}
+                    await params.result_callback(error_result)
+
+        else:
+            # Legacy API version - supports old parameter format
+            async def transition_func(
+                function_name=None,
+                tool_call_id=None,
+                args=None,
+                llm=None,
+                context=None,
+                result_callback=None,
+            ) -> None:
+                try:
+                    # Track pending function call
+                    self._pending_function_calls += 1
+                    logger.debug(
+                        f"Function call pending: {name} (total: {self._pending_function_calls})"
+                    )
+
+                    # Execute handler if present
+                    if handler:
+                        result = await self._call_handler(handler, args)
+                        logger.debug(f"Handler completed for {name}")
+                    else:
+                        result = {"status": "acknowledged"}
+                        logger.debug(f"Function called without handler: {name}")
+
+                    # For edge functions, prevent LLM completion until transition (run_llm=False)
+                    # For node functions, allow immediate completion (run_llm=True)
+                    async def on_context_updated() -> None:
+                        if is_edge_function:
+                            await on_context_updated_edge(args, result, result_callback)
+                        else:
+                            await on_context_updated_node()
+
+                    properties = FunctionCallResultProperties(
+                        run_llm=not is_edge_function,
+                        on_context_updated=on_context_updated,
+                    )
+                    await result_callback(result, properties=properties)
+
+                except Exception as e:
+                    logger.error(f"Error in transition function {name}: {str(e)}")
+                    self._pending_function_calls = 0
+                    error_result = {"status": "error", "error": str(e)}
+                    await result_callback(error_result)
 
         return transition_func
 
