@@ -25,9 +25,18 @@ from pipecat.adapters.base_llm_adapter import BaseLLMAdapter
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.adapters.services.anthropic_adapter import AnthropicLLMAdapter
-from pipecat.adapters.services.bedrock_adapter import AWSBedrockLLMAdapter
 from pipecat.adapters.services.gemini_adapter import GeminiLLMAdapter
 from pipecat.adapters.services.open_ai_adapter import OpenAILLMAdapter
+
+try:
+    from pipecat.adapters.services.bedrock_adapter import AWSBedrockLLMAdapter
+except ImportError:
+
+    class AWSBedrockLLMAdapter:
+        """Placeholder for AWSBedrockLLMAdapter when not available."""
+
+        pass
+
 
 from .types import FlowsFunctionSchema
 
