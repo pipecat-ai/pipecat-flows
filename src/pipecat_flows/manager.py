@@ -482,6 +482,9 @@ class FlowManager:
             self._validate_node_config(node_id, node_config)
             logger.debug(f"Setting node: {node_id}")
 
+            # Clear any deferred post-actions from previous node
+            self.action_manager.clear_deferred_post_actions()
+
             # Register action handlers from config
             for action_list in [
                 node_config.get("pre_actions", []),
@@ -558,18 +561,27 @@ class FlowManager:
             self.current_functions = new_functions
 
             # Trigger completion with new context
-            if self._context_aggregator and node_config.get("respond_immediately", True):
+            respond_immediately = node_config.get("respond_immediately", True)
+            if self._context_aggregator and respond_immediately:
                 await self.task.queue_frames([self._context_aggregator.user().get_context_frame()])
 
             # Execute post-actions if any
             if post_actions := node_config.get("post_actions"):
-                await self._execute_actions(post_actions=post_actions)
+                if respond_immediately:
+                    await self._execute_actions(post_actions=post_actions)
+                else:
+                    # Schedule post-actions for execution after first LLM response in this node
+                    print("[pk] Scheduling post-actions for execution after LLM response")
+                    self._schedule_deferred_post_actions(post_actions=post_actions)
 
             logger.debug(f"Successfully set node: {node_id}")
 
         except Exception as e:
             logger.error(f"Error setting node {node_id}: {str(e)}")
             raise FlowError(f"Failed to set node {node_id}: {str(e)}") from e
+
+    def _schedule_deferred_post_actions(self, post_actions: List[ActionConfig]) -> None:
+        self.action_manager.schedule_deferred_post_actions(post_actions=post_actions)
 
     async def _create_conversation_summary(
         self, summary_prompt: str, messages: List[dict]
