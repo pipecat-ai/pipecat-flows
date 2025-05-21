@@ -24,12 +24,28 @@ class TestFlowsFunction(unittest.TestCase):
     def test_description_is_set_from_function(self):
         """Test that FlowsFunction extracts the description from the function."""
 
-        def my_function():
+        def my_function_short_description():
             """This is a test function."""
             return {}
 
-        func = FlowsFunction(function=my_function)
+        func = FlowsFunction(function=my_function_short_description)
         self.assertEqual(func.description, "This is a test function.")
+
+        def my_function_long_description():
+            """
+            This is a test function.
+
+            It does some really cool stuff.
+
+            Trust me, you'll want to use it.
+            """
+            return {}
+
+        func = FlowsFunction(function=my_function_long_description)
+        self.assertEqual(
+            func.description,
+            "This is a test function.\n\nIt does some really cool stuff.\n\nTrust me, you'll want to use it.",
+        )
 
     def test_properties_are_set_from_function(self):
         """Test that FlowsFunction extracts the properties from the function."""
@@ -99,6 +115,38 @@ class TestFlowsFunction(unittest.TestCase):
 
         func = FlowsFunction(function=my_function_complex_params)
         self.assertEqual(func.required, ["address_lines"])
+
+    def test_property_descriptions_are_set_from_function(self):
+        """Test that FlowsFunction extracts the property descriptions from the function."""
+
+        def my_function(name: str, age: int, height: Union[float, None]):
+            """
+            This is a test function.
+
+            Args:
+                name (str): The name of the person.
+                age (int): The age of the person.
+                height (float | None): The height of the person in meters. Defaults to None.
+            """
+            return {}
+
+        func = FlowsFunction(function=my_function)
+
+        # Validate that the function description is still set correctly even with the longer docstring
+        self.assertEqual(func.description, "This is a test function.")
+
+        # Validate that the property descriptions are set correctly
+        self.assertEqual(
+            func.properties,
+            {
+                "name": {"type": "string", "description": "The name of the person."},
+                "age": {"type": "integer", "description": "The age of the person."},
+                "height": {
+                    "anyOf": [{"type": "number"}, {"type": "null"}],
+                    "description": "The height of the person in meters. Defaults to None.",
+                },
+            },
+        )
 
 
 if __name__ == "__main__":
