@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional, Union
 import unittest
 
 from pipecat_flows.types import FlowsFunction
@@ -54,7 +54,7 @@ class TestFlowsFunction(unittest.TestCase):
         )
 
         def my_function_complex_params(
-            address_lines: list[str], nickname: Union[str, int], extra: Union[dict[str, str], None]
+            address_lines: list[str], nickname: Union[str, int], extra: Optional[dict[str, str]]
         ):
             return {}
 
