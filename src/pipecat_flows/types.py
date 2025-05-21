@@ -17,9 +17,9 @@ and function interactions.
 """
 
 import inspect
+import types
 from dataclasses import dataclass
 from enum import Enum
-import types
 from typing import (
     Any,
     Awaitable,
@@ -239,28 +239,29 @@ class FlowsFunction:
         # TODO: should ignore args and return type, right? Just the top-level docstring?
         self.description = inspect.getdoc(self.function) or ""
 
-        # Get function properties as JSON schema
-        # TODO: also get whether each property is required
+        # Get function parameters as JSON schemas, and the list of required parameters
         # TODO: is there a way to get "args" from doc string and use it to fill in descriptions?
-        self.properties = self._get_parameters_as_jsonschema(self.function)
+        self.properties, self.required = self._get_parameters_as_jsonschema(self.function)
 
     # TODO: maybe to better support things like enums, check if each type is a pydantic type and use its convert-to-jsonschema function
-    def _get_parameters_as_jsonschema(self, func: Callable) -> Dict[str, Any]:
+    def _get_parameters_as_jsonschema(self, func: Callable) -> Tuple[Dict[str, Any], List[str]]:
         """
-        Get function parameters as a dictionary of JSON schemas.
+        Get function parameters as a dictionary of JSON schemas and a list of required parameters.
 
         Args:
             func: Function to get parameters from
 
         Returns:
-            A dictionary mapping each function parameter to its JSON schema
+            A tuple containing:
+                - A dictionary mapping each function parameter to its JSON schema
+                - A list of required parameter names
         """
 
         sig = inspect.signature(func)
         hints = get_type_hints(func)
         properties = {}
+        required = []
 
-        # TODO: use param or ignore it
         for name, param in sig.parameters.items():
             # Ignore 'self' parameter
             if name == "self":
@@ -271,7 +272,12 @@ class FlowsFunction:
             # Convert type hint to JSON schema
             properties[name] = self._typehint_to_jsonschema(type_hint)
 
-        return properties
+            # Check if the parameter is required
+            # If the parameter has no default value, it's required
+            if param.default is inspect.Parameter.empty:
+                required.append(name)
+
+        return properties, required
 
     # TODO: test this way more, throwing crazy types at it
     def _typehint_to_jsonschema(self, type_hint: Any) -> Dict[str, Any]:
@@ -309,18 +315,7 @@ class FlowsFunction:
 
         # Handle Optional/Union types
         if origin is Union or origin is types.UnionType:
-            # Check if this is an Optional (Union with None)
-            has_none = type(None) in args
-            non_none_args = [arg for arg in args if arg is not type(None)]
-
-            if has_none and len(non_none_args) == 1:
-                # This is an Optional[X]
-                schema = self._typehint_to_jsonschema(non_none_args[0])
-                schema["nullable"] = True
-                return schema
-            else:
-                # This is a general Union
-                return {"anyOf": [self._typehint_to_jsonschema(arg) for arg in args]}
+            return {"anyOf": [self._typehint_to_jsonschema(arg) for arg in args]}
 
         # Handle List, Tuple, Set with specific item types
         if origin in (list, List, tuple, Tuple, set, Set) and args:
