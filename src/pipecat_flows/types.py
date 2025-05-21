@@ -16,6 +16,7 @@ These types provide structure and validation for flow configurations
 and function interactions.
 """
 
+import inspect
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Awaitable, Callable, Dict, List, Optional, TypedDict, TypeVar, Union
@@ -215,9 +216,7 @@ class FlowsFunction:
 
     def _initialize_metadata(self):
         self.name = self.function.__name__
-        self.description = (
-            self.function.__doc__
-        )  # TODO: do we need a default description? what happens if it's None?
+        self.description = inspect.getdoc(self.function)
 
 
 class NodeConfigRequired(TypedDict):
