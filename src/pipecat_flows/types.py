@@ -208,6 +208,18 @@ class FlowsFunctionSchema:
         )
 
 
+class FlowsFunction:
+    def __init__(self, function: Callable):
+        self.function = function
+        self._initialize_metadata()
+
+    def _initialize_metadata(self):
+        self.name = self.function.__name__
+        self.description = (
+            self.function.__doc__
+        )  # TODO: do we need a default description? what happens if it's None?
+
+
 class NodeConfigRequired(TypedDict):
     """Required fields for node configuration."""
 
