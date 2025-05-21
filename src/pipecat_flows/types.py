@@ -216,7 +216,7 @@ class FlowsFunction:
 
     def _initialize_metadata(self):
         self.name = self.function.__name__
-        self.description = inspect.getdoc(self.function)
+        self.description = inspect.getdoc(self.function) or ""
 
 
 class NodeConfigRequired(TypedDict):
