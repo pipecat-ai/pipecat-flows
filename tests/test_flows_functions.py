@@ -40,17 +40,21 @@ class TestFlowsFunction(unittest.TestCase):
         func = FlowsFunction(function=my_function_no_params)
         self.assertEqual(func.properties, {})
 
-        def my_function_simple_params(name: str, age: int, height: float):
+        def my_function_simple_params(name: str, age: int, height: Union[float, None]):
             return {}
 
         func = FlowsFunction(function=my_function_simple_params)
         self.assertEqual(
             func.properties,
-            {"name": {"type": "string"}, "age": {"type": "integer"}, "height": {"type": "number"}},
+            {
+                "name": {"type": "string"},
+                "age": {"type": "integer"},
+                "height": {"type": "number", "nullable": True},
+            },
         )
 
         def my_function_complex_params(
-            address_lines: list[str], extra: Union[dict[str, str], None]
+            address_lines: list[str], nickname: Union[str, int], extra: Union[dict[str, str], None]
         ):
             return {}
 
@@ -59,6 +63,7 @@ class TestFlowsFunction(unittest.TestCase):
             func.properties,
             {
                 "address_lines": {"type": "array", "items": {"type": "string"}},
+                "nickname": {"anyOf": [{"type": "string"}, {"type": "integer"}]},
                 "extra": {
                     "type": "object",
                     "additionalProperties": {"type": "string"},
