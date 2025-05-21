@@ -19,8 +19,24 @@ and function interactions.
 import inspect
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional, TypedDict, TypeVar, Union
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypedDict,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
+from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 
 T = TypeVar("T")
@@ -215,8 +231,127 @@ class FlowsFunction:
         self._initialize_metadata()
 
     def _initialize_metadata(self):
+        # Get function name
         self.name = self.function.__name__
+
+        # Get function description
+        # TODO: should ignore args and return type, right? Just the top-level docstring?
         self.description = inspect.getdoc(self.function) or ""
+
+        # Get function properties as JSON schema
+        # TODO: also get whether each property is required
+        # TODO: is there a way to get "args" from doc string and use it to fill in descriptions?
+        self.properties = self._get_parameters_as_jsonschema(self.function)
+
+    # TODO: maybe to better support things like enums, check if each type is a pydantic type and use its convert-to-jsonschema function
+    def _get_parameters_as_jsonschema(self, func: Callable) -> Dict[str, Any]:
+        """
+        Get function parameters as a dictionary of JSON schemas.
+
+        Args:
+            func: Function to get parameters from
+
+        Returns:
+            A dictionary mapping each function parameter to its JSON schema
+        """
+
+        sig = inspect.signature(func)
+        hints = get_type_hints(func)
+        properties = {}
+
+        # TODO: use param or ignore it
+        for name, param in sig.parameters.items():
+            # Ignore 'self' parameter
+            if name == "self":
+                continue
+
+            type_hint = hints.get(name)
+
+            # Convert type hint to JSON schema
+            properties[name] = self._typehint_to_jsonschema(type_hint)
+
+        return properties
+
+    # TODO: test this way more, throwing crazy types at it
+    def _typehint_to_jsonschema(self, type_hint: Any) -> Dict[str, Any]:
+        """
+        Convert a Python type hint to a JSON Schema.
+
+        Args:
+            hint: A Python type hint
+
+        Returns:
+            A dictionary representing the JSON Schema
+        """
+        if type_hint is None:
+            return {}
+
+        # Handle basic types
+        if type_hint is type(None):
+            return {"type": "null"}
+        if type_hint is str:
+            return {"type": "string"}
+        elif type_hint is int:
+            return {"type": "integer"}
+        elif type_hint is float:
+            return {"type": "number"}
+        elif type_hint is bool:
+            return {"type": "boolean"}
+        elif type_hint is dict or type_hint is Dict:
+            return {"type": "object"}
+        elif type_hint is list or type_hint is List:
+            return {"type": "array"}
+
+        # Get origin and arguments for complex types
+        origin = get_origin(type_hint)
+        args = get_args(type_hint)
+
+        # Handle Optional/Union types
+        if origin is Union:
+            # Check if this is an Optional (Union with None)
+            has_none = type(None) in args
+            non_none_args = [arg for arg in args if arg is not type(None)]
+
+            if has_none and len(non_none_args) == 1:
+                # This is an Optional[X]
+                schema = self._typehint_to_jsonschema(non_none_args[0])
+                schema["nullable"] = True
+                return schema
+            else:
+                # This is a general Union
+                return {"anyOf": [self._typehint_to_jsonschema(arg) for arg in args]}
+
+        # Handle List, Tuple, Set with specific item types
+        if origin in (list, List, tuple, Tuple, set, Set) and args:
+            return {"type": "array", "items": self._typehint_to_jsonschema(args[0])}
+
+        # Handle Dict with specific key/value types
+        if origin in (dict, Dict) and len(args) == 2:
+            # For JSON Schema, keys must be strings
+            return {"type": "object", "additionalProperties": self._typehint_to_jsonschema(args[1])}
+
+        # Handle TypedDict
+        if hasattr(type_hint, "__annotations__"):
+            properties = {}
+            required = []
+
+            for field_name, field_type in get_type_hints(type_hint).items():
+                properties[field_name] = self._typehint_to_jsonschema(field_type)
+                # Check if field is required (this is a simplification, might need adjustment)
+                if not getattr(type_hint, "__total__", True) or not isinstance(
+                    field_type, Optional
+                ):
+                    required.append(field_name)
+
+            schema = {"type": "object", "properties": properties}
+
+            if required:
+                schema["required"] = required
+
+            return schema
+
+        # Default to any type if we can't determine the specific schema
+        return {}
 
 
 class NodeConfigRequired(TypedDict):
