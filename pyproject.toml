@@ -21,6 +21,7 @@ classifiers = [
 dependencies = [
     "pipecat-ai>=0.0.67",
     "loguru~=0.7.2",
+    "docstring_parser~=0.16"
 ]
 
 [project.urls]
