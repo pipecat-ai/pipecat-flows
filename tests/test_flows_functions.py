@@ -54,7 +54,7 @@ class TestFlowsFunction(unittest.TestCase):
         )
 
         def my_function_complex_params(
-            address_lines: list[str], nickname: Union[str, int], extra: Optional[dict[str, str]]
+            address_lines: list[str], nickname: str | int, extra: Optional[dict[str, str]]
         ):
             return {}
 

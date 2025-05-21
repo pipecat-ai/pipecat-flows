@@ -19,6 +19,7 @@ and function interactions.
 import inspect
 from dataclasses import dataclass
 from enum import Enum
+import types
 from typing import (
     Any,
     Awaitable,
@@ -307,7 +308,7 @@ class FlowsFunction:
         args = get_args(type_hint)
 
         # Handle Optional/Union types
-        if origin is Union:
+        if origin is Union or origin is types.UnionType:
             # Check if this is an Optional (Union with None)
             has_none = type(None) in args
             non_none_args = [arg for arg in args if arg is not type(None)]
