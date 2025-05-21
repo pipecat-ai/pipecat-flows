@@ -37,6 +37,7 @@ from typing import (
     get_type_hints,
 )
 
+import docstring_parser
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 
@@ -235,16 +236,21 @@ class FlowsFunction:
         # Get function name
         self.name = self.function.__name__
 
+        # Parse docstring for description and parameters
+        docstring = docstring_parser.parse(inspect.getdoc(self.function))
+
         # Get function description
-        # TODO: should ignore args and return type, right? Just the top-level docstring?
-        self.description = inspect.getdoc(self.function) or ""
+        self.description = (docstring.description or "").strip()
 
         # Get function parameters as JSON schemas, and the list of required parameters
-        # TODO: is there a way to get "args" from doc string and use it to fill in descriptions?
-        self.properties, self.required = self._get_parameters_as_jsonschema(self.function)
+        self.properties, self.required = self._get_parameters_as_jsonschema(
+            self.function, docstring.params
+        )
 
     # TODO: maybe to better support things like enums, check if each type is a pydantic type and use its convert-to-jsonschema function
-    def _get_parameters_as_jsonschema(self, func: Callable) -> Tuple[Dict[str, Any], List[str]]:
+    def _get_parameters_as_jsonschema(
+        self, func: Callable, docstring_params: List[docstring_parser.DocstringParam]
+    ) -> Tuple[Dict[str, Any], List[str]]:
         """
         Get function parameters as a dictionary of JSON schemas and a list of required parameters.
 
@@ -272,10 +278,15 @@ class FlowsFunction:
             # Convert type hint to JSON schema
             properties[name] = self._typehint_to_jsonschema(type_hint)
 
-            # Check if the parameter is required
+            # Add whether the parameter is required
             # If the parameter has no default value, it's required
             if param.default is inspect.Parameter.empty:
                 required.append(name)
+
+            # Add parameter description from docstring
+            for doc_param in docstring_params:
+                if doc_param.arg_name == name:
+                    properties[name]["description"] = doc_param.description or ""
 
         return properties, required
 
