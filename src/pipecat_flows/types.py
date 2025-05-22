@@ -227,7 +227,7 @@ class FlowsFunctionSchema:
         )
 
 
-class FlowsFunction:
+class FlowsDirectFunction:
     def __init__(self, function: Callable):
         self.function = function
         self._initialize_metadata()
