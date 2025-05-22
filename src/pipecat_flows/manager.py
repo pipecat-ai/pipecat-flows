@@ -49,6 +49,7 @@ from .types import (
     FlowArgs,
     FlowConfig,
     FlowResult,
+    FlowsDirectFunction,
     FlowsFunctionSchema,
     FunctionHandler,
     NodeConfig,
@@ -522,8 +523,12 @@ class FlowManager:
                 )
 
             for func_config in functions_list:
+                # Handle FlowsDirectFunctions
+                if callable(func_config):
+                    print("[pk] It's a direct function!")
+                    pass
                 # Handle Gemini's nested function declarations as a special case
-                if (
+                elif (
                     not isinstance(func_config, FlowsFunctionSchema)
                     and "function_declarations" in func_config
                 ):
@@ -533,8 +538,8 @@ class FlowManager:
                             {"function_declarations": [declaration]}
                         )
                         await register_function_schema(schema)
+                # Convert to FlowsFunctionSchema if needed and process it
                 else:
-                    # Convert to FlowsFunctionSchema if needed and process it
                     schema = (
                         func_config
                         if isinstance(func_config, FlowsFunctionSchema)
@@ -686,6 +691,7 @@ class FlowManager:
         2. Functions have valid configurations based on their type:
         - FlowsFunctionSchema objects have proper handler/transition fields
         - Dictionary format functions have valid handler/transition entries
+        - Direct functions are valid according to the FlowsDirectFunctions validation
         3. Edge functions (matching node names) are allowed without handlers/transitions
 
         Args:
@@ -704,6 +710,11 @@ class FlowManager:
 
         # Validate each function configuration if there are any
         for func in functions_list:
+            # If the function is callable, validate using FlowsDirectFunction
+            if callable(func):
+                FlowsDirectFunction.validate_function(func)
+                continue
+
             # Extract function name using adapter (handles all formats)
             try:
                 name = self.adapter.get_function_name(func)
