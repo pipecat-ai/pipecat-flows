@@ -28,7 +28,7 @@ from pipecat.services.openai.llm import OpenAILLMService
 
 from pipecat_flows.exceptions import FlowError, FlowTransitionError
 from pipecat_flows.manager import FlowConfig, FlowManager, NodeConfig
-from pipecat_flows.types import FlowArgs, FlowResult
+from pipecat_flows.types import FlowArgs, FlowResult, FlowsFunctionSchema
 
 
 class TestFlowManager(unittest.IsolatedAsyncioTestCase):
@@ -681,7 +681,10 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         new_functions = set()
         with self.assertRaises(FlowError):
-            await flow_manager._register_function("test", None, None, new_functions)
+            await flow_manager._register_function_schema(
+                FlowsFunctionSchema(name="test", description="test", properties={}, required=[]),
+                new_functions,
+            )
 
     async def test_action_execution_error_handling(self):
         """Test error handling in action execution."""
