@@ -438,7 +438,6 @@ class FlowManager:
 
         async def transition_func(params: FunctionCallParams) -> None:
             """Inner function that handles the actual tool invocation."""
-            # TODO: implement
             try:
                 # Track pending function call
                 self._pending_function_calls += 1
@@ -507,7 +506,15 @@ class FlowManager:
     async def _register_function_schema(
         self, schema: FlowsFunctionSchema, new_functions: Set[str]
     ) -> None:
-        # TODO: add docstring
+        """Register a function with the LLM if not already registered.
+
+        Args:
+            schema: The FlowsFunctionSchema for the function to register with the LLM
+            new_functions: Set to track newly registered functions for this node
+
+        Raises:
+            FlowError: If function registration fails
+        """
         name = schema.name
         handler = schema.handler
         if name not in self.current_functions:
@@ -537,56 +544,20 @@ class FlowManager:
     async def _register_direct_function(
         self, func: FlowsDirectFunction, new_functions: Set[str]
     ) -> None:
+        """Register a function with the LLM if not already registered.
+
+        Args:
+            func: The FlowsDirectFunction for the function to register with the LLM
+            new_functions: Set to track newly registered functions for this node
+
+        Raises:
+            FlowError: If function registration fails
+        """
         name = func.name
         if name not in self.current_functions:
             try:
                 # Create transition function
                 transition_func = await self._create_transition_func_from_direct_function(func)
-
-                # Register function with LLM
-                self.llm.register_function(
-                    name,
-                    transition_func,
-                )
-
-                new_functions.add(name)
-                logger.debug(f"Registered function: {name}")
-            except Exception as e:
-                logger.error(f"Failed to register function {name}: {str(e)}")
-                raise FlowError(f"Function registration failed: {str(e)}") from e
-
-    async def _register_function(
-        self,
-        name: str,
-        new_functions: Set[str],
-        handler: Optional[Callable],
-        transition_to: Optional[str] = None,
-        transition_callback: Optional[Callable] = None,
-    ) -> None:
-        """Register a function with the LLM if not already registered.
-
-        Args:
-            name: Name of the function to register with the LLM
-            new_functions: Set to track newly registered functions for this node
-            handler: Either a callable function or a string. If string starts with
-                    '__function__:', extracts the function name after the prefix
-            transition_to: Optional node name to transition to after function execution
-            transition_callback: Optional callback for dynamic transitions
-
-        Raises:
-            FlowError: If function registration fails or handler lookup fails
-        """
-        if name not in self.current_functions:
-            try:
-                # Handle special token format (e.g. "__function__:function_name")
-                if isinstance(handler, str) and handler.startswith("__function__:"):
-                    func_name = handler.split(":")[1]
-                    handler = self._lookup_function(func_name)
-
-                # Create transition function
-                transition_func = await self._create_transition_func(
-                    name, handler, transition_to, transition_callback
-                )
 
                 # Register function with LLM
                 self.llm.register_function(
@@ -667,7 +638,6 @@ class FlowManager:
                 """Helper to register a single direct function."""
                 direct_function = FlowsDirectFunction(function=func)
                 tools.append(direct_function)
-                # TODO: ensure that "traditional" (non-direct-function) examples still work
                 await self._register_direct_function(
                     func=direct_function,
                     new_functions=new_functions,
