@@ -242,7 +242,6 @@ def create_end_node() -> NodeConfig:
                 "content": "Thank them and end the conversation.",
             }
         ],
-        "functions": [],
         "post_actions": [{"type": "end_conversation"}],
     }
 

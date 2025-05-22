@@ -212,7 +212,6 @@ class NodeConfigRequired(TypedDict):
     """Required fields for node configuration."""
 
     task_messages: List[dict]
-    functions: List[Union[Dict[str, Any], FlowsFunctionSchema]]
 
 
 class NodeConfig(NodeConfigRequired, total=False):
@@ -220,11 +219,11 @@ class NodeConfig(NodeConfigRequired, total=False):
 
     Required fields:
         task_messages: List of message dicts defining the current node's objectives
-        functions: List of function definitions in provider-specific format, FunctionSchema,
-                  or FlowsFunctionSchema
 
     Optional fields:
         role_messages: List of message dicts defining the bot's role/personality
+        functions: List of function definitions in provider-specific format, FunctionSchema,
+            or FlowsFunctionSchema
         pre_actions: Actions to execute before LLM inference
         post_actions: Actions to execute after LLM inference
         context_strategy: Strategy for updating context during transitions
@@ -252,6 +251,7 @@ class NodeConfig(NodeConfigRequired, total=False):
     """
 
     role_messages: List[Dict[str, Any]]
+    functions: List[Union[Dict[str, Any], FlowsFunctionSchema]]
     pre_actions: List[ActionConfig]
     post_actions: List[ActionConfig]
     context_strategy: ContextStrategyConfig

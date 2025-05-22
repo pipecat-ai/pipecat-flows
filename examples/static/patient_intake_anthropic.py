@@ -409,14 +409,6 @@ Be thorough in reviewing all details and wait for explicit confirmation.""",
                     "content": "Thank them for their time and end the conversation.",
                 }
             ],
-            "functions": [
-                # Add a dummy function to satisfy Anthropic's requirement
-                {
-                    "name": "end_conversation",
-                    "description": "End the conversation",
-                    "input_schema": {"type": "object", "properties": {}},
-                }
-            ],
             "post_actions": [{"type": "end_conversation"}],
         },
     },

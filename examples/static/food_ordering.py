@@ -280,7 +280,6 @@ Be friendly and clear when reading back the order details.""",
                     "content": "Thank the user for their order and end the conversation politely and concisely.",
                 }
             ],
-            "functions": [],
             "post_actions": [{"type": "end_conversation"}],
         },
     },

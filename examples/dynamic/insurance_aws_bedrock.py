@@ -322,16 +322,6 @@ def create_end_node() -> NodeConfig:
                 ),
             }
         ],
-        "functions": [
-            FlowsFunctionSchema(
-                name="end_conversation",
-                description="End the conversation",
-                properties={
-                    "input_schema": {"type": "object", "properties": {}},
-                },
-                required=[],
-            ),
-        ],
         "post_actions": [{"type": "end_conversation"}],
     }
 

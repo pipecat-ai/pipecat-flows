@@ -507,6 +507,9 @@ class FlowManager:
             tools = []
             new_functions: Set[str] = set()
 
+            # Get functions list with default empty list if not provided
+            functions_list = node_config.get("functions", [])
+
             async def register_function_schema(schema):
                 """Helper to register a single FlowsFunctionSchema."""
                 tools.append(schema)
@@ -518,7 +521,7 @@ class FlowManager:
                     transition_callback=schema.transition_callback,
                 )
 
-            for func_config in node_config["functions"]:
+            for func_config in functions_list:
                 # Handle Gemini's nested function declarations as a special case
                 if (
                     not isinstance(func_config, FlowsFunctionSchema)
@@ -547,7 +550,7 @@ class FlowManager:
 
             # Use provider adapter to format tools, passing original configs for Gemini adapter
             formatted_tools = self.adapter.format_functions(
-                standard_functions, original_configs=node_config["functions"]
+                standard_functions, original_configs=functions_list
             )
 
             # Update LLM context
@@ -679,7 +682,7 @@ class FlowManager:
         """Validate the configuration of a conversation node.
 
         This method ensures that:
-        1. Required fields (task_messages, functions) are present
+        1. Required fields (task_messages) are present
         2. Functions have valid configurations based on their type:
         - FlowsFunctionSchema objects have proper handler/transition fields
         - Dictionary format functions have valid handler/transition entries
@@ -695,11 +698,12 @@ class FlowManager:
         # Check required fields
         if "task_messages" not in config:
             raise ValueError(f"Node '{node_id}' missing required 'task_messages' field")
-        if "functions" not in config:
-            raise ValueError(f"Node '{node_id}' missing required 'functions' field")
 
-        # Validate each function configuration
-        for func in config["functions"]:
+        # Get functions list with default empty list if not provided
+        functions_list = config.get("functions", [])
+
+        # Validate each function configuration if there are any
+        for func in functions_list:
             # Extract function name using adapter (handles all formats)
             try:
                 name = self.adapter.get_function_name(func)

@@ -421,7 +421,6 @@ After showing details or recommendations, ask if they'd like to explore another 
                     "content": "Thank the user warmly and mention they can return anytime to discover more movies.",
                 }
             ],
-            "functions": [],
             "post_actions": [{"type": "end_conversation"}],
         },
     },

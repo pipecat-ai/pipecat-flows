@@ -433,7 +433,6 @@ Be thorough in reviewing all details and wait for explicit confirmation.""",
                     "content": "Thank them for their time and end the conversation.",
                 }
             ],
-            "functions": [],
             "post_actions": [{"type": "end_conversation"}],
         },
     },

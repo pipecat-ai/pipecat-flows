@@ -343,14 +343,6 @@ Be thorough in reviewing all details and wait for explicit confirmation.""",
             "task_messages": [
                 {"role": "user", "content": "Thank them for their time and end the conversation."}
             ],
-            "functions": [
-                FlowsFunctionSchema(
-                    name="end_conversation",
-                    description="End the conversation",
-                    properties={},
-                    required=[],
-                )
-            ],
             "post_actions": [{"type": "end_conversation"}],
         },
     },

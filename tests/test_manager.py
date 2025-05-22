@@ -22,7 +22,7 @@ import unittest
 from typing import Dict
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-from pipecat.frames.frames import LLMMessagesAppendFrame, LLMMessagesUpdateFrame
+from pipecat.frames.frames import LLMMessagesAppendFrame, LLMMessagesUpdateFrame, LLMSetToolsFrame
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 
@@ -319,11 +319,12 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             await flow_manager.set_node("test", invalid_config)
         self.assertIn("missing required 'task_messages' field", str(context.exception))
 
-        # Test missing functions
-        invalid_config = {"task_messages": []}
-        with self.assertRaises(FlowError) as context:
-            await flow_manager.set_node("test", invalid_config)
-        self.assertIn("missing required 'functions' field", str(context.exception))
+        # Test valid config
+        valid_config = {"task_messages": []}
+        await flow_manager.set_node("test", valid_config)
+
+        self.assertEqual(flow_manager.current_node, "test")
+        self.assertEqual(flow_manager.current_functions, set())
 
     async def test_function_registration(self):
         """Test function registration with LLM."""
@@ -1219,3 +1220,60 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(correct_flow_manager)
         self.assertEqual(result["args_received"]["test"], "value")
         self.assertTrue(result["has_flow_manager"])
+
+    async def test_node_without_functions(self):
+        """Test node configuration without functions field."""
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+        )
+        await flow_manager.initialize()
+
+        # Create node config without functions field
+        node_config: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Test task without functions."}],
+        }
+
+        # Set node and verify it works without error
+        await flow_manager.set_node("no_functions", node_config)
+
+        # Verify current_functions is empty set
+        self.assertEqual(flow_manager.current_functions, set())
+
+        # Verify LLM tools were still set (with empty or placeholder functions)
+        tools_frames_call = [
+            call
+            for call in self.mock_task.queue_frames.call_args_list
+            if any(isinstance(frame, LLMSetToolsFrame) for frame in call[0][0])
+        ]
+        self.assertTrue(len(tools_frames_call) > 0, "Should have called LLMSetToolsFrame")
+
+    async def test_node_with_empty_functions(self):
+        """Test node configuration with empty functions list."""
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+        )
+        await flow_manager.initialize()
+
+        # Create node config with empty functions list
+        node_config: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Test task with empty functions."}],
+            "functions": [],
+        }
+
+        # Set node and verify it works without error
+        await flow_manager.set_node("empty_functions", node_config)
+
+        # Verify current_functions is empty set
+        self.assertEqual(flow_manager.current_functions, set())
+
+        # Verify LLM tools were still set (with empty or placeholder functions)
+        tools_frames_call = [
+            call
+            for call in self.mock_task.queue_frames.call_args_list
+            if any(isinstance(frame, LLMSetToolsFrame) for frame in call[0][0])
+        ]
+        self.assertTrue(len(tools_frames_call) > 0, "Should have called LLMSetToolsFrame")

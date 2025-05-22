@@ -364,7 +364,6 @@ def create_transferring_to_human_agent_node() -> NodeConfig:
                 "content": "Start by apologizing to the customer that there was an issue fulfilling their last request, then inform them that they are being transferred to a human agent. Tell them to please hold while you connect them, and thank them for their patience.",
             }
         ],
-        functions=[],
         pre_actions=[
             ActionConfig(type="function", handler=mute_customer),
         ],
@@ -421,7 +420,6 @@ def create_end_customer_conversation_node() -> NodeConfig:
                 "content": "Thank the customer warmly and mention they can call back anytime if they need more help.",
             }
         ],
-        functions=[],
         post_actions=[ActionConfig(type="end_conversation")],
     )
 
@@ -437,7 +435,6 @@ def create_end_human_agent_conversation_node() -> NodeConfig:
                 "content": "Tell the agent that you're patching them through to the customer right now.",
             },
         ],
-        functions=[],
         post_actions=[
             ActionConfig(type="function", handler=unmute_customer_and_make_humans_hear_each_other),
             ActionConfig(type="end_conversation"),

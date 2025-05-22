@@ -412,14 +412,6 @@ After showing details or recommendations, ask if they'd like to explore another 
                     ],
                 }
             ],
-            "functions": [
-                # Add a dummy function to satisfy Anthropic's requirement
-                {
-                    "name": "end_conversation",
-                    "description": "End the conversation",
-                    "input_schema": {"type": "object", "properties": {}},
-                }
-            ],
             "post_actions": [{"type": "end_conversation"}],
         },
     },

@@ -338,7 +338,6 @@ flow_config: FlowConfig = {
                     "content": "Wish them a wonderful trip and end the conversation.",
                 }
             ],
-            "functions": [],
             "post_actions": [{"type": "end_conversation"}],
         },
     },
