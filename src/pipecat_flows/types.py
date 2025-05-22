@@ -232,6 +232,14 @@ class FlowsDirectFunction:
         self.function = function
         self._initialize_metadata()
 
+    # TODO: implement this.
+    # Throw an error on any validation failure.
+    # Add unit tests.
+    # Test with different callable types (functions, lambdas, methods, etc.), and different siganatures.
+    @staticmethod
+    def validate_function(function: Callable) -> None:
+        pass
+
     def _initialize_metadata(self):
         # Get function name
         self.name = self.function.__name__
