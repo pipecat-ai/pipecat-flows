@@ -235,10 +235,23 @@ class FlowsDirectFunction:
     # TODO: implement this.
     # Throw an error on any validation failure.
     # Add unit tests.
-    # Test with different callable types (functions, lambdas, methods, etc.), and different siganatures.
+    # Test with different callable types (functions, lambdas, methods, etc.), and different signatures.
     @staticmethod
     def validate_function(function: Callable) -> None:
         pass
+
+    def to_function_schema(self) -> FunctionSchema:
+        """Convert to a standard FunctionSchema for use with LLMs.
+
+        Returns:
+            FunctionSchema without flow-specific fields
+        """
+        return FunctionSchema(
+            name=self.name,
+            description=self.description,
+            properties=self.properties,
+            required=self.required,
+        )
 
     def _initialize_metadata(self):
         # Get function name

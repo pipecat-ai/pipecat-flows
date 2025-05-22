@@ -26,6 +26,7 @@ The flow manager coordinates all aspects of a conversation, including:
 import asyncio
 import inspect
 import sys
+import uuid
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Union, cast
 
 from loguru import logger
@@ -384,6 +385,98 @@ class FlowManager:
 
         return transition_func
 
+    async def _create_transition_func_from_direct_function(
+        self, func: FlowsDirectFunction
+    ) -> Callable:
+        """Create a transition function for the given direct function.
+
+        Args:
+            func: The FlowsDirectFunction to create a transition function for
+
+        Returns:
+            Callable: The created transition function
+        """
+        name = func.name
+
+        def decrease_pending_function_calls() -> None:
+            """Decrease the pending function calls counter if greater than zero."""
+            if self._pending_function_calls > 0:
+                self._pending_function_calls -= 1
+                logger.debug(
+                    f"Function call completed: {name} (remaining: {self._pending_function_calls})"
+                )
+
+        async def on_context_updated_edge(next_node: NodeConfig, result_callback: Callable) -> None:
+            """Handle context updates for edge functions with transitions."""
+            try:
+                decrease_pending_function_calls()
+
+                # Only process transition if this was the last pending call
+                if self._pending_function_calls == 0:
+                    # TODO: figure out how to elegantly get name of the next node
+                    # TODO: handle possibility of next_node being a string identifying a node? for static flows? mabe we can just say direct functions are only supported in dynamic flows?
+                    await self.set_node(str(uuid.uuid4()), next_node)
+                    # Reset counter after transition completes
+                    self._pending_function_calls = 0
+                    logger.debug("Reset pending function calls counter")
+                else:
+                    logger.debug(
+                        f"Skipping transition, {self._pending_function_calls} calls still pending"
+                    )
+            except Exception as e:
+                logger.error(f"Error in transition: {str(e)}")
+                self._pending_function_calls = 0
+                await result_callback(
+                    {"status": "error", "error": str(e)},
+                    properties=None,  # Clear properties to prevent further callbacks
+                )
+                raise  # Re-raise to prevent further processing
+
+        async def on_context_updated_node() -> None:
+            """Handle context updates for node functions without transitions."""
+            decrease_pending_function_calls()
+
+        async def transition_func(params: FunctionCallParams) -> None:
+            """Inner function that handles the actual tool invocation."""
+            # TODO: implement
+            try:
+                # Track pending function call
+                self._pending_function_calls += 1
+                logger.debug(
+                    f"Function call pending: {name} (total: {self._pending_function_calls})"
+                )
+
+                # Execute function
+                # TODO: we need to pass FlowManager, too, huh (just like in _call_handler())...
+                result, next_node = await func.function(**params.arguments)
+                if result is None:
+                    result = {"status": "acknowledged"}
+                    logger.debug(f"Function called without 'handler' logic: {name}")
+                else:
+                    logger.debug(f"Function with 'handler' logic {name}")
+
+                # For edge functions (where there's a next node), prevent LLM completion until transition (run_llm=False)
+                # For node functions, allow immediate completion (run_llm=True)
+                async def on_context_updated() -> None:
+                    if next_node:
+                        await on_context_updated_edge(next_node, params.result_callback)
+                    else:
+                        await on_context_updated_node()
+
+                properties = FunctionCallResultProperties(
+                    run_llm=not next_node,
+                    on_context_updated=on_context_updated,
+                )
+                await params.result_callback(result, properties=properties)
+
+            except Exception as e:
+                logger.error(f"Error in transition function {name}: {str(e)}")
+                self._pending_function_calls = 0
+                error_result = {"status": "error", "error": str(e)}
+                await params.result_callback(error_result)
+
+        return transition_func
+
     def _lookup_function(self, func_name: str) -> Callable:
         """Look up a function by name in the main module.
 
@@ -410,6 +503,57 @@ class FlowManager:
         )
 
         raise FlowError(error_message)
+
+    async def _register_function_schema(
+        self, schema: FlowsFunctionSchema, new_functions: Set[str]
+    ) -> None:
+        # TODO: add docstring
+        name = schema.name
+        handler = schema.handler
+        if name not in self.current_functions:
+            try:
+                # Handle special token format (e.g. "__function__:function_name")
+                if isinstance(handler, str) and handler.startswith("__function__:"):
+                    func_name = handler.split(":")[1]
+                    handler = self._lookup_function(func_name)
+
+                # Create transition function
+                transition_func = await self._create_transition_func(
+                    name, handler, schema.transition_to, schema.transition_callback
+                )
+
+                # Register function with LLM
+                self.llm.register_function(
+                    name,
+                    transition_func,
+                )
+
+                new_functions.add(name)
+                logger.debug(f"Registered function: {name}")
+            except Exception as e:
+                logger.error(f"Failed to register function {name}: {str(e)}")
+                raise FlowError(f"Function registration failed: {str(e)}") from e
+
+    async def _register_direct_function(
+        self, func: FlowsDirectFunction, new_functions: Set[str]
+    ) -> None:
+        name = func.name
+        if name not in self.current_functions:
+            try:
+                # Create transition function
+                transition_func = await self._create_transition_func_from_direct_function(func)
+
+                # Register function with LLM
+                self.llm.register_function(
+                    name,
+                    transition_func,
+                )
+
+                new_functions.add(name)
+                logger.debug(f"Registered function: {name}")
+            except Exception as e:
+                logger.error(f"Failed to register function {name}: {str(e)}")
+                raise FlowError(f"Function registration failed: {str(e)}") from e
 
     async def _register_function(
         self,
@@ -505,7 +649,7 @@ class FlowManager:
             messages.extend(node_config["task_messages"])
 
             # Register functions and prepare tools
-            tools = []
+            tools: List[FlowsFunctionSchema | FlowsDirectFunction] = []
             new_functions: Set[str] = set()
 
             # Get functions list with default empty list if not provided
@@ -514,19 +658,25 @@ class FlowManager:
             async def register_function_schema(schema):
                 """Helper to register a single FlowsFunctionSchema."""
                 tools.append(schema)
-                await self._register_function(
-                    name=schema.name,
+                await self._register_function_schema(
+                    schema=schema,
                     new_functions=new_functions,
-                    handler=schema.handler,
-                    transition_to=schema.transition_to,
-                    transition_callback=schema.transition_callback,
+                )
+
+            async def register_direct_function(func):
+                """Helper to register a single direct function."""
+                direct_function = FlowsDirectFunction(function=func)
+                tools.append(direct_function)
+                # TODO: ensure that "traditional" (non-direct-function) examples still work
+                await self._register_direct_function(
+                    func=direct_function,
+                    new_functions=new_functions,
                 )
 
             for func_config in functions_list:
                 # Handle FlowsDirectFunctions
                 if callable(func_config):
-                    print("[pk] It's a direct function!")
-                    pass
+                    await register_direct_function(func_config)
                 # Handle Gemini's nested function declarations as a special case
                 elif (
                     not isinstance(func_config, FlowsFunctionSchema)
