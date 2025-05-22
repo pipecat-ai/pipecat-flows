@@ -122,8 +122,6 @@ async def check_availability(time: str, party_size: int) -> tuple[TimeResult, No
     return result, next_node
 
 
-# TODO: might be cleaner to not return a tuple but instead write result within the function, avoiding to have to return None.
-# (Although, in the case of a function that *only* returns a result, we'd still have the same issue)
 async def end_conversation() -> tuple[Optional[FlowResult], NodeConfig]:
     """End the conversation."""
     return None, create_end_node()
