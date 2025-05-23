@@ -1,6 +1,7 @@
 import unittest
 from typing import Optional, Union
 
+from pipecat_flows.manager import FlowManager
 from pipecat_flows.types import FlowsDirectFunction
 
 # Copyright (c) 2025, Daily
@@ -15,7 +16,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
     def test_name_is_set_from_function(self):
         """Test that FlowsDirectFunction extracts the name from the function."""
 
-        def my_function():
+        def my_function(flow_manager: FlowManager):
             return {}
 
         func = FlowsDirectFunction(function=my_function)
@@ -24,14 +25,14 @@ class TestFlowsDirectFunction(unittest.TestCase):
     def test_description_is_set_from_function(self):
         """Test that FlowsDirectFunction extracts the description from the function."""
 
-        def my_function_short_description():
+        def my_function_short_description(flow_manager: FlowManager):
             """This is a test function."""
             return {}
 
         func = FlowsDirectFunction(function=my_function_short_description)
         self.assertEqual(func.description, "This is a test function.")
 
-        def my_function_long_description():
+        def my_function_long_description(flow_manager: FlowManager):
             """
             This is a test function.
 
@@ -50,13 +51,15 @@ class TestFlowsDirectFunction(unittest.TestCase):
     def test_properties_are_set_from_function(self):
         """Test that FlowsDirectFunction extracts the properties from the function."""
 
-        def my_function_no_params():
+        def my_function_no_params(flow_manager: FlowManager):
             return {}
 
         func = FlowsDirectFunction(function=my_function_no_params)
         self.assertEqual(func.properties, {})
 
-        def my_function_simple_params(name: str, age: int, height: Union[float, None]):
+        def my_function_simple_params(
+            name: str, age: int, height: Union[float, None], flow_manager: FlowManager
+        ):
             return {}
 
         func = FlowsDirectFunction(function=my_function_simple_params)
@@ -70,7 +73,10 @@ class TestFlowsDirectFunction(unittest.TestCase):
         )
 
         def my_function_complex_params(
-            address_lines: list[str], nickname: str | int | float, extra: Optional[dict[str, str]]
+            address_lines: list[str],
+            nickname: str | int | float,
+            extra: Optional[dict[str, str]],
+            flow_manager: FlowManager,
         ):
             return {}
 
@@ -94,13 +100,15 @@ class TestFlowsDirectFunction(unittest.TestCase):
     def test_required_is_set_from_function(self):
         """Test that FlowsDirectFunction extracts the required properties from the function."""
 
-        def my_function_no_params():
+        def my_function_no_params(flow_manager: FlowManager):
             return {}
 
         func = FlowsDirectFunction(function=my_function_no_params)
         self.assertEqual(func.required, [])
 
-        def my_function_simple_params(name: str, age: int, height: Union[float, None] = None):
+        def my_function_simple_params(
+            name: str, age: int, height: Union[float, None] = None, flow_manager: FlowManager = None
+        ):
             return {}
 
         func = FlowsDirectFunction(function=my_function_simple_params)
@@ -110,6 +118,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
             address_lines: list[str],
             nickname: str | int | None = "Bud",
             extra: Optional[dict[str, str]] = None,
+            flow_manager: FlowManager = None,
         ):
             return {}
 
@@ -119,7 +128,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
     def test_property_descriptions_are_set_from_function(self):
         """Test that FlowsDirectFunction extracts the property descriptions from the function."""
 
-        def my_function(name: str, age: int, height: Union[float, None]):
+        def my_function(name: str, age: int, height: Union[float, None], flow_manager: FlowManager):
             """
             This is a test function.
 
