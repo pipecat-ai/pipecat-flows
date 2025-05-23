@@ -410,7 +410,7 @@ class NodeConfigRequired(TypedDict):
     """Required fields for node configuration."""
 
     task_messages: List[dict]
-    functions: List[Union[Dict[str, Any], FlowsFunctionSchema]]
+    functions: List[Union[Dict[str, Any], FlowsFunctionSchema, FlowsDirectFunction]]
 
 
 class NodeConfig(NodeConfigRequired, total=False):
