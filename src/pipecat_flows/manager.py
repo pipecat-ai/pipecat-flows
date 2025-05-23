@@ -54,6 +54,7 @@ from .types import (
     FlowsFunctionSchema,
     FunctionHandler,
     NodeConfig,
+    UnifiedFunctionResult,
 )
 
 if TYPE_CHECKING:
@@ -226,7 +227,9 @@ class FlowManager:
                     "Provide handler in action config or register manually."
                 )
 
-    async def _call_handler(self, handler: FunctionHandler, args: FlowArgs) -> FlowResult:
+    async def _call_handler(
+        self, handler: FunctionHandler, args: FlowArgs
+    ) -> FlowResult | UnifiedFunctionResult:
         """Call handler with appropriate parameters based on its signature.
 
         Detects whether the handler can accept a flow_manager parameter and
@@ -265,7 +268,7 @@ class FlowManager:
     async def _create_transition_func(
         self,
         name: str,
-        handler: Optional[Callable],
+        handler: Optional[Callable | FlowsDirectFunction],
         transition_to: Optional[str],
         transition_callback: Optional[Callable] = None,
     ) -> Callable:
@@ -292,8 +295,6 @@ class FlowManager:
         if transition_callback:
             self._validate_transition_callback(name, transition_callback)
 
-        is_edge_function = bool(transition_to) or bool(transition_callback)
-
         def decrease_pending_function_calls() -> None:
             """Decrease the pending function calls counter if greater than zero."""
             if self._pending_function_calls > 0:
@@ -303,15 +304,35 @@ class FlowManager:
                 )
 
         async def on_context_updated_edge(
-            args: Dict[str, Any], result: Any, result_callback: Callable
+            next_node: Optional[NodeConfig],
+            args: Optional[Dict[str, Any]],
+            result: Optional[Any],
+            result_callback: Callable,
         ) -> None:
-            """Handle context updates for edge functions with transitions."""
+            """
+            Handle context updates for edge functions with transitions.
+
+            If `next_node` is provided:
+            - Ignore `args` and `result` and just transition to it.
+
+            Otherwise, if `transition_to` is available:
+            - Use it to look up the next node.
+
+            Otherwise, if `transition_callback` is provided:
+            - Call it with `args` and `result` to determine the next node.
+            """
             try:
                 decrease_pending_function_calls()
 
                 # Only process transition if this was the last pending call
                 if self._pending_function_calls == 0:
-                    if transition_to:  # Static flow
+                    if next_node:
+                        # TODO: figure out how to elegantly get name of the next node
+                        # TODO: handle possibility of next_node being a string identifying a node? for static flows? mabe we can just say direct functions are only supported in dynamic flows?
+                        # TODO: put name of next_node in the debug log message
+                        logger.debug(f"Transition to handler-returned node for: {name}")
+                        await self.set_node(str(uuid.uuid4()), next_node)
+                    elif transition_to:  # Static flow
                         logger.debug(f"Static transition to: {transition_to}")
                         await self.set_node(transition_to, self.nodes[transition_to])
                     elif transition_callback:  # Dynamic flow
@@ -354,116 +375,58 @@ class FlowManager:
                 )
 
                 # Execute handler if present
+                is_transition_only_function = False
+                acknowledged_result = {"status": "acknowledged"}
                 if handler:
-                    result = await self._call_handler(handler, params.arguments)
-                    logger.debug(f"Handler completed for {name}")
+                    # Invoke the handler with the provided arguments
+                    if isinstance(handler, FlowsDirectFunction):
+                        handler_response = await handler.invoke(params.arguments, self)
+                    else:
+                        handler_response = await self._call_handler(handler, params.arguments)
+                    # Support both "unified" handlers that return (result, next_node) and handlers
+                    # that return just the result.
+                    if isinstance(handler_response, tuple):
+                        result, next_node = handler_response
+                        if result is None:
+                            result = acknowledged_result
+                            is_transition_only_function = True
+                    else:
+                        result = handler_response
+                        next_node = None
                 else:
-                    result = {"status": "acknowledged"}
-                    logger.debug(f"Function called without handler: {name}")
+                    result = acknowledged_result
+                    next_node = None
+                    is_transition_only_function = True
+                # TODO: test transition-only and non-transition-only functions using both transitional and unified functions
+                logger.debug(
+                    f"{'Transition-only function called for' if is_transition_only_function else 'Function handler completed for'} {name}"
+                )
 
                 # For edge functions, prevent LLM completion until transition (run_llm=False)
                 # For node functions, allow immediate completion (run_llm=True)
+                has_explicit_transition = bool(transition_to) or bool(transition_callback)
+
                 async def on_context_updated() -> None:
-                    if is_edge_function:
+                    if next_node:
                         await on_context_updated_edge(
-                            params.arguments, result, params.result_callback
+                            next_node=next_node,
+                            args=None,
+                            result=None,
+                            result_callback=params.result_callback,
+                        )
+                    elif has_explicit_transition:
+                        await on_context_updated_edge(
+                            next_node=None,
+                            args=params.arguments,
+                            result=result,
+                            result_callback=params.result_callback,
                         )
                     else:
                         await on_context_updated_node()
 
+                is_edge_function = bool(next_node) or has_explicit_transition
                 properties = FunctionCallResultProperties(
                     run_llm=not is_edge_function,
-                    on_context_updated=on_context_updated,
-                )
-                await params.result_callback(result, properties=properties)
-
-            except Exception as e:
-                logger.error(f"Error in transition function {name}: {str(e)}")
-                self._pending_function_calls = 0
-                error_result = {"status": "error", "error": str(e)}
-                await params.result_callback(error_result)
-
-        return transition_func
-
-    async def _create_transition_func_from_direct_function(
-        self, func: FlowsDirectFunction
-    ) -> Callable:
-        """Create a transition function for the given direct function.
-
-        Args:
-            func: The FlowsDirectFunction to create a transition function for
-
-        Returns:
-            Callable: The created transition function
-        """
-        name = func.name
-
-        def decrease_pending_function_calls() -> None:
-            """Decrease the pending function calls counter if greater than zero."""
-            if self._pending_function_calls > 0:
-                self._pending_function_calls -= 1
-                logger.debug(
-                    f"Function call completed: {name} (remaining: {self._pending_function_calls})"
-                )
-
-        async def on_context_updated_edge(next_node: NodeConfig, result_callback: Callable) -> None:
-            """Handle context updates for edge functions with transitions."""
-            try:
-                decrease_pending_function_calls()
-
-                # Only process transition if this was the last pending call
-                if self._pending_function_calls == 0:
-                    # TODO: figure out how to elegantly get name of the next node
-                    # TODO: handle possibility of next_node being a string identifying a node? for static flows? mabe we can just say direct functions are only supported in dynamic flows?
-                    await self.set_node(str(uuid.uuid4()), next_node)
-                    # Reset counter after transition completes
-                    self._pending_function_calls = 0
-                    logger.debug("Reset pending function calls counter")
-                else:
-                    logger.debug(
-                        f"Skipping transition, {self._pending_function_calls} calls still pending"
-                    )
-            except Exception as e:
-                logger.error(f"Error in transition: {str(e)}")
-                self._pending_function_calls = 0
-                await result_callback(
-                    {"status": "error", "error": str(e)},
-                    properties=None,  # Clear properties to prevent further callbacks
-                )
-                raise  # Re-raise to prevent further processing
-
-        async def on_context_updated_node() -> None:
-            """Handle context updates for node functions without transitions."""
-            decrease_pending_function_calls()
-
-        async def transition_func(params: FunctionCallParams) -> None:
-            """Inner function that handles the actual tool invocation."""
-            try:
-                # Track pending function call
-                self._pending_function_calls += 1
-                logger.debug(
-                    f"Function call pending: {name} (total: {self._pending_function_calls})"
-                )
-
-                # Execute function
-                # TODO: we need to pass FlowManager, too, huh (just like in _call_handler())...
-                result, next_node = await func.function(**params.arguments)
-                if result is None:
-                    result = {"status": "acknowledged"}
-                    logger.debug(f"Function called without 'handler' logic: {name}")
-                else:
-                    logger.debug(f"Function with 'handler' logic {name}")
-
-                # For edge functions (where there's a next node), prevent LLM completion until transition (run_llm=False)
-                # For node functions, allow immediate completion (run_llm=True)
-                async def on_context_updated() -> None:
-                    if next_node:
-                        await on_context_updated_edge(next_node, params.result_callback)
-                    else:
-                        await on_context_updated_node()
-
-                properties = FunctionCallResultProperties(
-                    run_llm=not next_node,
                     on_context_updated=on_context_updated,
                 )
                 await params.result_callback(result, properties=properties)
@@ -503,20 +466,26 @@ class FlowManager:
 
         raise FlowError(error_message)
 
-    async def _register_function_schema(
-        self, schema: FlowsFunctionSchema, new_functions: Set[str]
+    async def _register_function(
+        self,
+        name: str,
+        new_functions: Set[str],
+        handler: Optional[Callable | FlowsDirectFunction],
+        transition_to: Optional[str] = None,
+        transition_callback: Optional[Callable] = None,
     ) -> None:
         """Register a function with the LLM if not already registered.
 
         Args:
-            schema: The FlowsFunctionSchema for the function to register with the LLM
+            name: Name of the function to register
+            handler: The function handler to register
+            transition_to: Optional node to transition to (static flows)
+            transition_callback: Optional transition callback (dynamic flows)
             new_functions: Set to track newly registered functions for this node
 
         Raises:
             FlowError: If function registration fails
         """
-        name = schema.name
-        handler = schema.handler
         if name not in self.current_functions:
             try:
                 # Handle special token format (e.g. "__function__:function_name")
@@ -526,38 +495,8 @@ class FlowManager:
 
                 # Create transition function
                 transition_func = await self._create_transition_func(
-                    name, handler, schema.transition_to, schema.transition_callback
+                    name, handler, transition_to, transition_callback
                 )
-
-                # Register function with LLM
-                self.llm.register_function(
-                    name,
-                    transition_func,
-                )
-
-                new_functions.add(name)
-                logger.debug(f"Registered function: {name}")
-            except Exception as e:
-                logger.error(f"Failed to register function {name}: {str(e)}")
-                raise FlowError(f"Function registration failed: {str(e)}") from e
-
-    async def _register_direct_function(
-        self, func: FlowsDirectFunction, new_functions: Set[str]
-    ) -> None:
-        """Register a function with the LLM if not already registered.
-
-        Args:
-            func: The FlowsDirectFunction for the function to register with the LLM
-            new_functions: Set to track newly registered functions for this node
-
-        Raises:
-            FlowError: If function registration fails
-        """
-        name = func.name
-        if name not in self.current_functions:
-            try:
-                # Create transition function
-                transition_func = await self._create_transition_func_from_direct_function(func)
 
                 # Register function with LLM
                 self.llm.register_function(
@@ -626,21 +565,27 @@ class FlowManager:
             # Get functions list with default empty list if not provided
             functions_list = node_config.get("functions", [])
 
-            async def register_function_schema(schema):
+            async def register_function_schema(schema: FlowsFunctionSchema):
                 """Helper to register a single FlowsFunctionSchema."""
                 tools.append(schema)
-                await self._register_function_schema(
-                    schema=schema,
+                await self._register_function(
+                    name=schema.name,
                     new_functions=new_functions,
+                    handler=schema.handler,
+                    transition_to=schema.transition_to,
+                    transition_callback=schema.transition_callback,
                 )
 
             async def register_direct_function(func):
                 """Helper to register a single direct function."""
                 direct_function = FlowsDirectFunction(function=func)
                 tools.append(direct_function)
-                await self._register_direct_function(
-                    func=direct_function,
+                await self._register_function(
+                    name=direct_function.name,
                     new_functions=new_functions,
+                    handler=direct_function,
+                    transition_to=None,
+                    transition_callback=None,
                 )
 
             for func_config in functions_list:

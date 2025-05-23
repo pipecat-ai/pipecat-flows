@@ -81,7 +81,9 @@ class TimeResult(FlowResult):
 
 
 # Function handlers
-async def collect_party_size(size: int) -> tuple[PartySizeResult, NodeConfig]:
+async def collect_party_size(
+    size: int, flow_manager: FlowManager
+) -> tuple[PartySizeResult, NodeConfig]:
     """
     Record the number of people in the party.
 
@@ -97,7 +99,9 @@ async def collect_party_size(size: int) -> tuple[PartySizeResult, NodeConfig]:
     return result, next_node
 
 
-async def check_availability(time: str, party_size: int) -> tuple[TimeResult, NodeConfig]:
+async def check_availability(
+    time: str, party_size: int, flow_manager: FlowManager
+) -> tuple[TimeResult, NodeConfig]:
     """
     Check availability for requested time.
 
@@ -122,7 +126,7 @@ async def check_availability(time: str, party_size: int) -> tuple[TimeResult, No
     return result, next_node
 
 
-async def end_conversation() -> tuple[None, NodeConfig]:
+async def end_conversation(flow_manager: FlowManager) -> tuple[None, NodeConfig]:
     """End the conversation."""
     return None, create_end_node()
 
