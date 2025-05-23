@@ -449,7 +449,7 @@ class NodeConfig(NodeConfigRequired, total=False):
     """
 
     role_messages: List[Dict[str, Any]]
-    functions: List[Union[Dict[str, Any], FlowsFunctionSchema]]
+    functions: List[Union[Dict[str, Any], FlowsFunctionSchema, FlowsDirectFunction]]
     pre_actions: List[ActionConfig]
     post_actions: List[ActionConfig]
     context_strategy: ContextStrategyConfig
