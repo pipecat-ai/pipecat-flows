@@ -23,7 +23,7 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 
-from pipecat_flows import FlowArgs, FlowManager, FlowResult, FlowsFunctionSchema, NodeConfig
+from pipecat_flows import FlowManager, FlowResult, NamedNodeConfig, NodeConfig
 
 sys.path.append(str(Path(__file__).parent.parent))
 import argparse
@@ -83,7 +83,7 @@ class TimeResult(FlowResult):
 # Function handlers
 async def collect_party_size(
     size: int, flow_manager: FlowManager
-) -> tuple[PartySizeResult, NodeConfig]:
+) -> tuple[PartySizeResult, NamedNodeConfig]:
     """
     Record the number of people in the party.
 
@@ -94,14 +94,15 @@ async def collect_party_size(
     result = PartySizeResult(size=size, status="success")
 
     # Next node: time selection
-    next_node = create_time_selection_node()
+    # NOTE: name is optional, but useful for debug logging; you could use a NodeConfig here rather than a NamedNodeConfig
+    next_node = "get_time", create_time_selection_node()
 
     return result, next_node
 
 
 async def check_availability(
     time: str, party_size: int, flow_manager: FlowManager
-) -> tuple[TimeResult, NodeConfig]:
+) -> tuple[TimeResult, NamedNodeConfig]:
     """
     Check availability for requested time.
 
@@ -118,17 +119,19 @@ async def check_availability(
     )
 
     # Next node: confirmation or no availability
+    # NOTE: name is optional, but useful for debug logging; you could use a NodeConfig here rather than a NamedNodeConfig
     if is_available:
-        next_node = create_confirmation_node()
+        next_node = "confirm", create_confirmation_node()
     else:
-        next_node = create_no_availability_node(alternative_times)
+        next_node = "no_availability", create_no_availability_node(alternative_times)
 
     return result, next_node
 
 
-async def end_conversation(flow_manager: FlowManager) -> tuple[None, NodeConfig]:
+async def end_conversation(flow_manager: FlowManager) -> tuple[None, NamedNodeConfig]:
     """End the conversation."""
-    return None, create_end_node()
+    # NOTE: name is optional, but useful for debug logging; you could use a NodeConfig here rather than a NamedNodeConfig
+    return None, ("end", create_end_node())
 
 
 # Node configurations

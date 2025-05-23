@@ -81,7 +81,12 @@ Example:
     }
 """
 
-UnifiedFunctionResult = Tuple[Optional[FlowResult], Optional["NodeConfig"]]
+NamedNodeConfig = tuple[str, "NodeConfig"]
+"""Type alias for a node configuration with its name."""
+
+UnifiedFunctionResult = Tuple[
+    Optional[FlowResult], Optional["NodeConfig"] | Optional[NamedNodeConfig]
+]
 """Return type for "unified" functions that do either or both of handling some processing as well as specifying the next node."""
 
 LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult | UnifiedFunctionResult]]
