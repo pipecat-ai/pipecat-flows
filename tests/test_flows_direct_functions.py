@@ -1,5 +1,5 @@
 import unittest
-from typing import Optional, Union
+from typing import Optional, TypedDict, Union
 
 from pipecat_flows.exceptions import InvalidFunctionError
 from pipecat_flows.manager import FlowManager
@@ -94,6 +94,41 @@ class TestFlowsDirectFunction(unittest.TestCase):
                         {"type": "object", "additionalProperties": {"type": "string"}},
                         {"type": "null"},
                     ]
+                },
+            },
+        )
+
+        class MyInfo1(TypedDict):
+            name: str
+            age: int
+
+        class MyInfo2(TypedDict, total=False):
+            name: str
+            age: int
+
+        async def my_function_complex_type_params(
+            info1: MyInfo1, info2: MyInfo2, flow_manager: FlowManager
+        ):
+            return {}, None
+
+        func = FlowsDirectFunction(function=my_function_complex_type_params)
+        self.assertEqual(
+            func.properties,
+            {
+                "info1": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "age": {"type": "integer"},
+                    },
+                    "required": ["name", "age"],
+                },
+                "info2": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "age": {"type": "integer"},
+                    },
                 },
             },
         )
