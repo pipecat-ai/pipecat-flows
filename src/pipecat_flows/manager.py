@@ -42,7 +42,7 @@ from pipecat.transports.base_transport import BaseTransport
 
 from .actions import ActionError, ActionManager
 from .adapters import create_adapter
-from .exceptions import FlowError, FlowInitializationError, FlowTransitionError
+from .exceptions import FlowError, FlowInitializationError, FlowTransitionError, InvalidFunctionError
 from .types import (
     ActionConfig,
     ContextStrategy,
@@ -395,6 +395,11 @@ class FlowManager:
                     else:
                         result = handler_response
                         next_node = None
+                        # FlowsDirectFunctions should always be "unified" functions that return a tuple
+                        if isinstance(handler, FlowsDirectFunction):
+                            raise InvalidFunctionError(
+                                f"Direct function {name} expected to return a tuple (result, next_node) but got {type(result)}"
+                            )
                 else:
                     result = acknowledged_result
                     next_node = None
