@@ -122,7 +122,7 @@ async def check_availability(time: str, party_size: int) -> tuple[TimeResult, No
     return result, next_node
 
 
-async def end_conversation() -> tuple[Optional[FlowResult], NodeConfig]:
+async def end_conversation() -> tuple[None, NodeConfig]:
     """End the conversation."""
     return None, create_end_node()
 
