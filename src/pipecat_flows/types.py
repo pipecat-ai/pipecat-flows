@@ -42,6 +42,8 @@ import docstring_parser
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 
+from pipecat_flows.exceptions import InvalidFunctionError
+
 T = TypeVar("T")
 TransitionHandler = Callable[[Dict[str, T], "FlowManager"], Awaitable[None]]
 """Type for transition handler functions.
@@ -243,13 +245,20 @@ class FlowsDirectFunction:
         self.function = function
         self._initialize_metadata()
 
-    # TODO: implement this.
-    # Throw an error on any validation failure.
-    # Add unit tests.
-    # Test with different callable types (functions, lambdas, methods, etc.), and different signatures.
     @staticmethod
     def validate_function(function: Callable) -> None:
-        pass
+        if not inspect.iscoroutinefunction(function):
+            raise InvalidFunctionError(f"Direct function {function.__name__} must be async")
+        params = list(inspect.signature(function).parameters.items())
+        if len(params) == 0:
+            raise InvalidFunctionError(
+                f"Direct function {function.__name__} must have at least one parameter (flow_manager)"
+            )
+        last_param_name = params[-1][0]
+        if last_param_name != "flow_manager":
+            raise InvalidFunctionError(
+                f"Direct function {function.__name__} last parameter must be named 'flow_manager'"
+            )
 
     async def invoke(
         self, args: Mapping[str, Any], flow_manager: "FlowManager"
