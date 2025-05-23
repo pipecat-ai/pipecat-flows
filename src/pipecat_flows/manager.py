@@ -327,11 +327,13 @@ class FlowManager:
                 # Only process transition if this was the last pending call
                 if self._pending_function_calls == 0:
                     if next_node:
-                        # TODO: figure out how to elegantly get name of the next node
                         # TODO: handle possibility of next_node being a string identifying a node? for static flows? mabe we can just say direct functions are only supported in dynamic flows?
-                        # TODO: put name of next_node in the debug log message
-                        logger.debug(f"Transition to handler-returned node for: {name}")
-                        await self.set_node(str(uuid.uuid4()), next_node)
+                        if isinstance(next_node, tuple):
+                            next_node_name, next_node = next_node
+                        else:
+                            next_node_name, next_node = str(uuid.uuid4()), next_node
+                        logger.debug(f"Transition to function-returned node: {next_node_name}")
+                        await self.set_node(next_node_name, next_node)
                     elif transition_to:  # Static flow
                         logger.debug(f"Static transition to: {transition_to}")
                         await self.set_node(transition_to, self.nodes[transition_to])
