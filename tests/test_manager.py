@@ -509,6 +509,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         result = await flow_manager._call_handler(handler_no_args, {})
         self.assertEqual(result["status"], "success")
 
+    # TODO: test
     async def test_transition_func_error_handling(self):
         """Test error handling in transition functions."""
         flow_manager = FlowManager(
@@ -681,10 +682,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         new_functions = set()
         with self.assertRaises(FlowError):
-            await flow_manager._register_function_schema(
-                FlowsFunctionSchema(name="test", description="test", properties={}, required=[]),
-                new_functions,
-            )
+            await flow_manager._register_function("test", new_functions, None)
 
     async def test_action_execution_error_handling(self):
         """Test error handling in action execution."""

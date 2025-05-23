@@ -26,6 +26,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    Mapping,
     Optional,
     Set,
     Tuple,
@@ -80,7 +81,10 @@ Example:
     }
 """
 
-LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult]]
+UnifiedFunctionResult = Tuple[Optional[FlowResult], Optional["NodeConfig"]]
+"""Return type for "unified" functions that do either or both of handling some processing as well as specifying the next node."""
+
+LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult | UnifiedFunctionResult]]
 """Legacy function handler that only receives arguments.
 
 Args:
@@ -90,7 +94,9 @@ Returns:
     FlowResult: Result of the function execution
 """
 
-FlowFunctionHandler = Callable[[FlowArgs, "FlowManager"], Awaitable[FlowResult]]
+FlowFunctionHandler = Callable[
+    [FlowArgs, "FlowManager"], Awaitable[FlowResult | UnifiedFunctionResult]
+]
 """Modern function handler that receives both arguments and flow_manager.
 
 Args:
@@ -240,6 +246,12 @@ class FlowsDirectFunction:
     def validate_function(function: Callable) -> None:
         pass
 
+    async def invoke(
+        self, args: Mapping[str, Any], flow_manager: "FlowManager"
+    ) -> UnifiedFunctionResult:
+        # print(f"[pk] Invoking function {self.name} with args: {args}")
+        return await self.function(**args, flow_manager=flow_manager)
+
     def to_function_schema(self) -> FunctionSchema:
         """Convert to a standard FunctionSchema for use with LLMs.
 
@@ -274,6 +286,7 @@ class FlowsDirectFunction:
     ) -> Tuple[Dict[str, Any], List[str]]:
         """
         Get function parameters as a dictionary of JSON schemas and a list of required parameters.
+        Ignore the last parameter, as it's expected to be the flow_manager.
 
         Args:
             func: Function to get parameters from
@@ -292,6 +305,12 @@ class FlowsDirectFunction:
         for name, param in sig.parameters.items():
             # Ignore 'self' parameter
             if name == "self":
+                continue
+
+            # Ignore the last parameter, which is expected to be the flow_manager
+            param_names = [n for n in sig.parameters]
+            is_last_param = name == param_names[-1]
+            if is_last_param:
                 continue
 
             type_hint = hints.get(name)
