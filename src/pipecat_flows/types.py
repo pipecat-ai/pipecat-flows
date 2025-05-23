@@ -396,12 +396,14 @@ class FlowsDirectFunction:
             properties = {}
             required = []
 
+            # NOTE: this does not yet support some fields being required and others not, which could happen when:
+            # - the base class is a TypedDict with required fields (total=True or not specified) and the derived class has optional fields (total=False)
+            # - Python 3.11+ NotRequired is used
+            all_fields_required = getattr(type_hint, "__total__", True)
+
             for field_name, field_type in get_type_hints(type_hint).items():
                 properties[field_name] = self._typehint_to_jsonschema(field_type)
-                # Check if field is required (this is a simplification, might need adjustment)
-                if not getattr(type_hint, "__total__", True) or not isinstance(
-                    field_type, Optional
-                ):
+                if all_fields_required:
                     required.append(field_name)
 
             schema = {"type": "object", "properties": properties}
