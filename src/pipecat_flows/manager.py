@@ -42,7 +42,12 @@ from pipecat.transports.base_transport import BaseTransport
 
 from .actions import ActionError, ActionManager
 from .adapters import create_adapter
-from .exceptions import FlowError, FlowInitializationError, FlowTransitionError, InvalidFunctionError
+from .exceptions import (
+    FlowError,
+    FlowInitializationError,
+    FlowTransitionError,
+    InvalidFunctionError,
+)
 from .types import (
     ActionConfig,
     ContextStrategy,
