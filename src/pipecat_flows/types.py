@@ -254,17 +254,17 @@ class FlowsDirectFunction:
             raise InvalidFunctionError(
                 f"Direct function {function.__name__} must have at least one parameter (flow_manager)"
             )
-        last_param_name = params[-1][0]
-        if last_param_name != "flow_manager":
+        first_param_name = params[0][0]
+        if first_param_name != "flow_manager":
             raise InvalidFunctionError(
-                f"Direct function {function.__name__} last parameter must be named 'flow_manager'"
+                f"Direct function {function.__name__} first parameter must be named 'flow_manager'"
             )
 
     async def invoke(
         self, args: Mapping[str, Any], flow_manager: "FlowManager"
     ) -> UnifiedFunctionResult:
         # print(f"[pk] Invoking function {self.name} with args: {args}")
-        return await self.function(**args, flow_manager=flow_manager)
+        return await self.function(flow_manager=flow_manager, **args)
 
     def to_function_schema(self) -> FunctionSchema:
         """Convert to a standard FunctionSchema for use with LLMs.
@@ -321,10 +321,10 @@ class FlowsDirectFunction:
             if name == "self":
                 continue
 
-            # Ignore the last parameter, which is expected to be the flow_manager
-            param_names = [n for n in sig.parameters]
-            is_last_param = name == param_names[-1]
-            if is_last_param:
+            # Ignore the first parameter, which is expected to be the flow_manager
+            # (We have presumably validated that this is the case in validate_function())
+            is_first_param = name == next(iter(sig.parameters))
+            if is_first_param:
                 continue
 
             type_hint = hints.get(name)
