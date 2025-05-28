@@ -221,6 +221,12 @@ class TestFlowsDirectFunction(unittest.TestCase):
         with self.assertRaises(InvalidFunctionError):
             FlowsDirectFunction.validate_function(my_function_missing_flow_manager)
 
+        async def my_function_misplaced_flow_manager(foo: str, flow_manager: FlowManager):
+            return {}, None
+
+        with self.assertRaises(InvalidFunctionError):
+            FlowsDirectFunction.validate_function(my_function_misplaced_flow_manager)
+
 
 if __name__ == "__main__":
     unittest.main()
