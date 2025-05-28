@@ -58,6 +58,7 @@ from .types import (
     FlowsDirectFunction,
     FlowsFunctionSchema,
     FunctionHandler,
+    NamedNode,
     NodeConfig,
     UnifiedFunctionResult,
 )
@@ -309,7 +310,7 @@ class FlowManager:
                 )
 
         async def on_context_updated_edge(
-            next_node: Optional[NodeConfig],
+            next_node: Optional[NodeConfig | NamedNode],
             args: Optional[Dict[str, Any]],
             result: Optional[Any],
             result_callback: Callable,
@@ -331,11 +332,12 @@ class FlowManager:
 
                 # Only process transition if this was the last pending call
                 if self._pending_function_calls == 0:
-                    if next_node:
-                        # TODO: handle possibility of next_node being a string identifying a node? for static flows? mabe we can just say direct functions are only supported in dynamic flows?
-                        if isinstance(next_node, tuple):
+                    if next_node:  # Function-returned next node (as opposed to next node specified by transition_*)
+                        if isinstance(next_node, str):  # Static flow
+                            next_node_name, next_node = next_node, self.nodes[next_node]
+                        elif isinstance(next_node, tuple):  # Dynamic flow with named node
                             next_node_name, next_node = next_node
-                        else:
+                        else:  # Dynamic flow with anonymous node
                             next_node_name, next_node = str(uuid.uuid4()), next_node
                         logger.debug(f"Transition to function-returned node: {next_node_name}")
                         await self.set_node(next_node_name, next_node)
