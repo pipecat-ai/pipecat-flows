@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from typing import Optional, TypedDict, Union
 
@@ -226,6 +227,30 @@ class TestFlowsDirectFunction(unittest.TestCase):
 
         with self.assertRaises(InvalidFunctionError):
             FlowsDirectFunction.validate_function(my_function_misplaced_flow_manager)
+
+    def test_invoke_calls_function_with_args_and_flow_manager(self):
+        """Test that FlowsDirectFunction.invoke calls the function with correct args and flow_manager."""
+
+        called = {}
+
+        class DummyFlowManager:
+            pass
+
+        async def my_function(flow_manager: DummyFlowManager, name: str, age: int):
+            called["flow_manager"] = flow_manager
+            called["name"] = name
+            called["age"] = age
+            return {"status": "success"}, None
+
+        func = FlowsDirectFunction(function=my_function)
+        flow_manager = DummyFlowManager()
+        args = {"name": "Alice", "age": 30}
+
+        result = asyncio.run(func.invoke(args=args, flow_manager=flow_manager))
+        self.assertEqual(result, ({"status": "success"}, None))
+        self.assertIs(called["flow_manager"], flow_manager)
+        self.assertEqual(called["name"], "Alice")
+        self.assertEqual(called["age"], 30)
 
 
 if __name__ == "__main__":

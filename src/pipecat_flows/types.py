@@ -344,7 +344,6 @@ class FlowsDirectFunction:
 
         return properties, required
 
-    # TODO: test this way more, throwing crazy types at it
     def _typehint_to_jsonschema(self, type_hint: Any) -> Dict[str, Any]:
         """
         Convert a Python type hint to a JSON Schema.
