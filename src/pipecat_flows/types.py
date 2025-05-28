@@ -83,12 +83,14 @@ Example:
     }
 """
 
-NamedNodeConfig = tuple[str, "NodeConfig"]
-"""Type alias for a node configuration with its name."""
+NamedNode = str | tuple[str, "NodeConfig"]
+"""
+Type alias for a named node, which can either be:
+- A string representing the node name (for static flows)
+- A tuple containing the node name and a NodeConfig instance (for dynamic flows)
+"""
 
-UnifiedFunctionResult = Tuple[
-    Optional[FlowResult], Optional["NodeConfig"] | Optional[NamedNodeConfig]
-]
+UnifiedFunctionResult = Tuple[Optional[FlowResult], Optional["NodeConfig"] | Optional[NamedNode]]
 """Return type for "unified" functions that do either or both of handling some processing as well as specifying the next node."""
 
 LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult | UnifiedFunctionResult]]

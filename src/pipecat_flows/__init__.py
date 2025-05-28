@@ -72,7 +72,7 @@ from .types import (
     FlowResult,
     FlowsFunctionSchema,
     LegacyFunctionHandler,
-    NamedNodeConfig,
+    NamedNode,
     NodeConfig,
 )
 
