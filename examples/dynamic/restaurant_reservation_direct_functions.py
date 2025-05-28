@@ -82,7 +82,7 @@ class TimeResult(FlowResult):
 
 # Function handlers
 async def collect_party_size(
-    size: int, flow_manager: FlowManager
+    flow_manager: FlowManager, size: int
 ) -> tuple[PartySizeResult, NamedNodeConfig]:
     """
     Record the number of people in the party.
@@ -101,7 +101,7 @@ async def collect_party_size(
 
 
 async def check_availability(
-    time: str, party_size: int, flow_manager: FlowManager
+    flow_manager: FlowManager, time: str, party_size: int
 ) -> tuple[TimeResult, NamedNodeConfig]:
     """
     Check availability for requested time.
