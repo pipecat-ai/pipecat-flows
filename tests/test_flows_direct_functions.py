@@ -19,7 +19,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
         """Test that FlowsDirectFunction extracts the name from the function."""
 
         async def my_function(flow_manager: FlowManager):
-            return {}, None
+            return {"status": "success"}, None
 
         self.assertIsNone(FlowsDirectFunction.validate_function(my_function))
         func = FlowsDirectFunction(function=my_function)
@@ -30,7 +30,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
 
         async def my_function_short_description(flow_manager: FlowManager):
             """This is a test function."""
-            return {}, None
+            return {"status": "success"}, None
 
         self.assertIsNone(FlowsDirectFunction.validate_function(my_function_short_description))
         func = FlowsDirectFunction(function=my_function_short_description)
@@ -44,7 +44,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
 
             Trust me, you'll want to use it.
             """
-            return {}, None
+            return {"status": "success"}, None
 
         self.assertIsNone(FlowsDirectFunction.validate_function(my_function_long_description))
         func = FlowsDirectFunction(function=my_function_long_description)
@@ -57,7 +57,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
         """Test that FlowsDirectFunction extracts the properties from the function."""
 
         async def my_function_no_params(flow_manager: FlowManager):
-            return {}, None
+            return {"status": "success"}, None
 
         self.assertIsNone(FlowsDirectFunction.validate_function(my_function_no_params))
         func = FlowsDirectFunction(function=my_function_no_params)
@@ -66,7 +66,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
         async def my_function_simple_params(
             flow_manager: FlowManager, name: str, age: int, height: Union[float, None]
         ):
-            return {}, None
+            return {"status": "success"}, None
 
         self.assertIsNone(FlowsDirectFunction.validate_function(my_function_simple_params))
         func = FlowsDirectFunction(function=my_function_simple_params)
@@ -85,7 +85,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
             nickname: str | int | float,
             extra: Optional[dict[str, str]],
         ):
-            return {}, None
+            return {"status": "success"}, None
 
         self.assertIsNone(FlowsDirectFunction.validate_function(my_function_complex_params))
         func = FlowsDirectFunction(function=my_function_complex_params)
@@ -116,7 +116,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
         async def my_function_complex_type_params(
             flow_manager: FlowManager, info1: MyInfo1, info2: MyInfo2
         ):
-            return {}, None
+            return {"status": "success"}, None
 
         self.assertIsNone(FlowsDirectFunction.validate_function(my_function_complex_type_params))
         func = FlowsDirectFunction(function=my_function_complex_type_params)
@@ -145,7 +145,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
         """Test that FlowsDirectFunction extracts the required properties from the function."""
 
         async def my_function_no_params(flow_manager: FlowManager):
-            return {}, None
+            return {"status": "success"}, None
 
         self.assertIsNone(FlowsDirectFunction.validate_function(my_function_no_params))
         func = FlowsDirectFunction(function=my_function_no_params)
@@ -154,7 +154,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
         async def my_function_simple_params(
             flow_manager: FlowManager, name: str, age: int, height: Union[float, None] = None
         ):
-            return {}, None
+            return {"status": "success"}, None
 
         self.assertIsNone(FlowsDirectFunction.validate_function(my_function_simple_params))
         func = FlowsDirectFunction(function=my_function_simple_params)
@@ -166,7 +166,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
             nickname: str | int | None = "Bud",
             extra: Optional[dict[str, str]] = None,
         ):
-            return {}, None
+            return {"status": "success"}, None
 
         self.assertIsNone(FlowsDirectFunction.validate_function(my_function_complex_params))
         func = FlowsDirectFunction(function=my_function_complex_params)
@@ -186,7 +186,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
                 age (int): The age of the person.
                 height (float | None): The height of the person in meters. Defaults to None.
             """
-            return {}, None
+            return {"status": "success"}, None
 
         self.assertIsNone(FlowsDirectFunction.validate_function(my_function))
         func = FlowsDirectFunction(function=my_function)
@@ -211,19 +211,19 @@ class TestFlowsDirectFunction(unittest.TestCase):
         """Test that invalid functions fail FlowsDirectFunction validation."""
 
         def my_function_non_async(flow_manager: FlowManager):
-            return {}, None
+            return {"status": "success"}, None
 
         with self.assertRaises(InvalidFunctionError):
             FlowsDirectFunction.validate_function(my_function_non_async)
 
         async def my_function_missing_flow_manager():
-            return {}, None
+            return {"status": "success"}, None
 
         with self.assertRaises(InvalidFunctionError):
             FlowsDirectFunction.validate_function(my_function_missing_flow_manager)
 
         async def my_function_misplaced_flow_manager(foo: str, flow_manager: FlowManager):
-            return {}, None
+            return {"status": "success"}, None
 
         with self.assertRaises(InvalidFunctionError):
             FlowsDirectFunction.validate_function(my_function_misplaced_flow_manager)
