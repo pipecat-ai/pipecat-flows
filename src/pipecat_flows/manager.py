@@ -492,7 +492,8 @@ class FlowManager:
 
         Args:
             name: Name of the function to register
-            handler: The function handler to register
+            handler: A callable function handler, a FlowsDirectFunction, or a string.
+                    If string starts with '__function__:', extracts the function name after the prefix.
             transition_to: Optional node to transition to (static flows)
             transition_callback: Optional transition callback (dynamic flows)
             new_functions: Set to track newly registered functions for this node
@@ -603,7 +604,7 @@ class FlowManager:
                 )
 
             for func_config in functions_list:
-                # Handle FlowsDirectFunctions
+                # Handle direct functions
                 if callable(func_config):
                     await register_direct_function(func_config)
                 # Handle Gemini's nested function declarations as a special case

@@ -28,6 +28,7 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Protocol,
     Set,
     Tuple,
     TypedDict,
@@ -116,8 +117,28 @@ Returns:
     FlowResult: Result of the function execution
 """
 
+
 FunctionHandler = Union[LegacyFunctionHandler, FlowFunctionHandler]
 """Union type for function handlers supporting both legacy and modern patterns."""
+
+
+class DirectFunction(Protocol):
+    """
+    \"Direct\" function whose definition is automatically extracted from the function signature and docstring.
+    This can be used in NodeConfigs directly, in lieu of a FlowsFunctionSchema or function definition dict.
+
+    Args:
+        flow_manager: Reference to the FlowManager instance
+        **kwargs: Additional keyword arguments
+
+    Returns:
+        UnifiedFunctionResult: Result of the function execution, which can include both a FlowResult
+            and the next node to transition to.
+    """
+
+    def __call__(
+        self, flow_manager: "FlowManager", **kwargs: Any
+    ) -> Awaitable[UnifiedFunctionResult]: ...
 
 
 LegacyActionHandler = Callable[[Dict[str, Any]], Awaitable[None]]
@@ -433,7 +454,7 @@ class NodeConfig(NodeConfigRequired, total=False):
     Optional fields:
         role_messages: List of message dicts defining the bot's role/personality
         functions: List of function definitions in provider-specific format, FunctionSchema,
-            or FlowsFunctionSchema
+            or FlowsFunctionSchema; or a "direct function" whose definition is automatically extracted
         pre_actions: Actions to execute before LLM inference
         post_actions: Actions to execute after LLM inference
         context_strategy: Strategy for updating context during transitions
@@ -461,7 +482,7 @@ class NodeConfig(NodeConfigRequired, total=False):
     """
 
     role_messages: List[Dict[str, Any]]
-    functions: List[Union[Dict[str, Any], FlowsFunctionSchema, FlowsDirectFunction]]
+    functions: List[Union[Dict[str, Any], FlowsFunctionSchema, DirectFunction]]
     pre_actions: List[ActionConfig]
     post_actions: List[ActionConfig]
     context_strategy: ContextStrategyConfig

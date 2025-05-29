@@ -66,6 +66,7 @@ from .manager import FlowManager
 from .types import (
     ContextStrategy,
     ContextStrategyConfig,
+    DirectFunction,
     FlowArgs,
     FlowConfig,
     FlowFunctionHandler,
@@ -74,6 +75,7 @@ from .types import (
     LegacyFunctionHandler,
     NamedNode,
     NodeConfig,
+    UnifiedFunctionResult,
 )
 
 __all__ = [
@@ -86,8 +88,11 @@ __all__ = [
     "FlowConfig",
     "FlowFunctionHandler",
     "FlowResult",
+    "UnifiedFunctionResult",
     "FlowsFunctionSchema",
     "LegacyFunctionHandler",
+    "DirectFunction",
+    "NamedNode",
     "NodeConfig",
     # Exceptions
     "FlowError",
