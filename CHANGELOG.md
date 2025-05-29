@@ -7,6 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added support for providing "consolidated" functions, which are responsible
+  for both doing some work as well as specifying the next node to transition
+  to. When using consolidated functions, you don't specify `transition_to` or
+  `transition_callback`.
+
+  Usage:
+
+  ```python
+  # "Consolidated" function
+  async def do_something(args: FlowArgs) -> tuple[FlowResult, NamedNode]:
+    foo = args["foo"]
+    bar = args.get("bar", "")
+
+    # Do some work (optional; this function may be a transition-only function)
+    result = await process(foo, bar)
+
+    # Specify next node (optional; this function may be a work-only function)
+    # Here, you could use:
+    # - A NodeConfig by itself
+    # - A tuple of (name, NodeConfig), as shown below (name is helpful for debug logging)
+    # - A string identifying a node in a static flow
+    next_node = ("another_node", create_another_node())
+
+    return result, next_node
+
+  def create_a_node() -> NodeConfig:
+    return NodeConfig(
+        task_messages=[
+          # ...
+        ],
+        functions=[FlowsFunctionSchema(
+            name="do_something",
+            description="Do something interesting.",
+            handler=do_something,
+            properties={
+              "foo": {
+                "type": "integer",
+                "description": "The foo to do something interesting with."
+              },
+              "bar": {
+                "type": "string",
+                "description": "The bar to do something interesting with."
+              }
+            },
+            required=["foo"],
+        )],
+    )
+  ```
+
+- Added support for providing "direct" functions, which don't need an
+  accompanying `FlowsFunctionSchema` or function definition dict. Instead,
+  metadata (i.e. `name`, `description`, `properties`, and `required`) are
+  automatically extracted from a combination of the function signature and
+  docstring.
+
+  Usage:
+
+  ```python
+  # "Direct" function
+  # `flow_manager` must be the first parameter
+  async def do_something(flow_manager: FlowManager, foo: int, bar: str = "") -> tuple[FlowResult, NamedNode]:
+    """
+    Do something interesting.
+
+    Args:
+      foo (int): The foo to do something interesting with.
+      bar (string): The bar to do something interesting with.
+    """
+
+    # Do some work (optional; this function may be a transition-only function)
+    result = await process(foo, bar)
+
+    # Specify next node (optional; this function may be a work-only function)
+    # Here, you could use:
+    # - A NodeConfig by itself
+    # - A tuple of (name, NodeConfig), as shown below (name is helpful for debug logging)
+    # - A string identifying a node in a static flow
+    next_node = ("another_node", create_another_node())
+
+    return result, next_node
+
+  def create_a_node() -> NodeConfig:
+    return NodeConfig(
+      task_messages=[
+        # ...
+      ],
+      functions=[do_something]
+    )
+  ```
+
 ### Changed
 
 - `functions` are now optional in the `NodeConfig`. Additionally, for AWS
