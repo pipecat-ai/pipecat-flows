@@ -509,7 +509,6 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         result = await flow_manager._call_handler(handler_no_args, {})
         self.assertEqual(result["status"], "success")
 
-    # TODO: test
     async def test_transition_func_error_handling(self):
         """Test error handling in transition functions."""
         flow_manager = FlowManager(
