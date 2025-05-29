@@ -50,6 +50,7 @@ from .exceptions import (
 )
 from .types import (
     ActionConfig,
+    ConsolidatedFunctionResult,
     ContextStrategy,
     ContextStrategyConfig,
     FlowArgs,
@@ -60,7 +61,6 @@ from .types import (
     FunctionHandler,
     NamedNode,
     NodeConfig,
-    ConsolidatedFunctionResult,
 )
 
 if TYPE_CHECKING:

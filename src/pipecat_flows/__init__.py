@@ -64,6 +64,7 @@ from .exceptions import (
 )
 from .manager import FlowManager
 from .types import (
+    ConsolidatedFunctionResult,
     ContextStrategy,
     ContextStrategyConfig,
     DirectFunction,
@@ -75,7 +76,6 @@ from .types import (
     LegacyFunctionHandler,
     NamedNode,
     NodeConfig,
-    ConsolidatedFunctionResult,
 )
 
 __all__ = [
