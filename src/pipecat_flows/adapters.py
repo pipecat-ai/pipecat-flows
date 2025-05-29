@@ -18,7 +18,7 @@ providers while maintaining a consistent internal format.
 """
 
 import sys
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from loguru import logger
 from pipecat.adapters.base_llm_adapter import BaseLLMAdapter
@@ -29,7 +29,7 @@ from pipecat.adapters.services.bedrock_adapter import AWSBedrockLLMAdapter
 from pipecat.adapters.services.gemini_adapter import GeminiLLMAdapter
 from pipecat.adapters.services.open_ai_adapter import OpenAILLMAdapter
 
-from .types import FlowsFunctionSchema
+from .types import FlowsDirectFunction, FlowsFunctionSchema
 
 
 class LLMAdapter:
@@ -402,6 +402,20 @@ class GeminiAdapter(LLMAdapter):
                                 "type": "object",
                                 "properties": func_config.properties,
                                 "required": func_config.required,
+                            },
+                        }
+                    )
+                elif isinstance(func_config, Callable):
+                    # Convert direct function to Gemini format
+                    direct_func = FlowsDirectFunction(function=func_config)
+                    gemini_functions.append(
+                        {
+                            "name": direct_func.name,
+                            "description": direct_func.description,
+                            "parameters": {
+                                "type": "object",
+                                "properties": direct_func.properties,
+                                "required": direct_func.required,
                             },
                         }
                     )
