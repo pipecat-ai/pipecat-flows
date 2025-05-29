@@ -91,7 +91,7 @@ Type alias for a named node, which can either be:
 - A tuple containing the node name and a NodeConfig instance (for dynamic flows)
 """
 
-UnifiedFunctionResult = Tuple[Optional[FlowResult], Optional["NodeConfig"] | Optional[NamedNode]]
+UnifiedFunctionResult = Tuple[Optional[FlowResult], Optional[Union["NodeConfig", NamedNode]]]
 """Return type for "unified" functions that do either or both of handling some processing as well as specifying the next node."""
 
 LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult | UnifiedFunctionResult]]
