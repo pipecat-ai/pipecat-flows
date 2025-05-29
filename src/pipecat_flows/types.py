@@ -91,10 +91,14 @@ Type alias for a named node, which can either be:
 - A tuple containing the node name and a NodeConfig instance (for dynamic flows)
 """
 
-UnifiedFunctionResult = Tuple[Optional[FlowResult], Optional[Union["NodeConfig", NamedNode]]]
-"""Return type for "unified" functions that do either or both of handling some processing as well as specifying the next node."""
+ConsolidatedFunctionResult = Tuple[Optional[FlowResult], Optional[Union["NodeConfig", NamedNode]]]
+"""
+Return type for "consolidated" functions that do either or both of:
+- doing some work
+- specifying the next node to transition to after the work is done
+"""
 
-LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult | UnifiedFunctionResult]]
+LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult | ConsolidatedFunctionResult]]
 """Legacy function handler that only receives arguments.
 
 Args:
@@ -105,7 +109,7 @@ Returns:
 """
 
 FlowFunctionHandler = Callable[
-    [FlowArgs, "FlowManager"], Awaitable[FlowResult | UnifiedFunctionResult]
+    [FlowArgs, "FlowManager"], Awaitable[FlowResult | ConsolidatedFunctionResult]
 ]
 """Modern function handler that receives both arguments and flow_manager.
 
@@ -132,13 +136,13 @@ class DirectFunction(Protocol):
         **kwargs: Additional keyword arguments
 
     Returns:
-        UnifiedFunctionResult: Result of the function execution, which can include both a FlowResult
-            and the next node to transition to.
+        ConsolidatedFunctionResult: Result of the function execution, which can include both a 
+            FlowResult and the next node to transition to.
     """
 
     def __call__(
         self, flow_manager: "FlowManager", **kwargs: Any
-    ) -> Awaitable[UnifiedFunctionResult]: ...
+    ) -> Awaitable[ConsolidatedFunctionResult]: ...
 
 
 LegacyActionHandler = Callable[[Dict[str, Any]], Awaitable[None]]
@@ -285,7 +289,7 @@ class FlowsDirectFunction:
 
     async def invoke(
         self, args: Mapping[str, Any], flow_manager: "FlowManager"
-    ) -> UnifiedFunctionResult:
+    ) -> ConsolidatedFunctionResult:
         # print(f"[pk] Invoking function {self.name} with args: {args}")
         return await self.function(flow_manager=flow_manager, **args)
 

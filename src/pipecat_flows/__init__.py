@@ -75,7 +75,7 @@ from .types import (
     LegacyFunctionHandler,
     NamedNode,
     NodeConfig,
-    UnifiedFunctionResult,
+    ConsolidatedFunctionResult,
 )
 
 __all__ = [
@@ -88,7 +88,7 @@ __all__ = [
     "FlowConfig",
     "FlowFunctionHandler",
     "FlowResult",
-    "UnifiedFunctionResult",
+    "ConsolidatedFunctionResult",
     "FlowsFunctionSchema",
     "LegacyFunctionHandler",
     "DirectFunction",
