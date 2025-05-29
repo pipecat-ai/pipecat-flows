@@ -94,7 +94,7 @@ async def collect_party_size(
     result = PartySizeResult(size=size, status="success")
 
     # Next node: time selection
-    # NOTE: name is optional, but useful for debug logging; you could pass a NodeConfig here directly
+    # NOTE: name is optional, but useful for debug logging; you could use a NodeConfig here directly
     next_node = "get_time", create_time_selection_node()
 
     return result, next_node
@@ -119,7 +119,7 @@ async def check_availability(
     )
 
     # Next node: confirmation or no availability
-    # NOTE: name is optional, but useful for debug logging; you could pass a NodeConfig here directly
+    # NOTE: name is optional, but useful for debug logging; you could use a NodeConfig here directly
     if is_available:
         next_node = "confirm", create_confirmation_node()
     else:
@@ -130,7 +130,7 @@ async def check_availability(
 
 async def end_conversation(flow_manager: FlowManager) -> tuple[None, NamedNode]:
     """End the conversation."""
-    # NOTE: name is optional, but useful for debug logging; you could pass a NodeConfig here directly
+    # NOTE: name is optional, but useful for debug logging; you could use a NodeConfig here directly
     return None, ("end", create_end_node())
 
 
