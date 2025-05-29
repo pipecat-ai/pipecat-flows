@@ -136,7 +136,7 @@ class DirectFunction(Protocol):
         **kwargs: Additional keyword arguments
 
     Returns:
-        ConsolidatedFunctionResult: Result of the function execution, which can include both a 
+        ConsolidatedFunctionResult: Result of the function execution, which can include both a
             FlowResult and the next node to transition to.
     """
 
@@ -290,7 +290,6 @@ class FlowsDirectFunction:
     async def invoke(
         self, args: Mapping[str, Any], flow_manager: "FlowManager"
     ) -> ConsolidatedFunctionResult:
-        # print(f"[pk] Invoking function {self.name} with args: {args}")
         return await self.function(flow_manager=flow_manager, **args)
 
     def to_function_schema(self) -> FunctionSchema:
