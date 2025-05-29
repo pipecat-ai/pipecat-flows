@@ -162,8 +162,8 @@ class TestFlowsDirectFunction(unittest.TestCase):
 
         async def my_function_complex_params(
             flow_manager: FlowManager,
-            address_lines: list[str],
-            nickname: str | int | None = "Bud",
+            address_lines: Optional[list[str]],
+            nickname: str | int = "Bud",
             extra: Optional[dict[str, str]] = None,
         ):
             return {"status": "success"}, None
