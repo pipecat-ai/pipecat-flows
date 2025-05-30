@@ -135,6 +135,7 @@ async def end_conversation(flow_manager: FlowManager) -> tuple[None, NodeConfig]
 def create_initial_node(wait_for_user: bool) -> NodeConfig:
     """Create initial node for party size collection."""
     return {
+        "name": "initial",
         "role_messages": [
             {
                 "role": "system",
@@ -266,9 +267,7 @@ async def main(wait_for_user: bool):
         async def on_first_participant_joined(transport, participant):
             await transport.capture_participant_transcription(participant["id"])
             logger.debug("Initializing flow manager")
-            await flow_manager.initialize()
-            logger.debug("Setting initial node")
-            await flow_manager.set_node("initial", create_initial_node(wait_for_user))
+            await flow_manager.initialize(create_initial_node(wait_for_user))
 
         runner = PipelineRunner()
         await runner.run(task)
