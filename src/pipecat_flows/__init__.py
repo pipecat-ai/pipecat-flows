@@ -74,7 +74,6 @@ from .types import (
     FlowResult,
     FlowsFunctionSchema,
     LegacyFunctionHandler,
-    NamedNode,
     NodeConfig,
 )
 
@@ -92,7 +91,6 @@ __all__ = [
     "FlowsFunctionSchema",
     "LegacyFunctionHandler",
     "DirectFunction",
-    "NamedNode",
     "NodeConfig",
     # Exceptions
     "FlowError",
