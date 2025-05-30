@@ -84,18 +84,13 @@ Example:
     }
 """
 
-NamedNode = str | tuple[str, "NodeConfig"]
-"""
-Type alias for a named node, which can either be:
-- A string representing the node name (for static flows)
-- A tuple containing the node name and a NodeConfig instance (for dynamic flows)
-"""
-
-ConsolidatedFunctionResult = Tuple[Optional[FlowResult], Optional[Union["NodeConfig", NamedNode]]]
+ConsolidatedFunctionResult = Tuple[Optional[FlowResult], Optional[Union["NodeConfig", str]]]
 """
 Return type for "consolidated" functions that do either or both of:
 - doing some work
-- specifying the next node to transition to after the work is done
+- specifying the next node to transition to after the work is done, specified as either:
+    - a NodeConfig (for dynamic flows)
+    - a node name (for static flows)
 """
 
 LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult | ConsolidatedFunctionResult]]
@@ -455,6 +450,7 @@ class NodeConfig(NodeConfigRequired, total=False):
         task_messages: List of message dicts defining the current node's objectives
 
     Optional fields:
+        name: Name of the node, useful for debug logging
         role_messages: List of message dicts defining the bot's role/personality
         functions: List of function definitions in provider-specific format, FunctionSchema,
             or FlowsFunctionSchema; or a "direct function" whose definition is automatically extracted
@@ -484,6 +480,7 @@ class NodeConfig(NodeConfigRequired, total=False):
         }
     """
 
+    name: str
     role_messages: List[Dict[str, Any]]
     functions: List[Union[Dict[str, Any], FlowsFunctionSchema, DirectFunction]]
     pre_actions: List[ActionConfig]

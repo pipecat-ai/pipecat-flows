@@ -59,7 +59,6 @@ from .types import (
     FlowsDirectFunction,
     FlowsFunctionSchema,
     FunctionHandler,
-    NamedNode,
     NodeConfig,
 )
 
@@ -310,7 +309,7 @@ class FlowManager:
                 )
 
         async def on_context_updated_edge(
-            next_node: Optional[NodeConfig | NamedNode],
+            next_node: Optional[NodeConfig | str],
             args: Optional[Dict[str, Any]],
             result: Optional[Any],
             result_callback: Callable,
@@ -334,13 +333,13 @@ class FlowManager:
                 if self._pending_function_calls == 0:
                     if next_node:  # Function-returned next node (as opposed to next node specified by transition_*)
                         if isinstance(next_node, str):  # Static flow
-                            next_node_name, next_node = next_node, self.nodes[next_node]
-                        elif isinstance(next_node, tuple):  # Dynamic flow with named node
-                            next_node_name, next_node = next_node
-                        else:  # Dynamic flow with anonymous node
-                            next_node_name, next_node = str(uuid.uuid4()), next_node
-                        logger.debug(f"Transition to function-returned node: {next_node_name}")
-                        await self.set_node(next_node_name, next_node)
+                            node_name = next_node
+                            node = self.nodes[next_node]
+                        else:  # Dynamic flow
+                            node_name = next_node.get("name", str(uuid.uuid4()))
+                            node = next_node
+                        logger.debug(f"Transition to function-returned node: {node_name}")
+                        await self.set_node(node_name, node)
                     elif transition_to:  # Static flow
                         logger.debug(f"Static transition to: {transition_to}")
                         await self.set_node(transition_to, self.nodes[transition_to])

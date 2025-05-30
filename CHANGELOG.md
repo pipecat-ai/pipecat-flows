@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   ```python
   # "Consolidated" function
-  async def do_something(args: FlowArgs) -> tuple[FlowResult, NamedNode]:
+  async def do_something(args: FlowArgs) -> tuple[FlowResult, NodeConfig]:
     foo = args["foo"]
     bar = args.get("bar", "")
 
@@ -26,11 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     result = await process(foo, bar)
 
     # Specify next node (optional; this function may be a work-only function)
-    # Here, you could use:
-    # - A NodeConfig by itself
-    # - A tuple of (name, NodeConfig), as shown below (name is helpful for debug logging)
-    # - A string identifying a node in a static flow
-    next_node = ("another_node", create_another_node())
+    # This is either a NodeConfig (for dynamic flows) or a node name (for static flows)
+    next_node = create_another_node()
 
     return result, next_node
 
@@ -69,7 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```python
   # "Direct" function
   # `flow_manager` must be the first parameter
-  async def do_something(flow_manager: FlowManager, foo: int, bar: str = "") -> tuple[FlowResult, NamedNode]:
+  async def do_something(flow_manager: FlowManager, foo: int, bar: str = "") -> tuple[FlowResult, NodeConfig]:
     """
     Do something interesting.
 
@@ -82,11 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     result = await process(foo, bar)
 
     # Specify next node (optional; this function may be a work-only function)
-    # Here, you could use:
-    # - A NodeConfig by itself
-    # - A tuple of (name, NodeConfig), as shown below (name is helpful for debug logging)
-    # - A string identifying a node in a static flow
-    next_node = ("another_node", create_another_node())
+    # This is either a NodeConfig (for dynamic flows) or a node name (for static flows)
+    next_node = create_another_node()
 
     return result, next_node
 
