@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Addded a new optional `name` field to `NodeConfig`. When using dynamic flows alongside
+  "consolidated" functions that return a tuple (result, next node), giving the next node a `name` is
+  helpful for debug logging. If you don't specify a `name`, an automatically-generated UUID is used.
+
 - Added support for providing "consolidated" functions, which are responsible
   for both doing some work as well as specifying the next node to transition
   to. When using consolidated functions, you don't specify `transition_to` or
@@ -92,6 +96,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       functions=[do_something]
     )
   ```
+
+### Deprecated
+
+- Deprecated `transition_to` and `transition_callback` in favor of "consolidated" `handler`s that
+  return a tuple (result, next node). Alternatively, you could use "direct" functions and avoid
+  using `FlowsFunctionSchema`s or function definition dicts entirely. See the "Added" section above
+  for more details.
 
 ### Changed
 

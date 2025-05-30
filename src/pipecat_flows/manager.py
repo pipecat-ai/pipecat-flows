@@ -852,7 +852,7 @@ class FlowManager:
                 with warnings.catch_warnings():
                     warnings.simplefilter("always")
                     warnings.warn(
-                        '`transition_to` and `transition_callback` are deprecated and will be removed in a future version. Use a "consolidated" `handler` that returns a tuple (result, next_node) instead',
+                        '`transition_to` and `transition_callback` are deprecated and will be removed in a future version. Use a "consolidated" `handler` that returns a tuple (result, next_node) instead.',
                         DeprecationWarning,
                         stacklevel=2,
                     )

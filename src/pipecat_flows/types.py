@@ -455,7 +455,8 @@ class NodeConfig(NodeConfigRequired, total=False):
         task_messages: List of message dicts defining the current node's objectives
 
     Optional fields:
-        name: Name of the node, useful for debug logging
+        name: Name of the node, useful for debug logging when returning a next node from a
+            "consolidated" function
         role_messages: List of message dicts defining the bot's role/personality
         functions: List of function definitions in provider-specific format, FunctionSchema,
             or FlowsFunctionSchema; or a "direct function" whose definition is automatically extracted
