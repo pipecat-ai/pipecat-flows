@@ -18,6 +18,7 @@ and function interactions.
 
 import inspect
 import types
+import uuid
 from dataclasses import dataclass
 from enum import Enum
 from typing import (
@@ -493,6 +494,11 @@ class NodeConfig(NodeConfigRequired, total=False):
     post_actions: List[ActionConfig]
     context_strategy: ContextStrategyConfig
     respond_immediately: bool
+
+
+def get_or_generate_node_name(node_config: NodeConfig) -> str:
+    """Get the node name from the given configuration, defaulting to a UUID if not set."""
+    return node_config.get("name", str(uuid.uuid4()))
 
 
 class FlowConfig(TypedDict):

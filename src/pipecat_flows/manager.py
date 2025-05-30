@@ -61,6 +61,7 @@ from .types import (
     FlowsFunctionSchema,
     FunctionHandler,
     NodeConfig,
+    get_or_generate_node_name,
 )
 
 if TYPE_CHECKING:
@@ -160,7 +161,7 @@ class FlowManager:
         if not inspect.iscoroutinefunction(callback):
             raise ValueError(f"Transition callback for {name} must be async")
 
-    async def initialize(self) -> None:
+    async def initialize(self, initial_node: Optional[NodeConfig] = None) -> None:
         """Initialize the flow manager."""
         if self.initialized:
             logger.warning(f"{self.__class__.__name__} already initialized")
@@ -170,10 +171,26 @@ class FlowManager:
             self.initialized = True
             logger.debug(f"Initialized {self.__class__.__name__}")
 
-            # If in static mode, set initial node
+            # Set initial node
+            node_name = None
+            node = None
             if self.initial_node:
-                logger.debug(f"Setting initial node: {self.initial_node}")
-                await self.set_node(self.initial_node, self.nodes[self.initial_node])
+                # Static flow: self.initial_node is expected to be there
+                node_name = self.initial_node
+                node = self.nodes[self.initial_node]
+                if not node:
+                    raise ValueError(
+                        f"Initial node '{self.initial_node}' not found in static flow configuration"
+                    )
+            else:
+                # Dynamic flow: initial_node argument may have been provided (otherwise initial node
+                # will be set later via set_node())
+                if initial_node:
+                    node_name = get_or_generate_node_name(initial_node)
+                    node = initial_node
+            if node_name:
+                logger.debug(f"Setting initial node: {node_name}")
+                await self.set_node(node_name, node)
 
         except Exception as e:
             self.initialized = False
@@ -339,7 +356,7 @@ class FlowManager:
                             node_name = next_node
                             node = self.nodes[next_node]
                         else:  # Dynamic flow
-                            node_name = next_node.get("name", str(uuid.uuid4()))
+                            node_name = get_or_generate_node_name(next_node)
                             node = next_node
                         logger.debug(f"Transition to function-returned node: {node_name}")
                         await self.set_node(node_name, node)
