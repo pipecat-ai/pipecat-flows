@@ -27,6 +27,7 @@ import asyncio
 import inspect
 import sys
 import uuid
+import warnings
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Union, cast
 
 from loguru import logger
@@ -141,6 +142,8 @@ class FlowManager:
         self.state: Dict[str, Any] = {}  # Shared state across nodes
         self.current_functions: Set[str] = set()  # Track registered functions
         self.current_node: Optional[str] = None
+
+        self._showed_deprecation_warning_for_transition_fields = False
 
     def _validate_transition_callback(self, name: str, callback: Any) -> None:
         """Validate a transition callback.
@@ -838,3 +841,18 @@ class FlowManager:
                 logger.warning(
                     f"Function '{name}' in node '{node_id}' has neither handler, transition_to, nor transition_callback"
                 )
+
+            # Warn about usage of deprecated transition_to and transition_callback
+            if (
+                has_transition_to
+                or has_transition_callback
+                and not self._showed_deprecation_warning_for_transition_fields
+            ):
+                self._showed_deprecation_warning_for_transition_fields = True
+                with warnings.catch_warnings():
+                    warnings.simplefilter("always")
+                    warnings.warn(
+                        '`transition_to` and `transition_callback` are deprecated and will be removed in a future version. Use a "consolidated" `handler` that returns a tuple (result, next_node) instead',
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )

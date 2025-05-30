@@ -231,8 +231,13 @@ class FlowsFunctionSchema:
         properties: Dictionary defining properties types and descriptions
         required: List of required parameters
         handler: Function handler to process the function call
-        transition_to: Target node to transition to after function execution
-        transition_callback: Callback function for dynamic transitions
+        transition_to: Target node to transition to after function execution (deprecated)
+        transition_callback: Callback function for dynamic transitions (deprecated)
+
+    Deprecated:
+        0.0.18: `transition_to` and `transition_callback` are deprecated and will be removed in a
+            future version. Use a "consolidated" `handler` that returns a tuple (result, next_node)
+            instead.
     """
 
     name: str
