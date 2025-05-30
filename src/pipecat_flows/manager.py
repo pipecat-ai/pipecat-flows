@@ -145,6 +145,7 @@ class FlowManager:
         self.current_node: Optional[str] = None
 
         self._showed_deprecation_warning_for_transition_fields = False
+        self._showed_deprecation_warning_for_set_node = False
 
     def _validate_transition_callback(self, name: str, callback: Any) -> None:
         """Validate a transition callback.
@@ -190,7 +191,7 @@ class FlowManager:
                     node = initial_node
             if node_name:
                 logger.debug(f"Setting initial node: {node_name}")
-                await self.set_node(node_name, node)
+                await self._set_node(node_name, node)
 
         except Exception as e:
             self.initialized = False
@@ -359,10 +360,10 @@ class FlowManager:
                             node_name = get_or_generate_node_name(next_node)
                             node = next_node
                         logger.debug(f"Transition to function-returned node: {node_name}")
-                        await self.set_node(node_name, node)
+                        await self._set_node(node_name, node)
                     elif transition_to:  # Static flow
                         logger.debug(f"Static transition to: {transition_to}")
-                        await self.set_node(transition_to, self.nodes[transition_to])
+                        await self._set_node(transition_to, self.nodes[transition_to])
                     elif transition_callback:  # Dynamic flow
                         logger.debug(f"Dynamic transition for: {name}")
                         # Check callback signature
@@ -544,6 +545,20 @@ class FlowManager:
                 raise FlowError(f"Function registration failed: {str(e)}") from e
 
     async def set_node(self, node_id: str, node_config: NodeConfig) -> None:
+        if not self._showed_deprecation_warning_for_set_node:
+            self._showed_deprecation_warning_for_set_node = True
+            with warnings.catch_warnings():
+                warnings.simplefilter("always")
+                warnings.warn(
+                    """`set_node()` is deprecated and will be removed in a future version. Instead, do the following for dynamic flows: 
+- Use "consolidated" or "direct" functions that return a tuple (result, next_node); provide a `name` in your next_node's config for debug logging purposes
+- Pass your initial node to `FlowManager.initialize()`""",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+        await self._set_node(node_id, node_config)
+
+    async def _set_node(self, node_id: str, node_config: NodeConfig) -> None:
         """Set up a new conversation node and transition to it.
 
         Handles the complete node transition process in the following order:
