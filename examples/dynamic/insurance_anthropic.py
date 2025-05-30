@@ -29,7 +29,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
-from typing import Dict, TypedDict, Union
+from typing import TypedDict, Union
 
 import aiohttp
 from dotenv import load_dotenv
@@ -88,22 +88,37 @@ INSURANCE_RATES = {
 
 
 # Function handlers
-async def collect_age(args: FlowArgs) -> AgeCollectionResult:
-    """Process age collection."""
+async def collect_age(
+    args: FlowArgs, flow_manager: FlowManager
+) -> tuple[AgeCollectionResult, NodeConfig]:
+    """Process age collection and return next node name."""
     age = args["age"]
     logger.debug(f"collect_age handler executing with age: {age}")
-    return AgeCollectionResult(age=age)
+
+    flow_manager.state["age"] = age
+    result = AgeCollectionResult(age=age)
+
+    next_node = create_marital_status_node()
+
+    return result, next_node
 
 
-async def collect_marital_status(args: FlowArgs) -> MaritalStatusResult:
-    """Process marital status collection."""
+async def collect_marital_status(
+    args: FlowArgs, flow_manager: FlowManager
+) -> tuple[MaritalStatusResult, NodeConfig]:
+    """Process marital status collection and return next node name."""
     status = args["marital_status"]
     logger.debug(f"collect_marital_status handler executing with status: {status}")
-    return MaritalStatusResult(marital_status=status)
+
+    result = MaritalStatusResult(marital_status=status)
+
+    next_node = create_quote_calculation_node(flow_manager.state["age"], status)
+
+    return result, next_node
 
 
-async def calculate_quote(args: FlowArgs) -> QuoteCalculationResult:
-    """Calculate insurance quote based on age and marital status."""
+async def calculate_quote(args: FlowArgs) -> tuple[QuoteCalculationResult, NodeConfig]:
+    """Calculate insurance quote based on age and marital status, return next node name."""
     age = args["age"]
     marital_status = args["marital_status"]
     logger.debug(f"calculate_quote handler executing with age: {age}, status: {marital_status}")
@@ -116,15 +131,17 @@ async def calculate_quote(args: FlowArgs) -> QuoteCalculationResult:
     # Calculate quote
     monthly_premium = rates["base_rate"] * rates["risk_multiplier"]
 
-    return {
+    result = {
         "monthly_premium": monthly_premium,
         "coverage_amount": 250000,
         "deductible": 1000,
     }
+    next_node = create_quote_results_node(result)
+    return result, next_node
 
 
-async def update_coverage(args: FlowArgs) -> CoverageUpdateResult:
-    """Update coverage options and recalculate premium."""
+async def update_coverage(args: FlowArgs) -> tuple[CoverageUpdateResult, NodeConfig]:
+    """Update coverage options and recalculate premium, return next node name."""
     coverage_amount = args["coverage_amount"]
     deductible = args["deductible"]
     logger.debug(
@@ -136,51 +153,28 @@ async def update_coverage(args: FlowArgs) -> CoverageUpdateResult:
     if deductible > 1000:
         monthly_premium *= 0.9  # 10% discount for higher deductible
 
-    return {
+    result = {
         "monthly_premium": monthly_premium,
         "coverage_amount": coverage_amount,
         "deductible": deductible,
     }
+    next_node = create_quote_results_node(result)
+    return result, next_node
 
 
-async def end_quote() -> FlowResult:
-    """Handle quote completion."""
+async def end_quote(args: FlowArgs) -> tuple[FlowResult, str]:
+    """Handle quote completion and return next node name."""
     logger.debug("end_quote handler executing")
-    return {"status": "completed"}
-
-
-# Transition callbacks and handlers
-async def handle_age_collection(args: Dict, result: AgeCollectionResult, flow_manager: FlowManager):
-    flow_manager.state["age"] = result["age"]
-    await flow_manager.set_node("marital_status", create_marital_status_node())
-
-
-async def handle_marital_status_collection(
-    args: Dict, result: MaritalStatusResult, flow_manager: FlowManager
-):
-    flow_manager.state["marital_status"] = result["marital_status"]
-    await flow_manager.set_node(
-        "quote_calculation",
-        create_quote_calculation_node(
-            flow_manager.state["age"], flow_manager.state["marital_status"]
-        ),
-    )
-
-
-async def handle_quote_calculation(
-    args: Dict, result: QuoteCalculationResult, flow_manager: FlowManager
-):
-    await flow_manager.set_node("quote_results", create_quote_results_node(result))
-
-
-async def handle_end_quote(_: Dict, result: FlowResult, flow_manager: FlowManager):
-    await flow_manager.set_node("end", create_end_node())
+    result = {"status": "completed"}
+    next_node = create_end_node()
+    return result, next_node
 
 
 # Node configurations
 def create_initial_node() -> NodeConfig:
     """Create the initial node asking for age."""
     return {
+        "name": "initial",
         "role_messages": [
             {
                 "role": "system",
@@ -221,7 +215,6 @@ def create_initial_node() -> NodeConfig:
                     "properties": {"age": {"type": "integer"}},
                     "required": ["age"],
                 },
-                "transition_callback": handle_age_collection,
             }
         ],
     }
@@ -230,6 +223,7 @@ def create_initial_node() -> NodeConfig:
 def create_marital_status_node() -> NodeConfig:
     """Create node for collecting marital status."""
     return {
+        "name": "marital_status",
         "task_messages": [
             {
                 "role": "user",
@@ -253,7 +247,6 @@ def create_marital_status_node() -> NodeConfig:
                     },
                     "required": ["marital_status"],
                 },
-                "transition_callback": handle_marital_status_collection,
             }
         ],
     }
@@ -262,6 +255,7 @@ def create_marital_status_node() -> NodeConfig:
 def create_quote_calculation_node(age: int, marital_status: str) -> NodeConfig:
     """Create node for calculating initial quote."""
     return {
+        "name": "quote_calculation",
         "task_messages": [
             {
                 "role": "user",
@@ -290,7 +284,6 @@ def create_quote_calculation_node(age: int, marital_status: str) -> NodeConfig:
                     },
                     "required": ["age", "marital_status"],
                 },
-                "transition_callback": handle_quote_calculation,
             }
         ],
     }
@@ -301,6 +294,7 @@ def create_quote_results_node(
 ) -> NodeConfig:
     """Create node for showing quote and adjustment options."""
     return {
+        "name": "quote_results",
         "task_messages": [
             {
                 "role": "user",
@@ -341,7 +335,6 @@ def create_quote_results_node(
                 "handler": end_quote,
                 "description": "Complete the quote process",
                 "input_schema": {"type": "object", "properties": {}},
-                "transition_callback": handle_end_quote,
             },
         ],
     }
@@ -350,6 +343,7 @@ def create_quote_results_node(
 def create_end_node() -> NodeConfig:
     """Create the final node."""
     return {
+        "name": "end",
         "task_messages": [
             {
                 "role": "user",
@@ -421,9 +415,7 @@ async def main():
         async def on_first_participant_joined(transport, participant):
             await transport.capture_participant_transcription(participant["id"])
             # Initialize flow
-            await flow_manager.initialize()
-            # Set initial node
-            await flow_manager.set_node("initial", create_initial_node())
+            await flow_manager.initialize(create_initial_node())
 
         # Run the pipeline
         runner = PipelineRunner()
