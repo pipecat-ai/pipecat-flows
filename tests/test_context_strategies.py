@@ -96,7 +96,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         await flow_manager.initialize()
 
         # First node should use UpdateFrame regardless of strategy
-        await flow_manager._set_node("first", self.sample_node)
+        await flow_manager.set_node("first", self.sample_node)
         first_call = self.mock_task.queue_frames.call_args_list[0]
         first_frames = first_call[0][0]
         self.assertTrue(any(isinstance(f, LLMMessagesUpdateFrame) for f in first_frames))
@@ -105,7 +105,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         self.mock_task.queue_frames.reset_mock()
 
         # Subsequent node should use AppendFrame with default strategy
-        await flow_manager._set_node("second", self.sample_node)
+        await flow_manager.set_node("second", self.sample_node)
         second_call = self.mock_task.queue_frames.call_args_list[0]
         second_frames = second_call[0][0]
         self.assertTrue(any(isinstance(f, LLMMessagesAppendFrame) for f in second_frames))
@@ -121,11 +121,11 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         await flow_manager.initialize()
 
         # Set initial node
-        await flow_manager._set_node("first", self.sample_node)
+        await flow_manager.set_node("first", self.sample_node)
         self.mock_task.queue_frames.reset_mock()
 
         # Second node should use UpdateFrame with RESET strategy
-        await flow_manager._set_node("second", self.sample_node)
+        await flow_manager.set_node("second", self.sample_node)
         second_call = self.mock_task.queue_frames.call_args_list[0]
         second_frames = second_call[0][0]
         self.assertTrue(any(isinstance(f, LLMMessagesUpdateFrame) for f in second_frames))
@@ -150,10 +150,10 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         await flow_manager.initialize()
 
         # Set nodes and verify summary inclusion
-        await flow_manager._set_node("first", self.sample_node)
+        await flow_manager.set_node("first", self.sample_node)
         self.mock_task.queue_frames.reset_mock()
 
-        await flow_manager._set_node("second", self.sample_node)
+        await flow_manager.set_node("second", self.sample_node)
 
         # Verify summary was included in context update
         second_call = self.mock_task.queue_frames.call_args_list[0]
@@ -180,10 +180,10 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         )
 
         # Set nodes and verify fallback to RESET
-        await flow_manager._set_node("first", self.sample_node)
+        await flow_manager.set_node("first", self.sample_node)
         self.mock_task.queue_frames.reset_mock()
 
-        await flow_manager._set_node("second", self.sample_node)
+        await flow_manager.set_node("second", self.sample_node)
 
         # Verify UpdateFrame was used (RESET behavior)
         second_call = self.mock_task.queue_frames.call_args_list[0]
@@ -238,10 +238,10 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         }
 
         # Set nodes and verify strategy override
-        await flow_manager._set_node("first", self.sample_node)
+        await flow_manager.set_node("first", self.sample_node)
         self.mock_task.queue_frames.reset_mock()
 
-        await flow_manager._set_node("second", node_with_strategy)
+        await flow_manager.set_node("second", node_with_strategy)
 
         # Verify UpdateFrame was used (RESET behavior) despite global APPEND
         second_call = self.mock_task.queue_frames.call_args_list[0]
@@ -267,8 +267,8 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         await flow_manager.initialize()
 
         # Set nodes to trigger summary generation
-        await flow_manager._set_node("first", self.sample_node)
-        await flow_manager._set_node("second", self.sample_node)
+        await flow_manager.set_node("first", self.sample_node)
+        await flow_manager.set_node("second", self.sample_node)
 
         # Verify summary generation call
         create_call = self.mock_llm._client.chat.completions.create.call_args
@@ -299,7 +299,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         await flow_manager.initialize()
 
         # Set nodes to trigger summary generation
-        await flow_manager._set_node("first", self.sample_node)
+        await flow_manager.set_node("first", self.sample_node)
         self.mock_task.queue_frames.reset_mock()
 
         # Node with new task messages
@@ -307,7 +307,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
             "task_messages": [{"role": "system", "content": "New task."}],
             "functions": [],
         }
-        await flow_manager._set_node("second", new_node)
+        await flow_manager.set_node("second", new_node)
 
         # Verify context structure
         update_call = self.mock_task.queue_frames.call_args_list[0]
