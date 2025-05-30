@@ -61,7 +61,7 @@ from pipecat.transports.services.helpers.daily_rest import (
 )
 
 from pipecat_flows import ContextStrategyConfig, FlowManager, FlowResult, NodeConfig
-from pipecat_flows.types import ActionConfig, ContextStrategy, FlowsFunctionSchema
+from pipecat_flows.types import ActionConfig, ContextStrategy, FlowArgs, FlowsFunctionSchema
 
 sys.path.append(str(Path(__file__).parent.parent))
 from runner import configure
@@ -79,8 +79,9 @@ logger.add(sys.stderr, level="DEBUG")
 #    - check_store_location_and_hours_of_operation (always succeeds)
 #    - start_order (always fails)
 #    - end_customer_conversation
-#    Transition:
-#    - transition_after_customer_task (to either continued_customer_interaction or transferring_to_human_agent)
+#    Transitions to either:
+#    - continued_customer_interaction
+#    - transferring_to_human_agent
 #
 # 2. continued_customer_interaction
 #    The bot has already helped the customer with something. Now they're helping them with something else.
@@ -88,8 +89,9 @@ logger.add(sys.stderr, level="DEBUG")
 #    - check_store_location_and_hours_of_operation (always succeeds)
 #    - start_order (always fails)
 #    - end_customer_conversation
-#    Transition:
-#    - transition_after_customer_task (to either continued_customer_interaction or transferring_to_human_agent)
+#    Transitions to either:
+#    - continued_customer_interaction
+#    - transferring_to_human_agent
 #
 # 3. transferring_to_human_agent
 #    The customer is asked to please hold while the bot transfers them to a human agent. Hold music plays while the customer waits.
@@ -121,18 +123,24 @@ class StartOrderResult(FlowResult):
 
 
 # Function handlers
-async def check_store_location_and_hours_of_operation() -> StoreLocationAndHoursOfOperationResult:
+async def check_store_location_and_hours_of_operation() -> tuple[
+    StoreLocationAndHoursOfOperationResult, NodeConfig
+]:
     """Check store location and hours of operation."""
-    return StoreLocationAndHoursOfOperationResult(
+    result = StoreLocationAndHoursOfOperationResult(
         status="success",
         store_location="123 Main St, Anytown, USA",
         hours_of_operation="9am to 5pm, Monday through Friday",
     )
+    next_node = next_node_after_customer_task(result)
+    return result, next_node
 
 
-async def start_order() -> StartOrderResult:
+async def start_order() -> tuple[StartOrderResult, NodeConfig]:
     """Start a new order."""
-    return StartOrderResult(status="error")
+    result = StartOrderResult(status="error")
+    next_node = next_node_after_customer_task(result)
+    return result, next_node
 
 
 # Action handlers
@@ -216,41 +224,34 @@ async def unmute_customer_and_make_humans_hear_each_other(action: dict, flow_man
         )
 
 
-# Transitions
-async def start_customer_interaction(flow_manager: FlowManager):
-    """Transition to the "customer_interaction" node"""
-    await flow_manager.set_node("customer_interaction", create_initial_customer_interaction_node())
+# Functions
+async def end_customer_conversation(
+    args: FlowArgs, flow_manager: FlowManager
+) -> tuple[None, NodeConfig]:
+    """Transition to the "end_customer_conversation" node."""
+    return None, create_end_customer_conversation_node()
 
 
-async def transition_after_customer_task(args: Dict, result: FlowResult, flow_manager: FlowManager):
+async def end_human_agent_conversation(
+    args: FlowArgs, flow_manager: FlowManager
+) -> tuple[None, NodeConfig]:
+    """Transition to the "end_human_agent_conversation" node."""
+    return None, create_end_human_agent_conversation_node()
+
+
+# Helpers
+def next_node_after_customer_task(result: FlowResult) -> NodeConfig:
     """Transition to either the "continued_customer_interaction" node or "transferring_to_human_agent" node, depending on the outcome of the previous customer task"""
     if result.get("status") == "success":
-        await flow_manager.set_node(
-            "continued_customer_interaction", create_continued_customer_interaction_node()
-        )
+        return create_continued_customer_interaction_node()
     else:
-        await flow_manager.set_node(
-            "transferring_to_human_agent", create_transferring_to_human_agent_node()
-        )
+        return create_transferring_to_human_agent_node()
 
 
+# Transitions
 async def start_human_agent_interaction(flow_manager: FlowManager):
     """Transition to the "human_agent_interaction" node."""
     await flow_manager.set_node("human_agent_interaction", create_human_agent_interaction_node())
-
-
-async def end_customer_conversation(args: Dict, flow_manager: FlowManager):
-    """Transition to the "end_customer_conversation" node."""
-    await flow_manager.set_node(
-        "end_customer_conversation", create_end_customer_conversation_node()
-    )
-
-
-async def end_human_agent_conversation(args: Dict, flow_manager: FlowManager):
-    """Transition to the "end_human_agent_conversation" node."""
-    await flow_manager.set_node(
-        "end_human_agent_conversation", create_end_human_agent_conversation_node()
-    )
 
 
 # Node configuration
@@ -259,6 +260,7 @@ def create_initial_customer_interaction_node() -> NodeConfig:
     This is the initial node where the bot interacts with the customer and tries to help with their requests.
     """
     return NodeConfig(
+        name="customer_interaction",
         role_messages=[
             {
                 "role": "system",
@@ -283,7 +285,6 @@ def create_initial_customer_interaction_node() -> NodeConfig:
                 name="check_store_location_and_hours_of_operation",
                 description="Check store location and hours of operation",
                 handler=check_store_location_and_hours_of_operation,
-                transition_callback=transition_after_customer_task,
                 properties={},
                 required=[],
             ),
@@ -291,14 +292,13 @@ def create_initial_customer_interaction_node() -> NodeConfig:
                 name="start_order",
                 description="Start placing an order",
                 handler=start_order,
-                transition_callback=transition_after_customer_task,
                 properties={},
                 required=[],
             ),
             FlowsFunctionSchema(
                 name="end_customer_conversation",
                 description="End the conversation",
-                transition_callback=end_customer_conversation,
+                handler=end_customer_conversation,
                 properties={},
                 required=[],
             ),
@@ -312,6 +312,7 @@ def create_continued_customer_interaction_node() -> NodeConfig:
     It assumes that the bot has already previously helped the customer with something.
     """
     return NodeConfig(
+        name="continued_customer_interaction",
         task_messages=[
             {
                 "role": "system",
@@ -330,7 +331,6 @@ def create_continued_customer_interaction_node() -> NodeConfig:
                 name="check_store_location_and_hours_of_operation",
                 description="Check store location and hours of operation",
                 handler=check_store_location_and_hours_of_operation,
-                transition_callback=transition_after_customer_task,
                 properties={},
                 required=[],
             ),
@@ -338,14 +338,13 @@ def create_continued_customer_interaction_node() -> NodeConfig:
                 name="start_order",
                 description="Start placing an order",
                 handler=start_order,
-                transition_callback=transition_after_customer_task,
                 properties={},
                 required=[],
             ),
             FlowsFunctionSchema(
                 name="end_customer_conversation",
                 description="End the conversation",
-                transition_callback=end_customer_conversation,
+                handler=end_customer_conversation,
                 properties={},
                 required=[],
             ),
@@ -358,6 +357,7 @@ def create_transferring_to_human_agent_node() -> NodeConfig:
     This is the node where the customer is asked to please hold while the bot transfers them to a human agent. Hold music plays while the customer waits.
     """
     return NodeConfig(
+        name="transferring_to_human_agent",
         task_messages=[
             {
                 "role": "system",
@@ -381,6 +381,7 @@ def create_human_agent_interaction_node() -> NodeConfig:
     The customer continues to hear hold music.
     """
     return NodeConfig(
+        name="human_agent_interaction",
         task_messages=[
             {
                 "role": "system",
@@ -400,7 +401,7 @@ def create_human_agent_interaction_node() -> NodeConfig:
             FlowsFunctionSchema(
                 name="connect_human_agent_and_customer",
                 description="Connect the human agent to the customer",
-                transition_callback=end_human_agent_conversation,
+                handler=end_human_agent_conversation,
                 properties={},
                 required=[],
             )
@@ -414,6 +415,7 @@ def create_end_customer_conversation_node() -> NodeConfig:
     This is how a conversation ends when a human agent did not need to be brought in.
     """
     return NodeConfig(
+        name="end_customer_conversation",
         task_messages=[
             {
                 "role": "system",
@@ -429,6 +431,7 @@ def create_end_human_agent_conversation_node() -> NodeConfig:
     This is the node where the bot tells the agent that they're being patched through to the customer and ends the conversation (leaving the customer and agent in the room talking to each other).
     """
     return NodeConfig(
+        name="end_human_agent_conversation",
         task_messages=[
             {
                 "role": "system",
@@ -621,9 +624,7 @@ async def main():
             """
             await transport.capture_participant_transcription(participant["id"])
             # Initialize flow
-            await flow_manager.initialize()
-            # Set initial node
-            await start_customer_interaction(flow_manager=flow_manager)
+            await flow_manager.initialize(create_initial_customer_interaction_node())
 
         @transport.event_handler("on_participant_joined")
         async def on_participant_joined(transport: DailyTransport, participant: Dict[str, Any]):

@@ -81,13 +81,15 @@ class TimeResult(FlowResult):
 
 
 # Function handlers
-async def collect_party_size(args: FlowArgs) -> PartySizeResult:
+async def collect_party_size(args: FlowArgs) -> tuple[PartySizeResult, NodeConfig]:
     """Process party size collection."""
     size = args["size"]
-    return PartySizeResult(size=size, status="success")
+    result = PartySizeResult(size=size, status="success")
+    next_node = create_time_selection_node()
+    return result, next_node
 
 
-async def check_availability(args: FlowArgs) -> TimeResult:
+async def check_availability(args: FlowArgs) -> tuple[TimeResult, NodeConfig]:
     """Check reservation availability and return result."""
     time = args["time"]
     party_size = args["party_size"]
@@ -98,38 +100,20 @@ async def check_availability(args: FlowArgs) -> TimeResult:
     result = TimeResult(
         status="success", time=time, available=is_available, alternative_times=alternative_times
     )
-    return result
 
-
-# Transition handlers
-async def handle_party_size_collection(
-    args: Dict, result: PartySizeResult, flow_manager: FlowManager
-):
-    """Handle party size collection and transition to time selection."""
-    # Store party size in flow state
-    flow_manager.state["party_size"] = result["size"]
-    await flow_manager.set_node("get_time", create_time_selection_node())
-
-
-async def handle_availability_check(args: Dict, result: TimeResult, flow_manager: FlowManager):
-    """Handle availability check result and transition based on availability."""
-    # Store reservation details in flow state
-    flow_manager.state["requested_time"] = args["time"]
-
-    # Use result directly instead of accessing state
-    if result["available"]:
+    if is_available:
         logger.debug("Time is available, transitioning to confirmation node")
-        await flow_manager.set_node("confirm", create_confirmation_node())
+        next_node = create_confirmation_node()
     else:
         logger.debug(f"Time not available, storing alternatives: {result['alternative_times']}")
-        await flow_manager.set_node(
-            "no_availability", create_no_availability_node(result["alternative_times"])
-        )
+        next_node = create_no_availability_node(result["alternative_times"])
+
+    return result, next_node
 
 
-async def handle_end(_: Dict, result: FlowResult, flow_manager: FlowManager):
+async def end_conversation(args: FlowArgs) -> tuple[None, NodeConfig]:
     """Handle conversation end."""
-    await flow_manager.set_node("end", create_end_node())
+    return None, create_end_node()
 
 
 # Create function schemas
@@ -139,7 +123,6 @@ party_size_schema = FlowsFunctionSchema(
     properties={"size": {"type": "integer", "minimum": 1, "maximum": 12}},
     required=["size"],
     handler=collect_party_size,
-    transition_callback=handle_party_size_collection,
 )
 
 availability_schema = FlowsFunctionSchema(
@@ -155,7 +138,6 @@ availability_schema = FlowsFunctionSchema(
     },
     required=["time", "party_size"],
     handler=check_availability,
-    transition_callback=handle_availability_check,
 )
 
 end_conversation_schema = FlowsFunctionSchema(
@@ -163,7 +145,7 @@ end_conversation_schema = FlowsFunctionSchema(
     description="End the conversation",
     properties={},
     required=[],
-    transition_callback=handle_end,
+    handler=end_conversation,
 )
 
 
@@ -171,6 +153,7 @@ end_conversation_schema = FlowsFunctionSchema(
 def create_initial_node(wait_for_user: bool) -> NodeConfig:
     """Create initial node for party size collection."""
     return {
+        "name": "initial",
         "role_messages": [
             {
                 "role": "system",
@@ -192,6 +175,7 @@ def create_time_selection_node() -> NodeConfig:
     """Create node for time selection and availability check."""
     logger.debug("Creating time selection node")
     return {
+        "name": "get_time",
         "task_messages": [
             {
                 "role": "system",
@@ -205,6 +189,7 @@ def create_time_selection_node() -> NodeConfig:
 def create_confirmation_node() -> NodeConfig:
     """Create confirmation node for successful reservations."""
     return {
+        "name": "confirm",
         "task_messages": [
             {
                 "role": "system",
@@ -219,6 +204,7 @@ def create_no_availability_node(alternative_times: list[str]) -> NodeConfig:
     """Create node for handling no availability."""
     times_list = ", ".join(alternative_times)
     return {
+        "name": "no_availability",
         "task_messages": [
             {
                 "role": "system",
@@ -236,6 +222,7 @@ def create_no_availability_node(alternative_times: list[str]) -> NodeConfig:
 def create_end_node() -> NodeConfig:
     """Create the final node."""
     return {
+        "name": "end",
         "task_messages": [
             {
                 "role": "system",
@@ -297,9 +284,7 @@ async def main(wait_for_user: bool):
         async def on_first_participant_joined(transport, participant):
             await transport.capture_participant_transcription(participant["id"])
             logger.debug("Initializing flow manager")
-            await flow_manager.initialize()
-            logger.debug("Setting initial node")
-            await flow_manager.set_node("initial", create_initial_node(wait_for_user))
+            await flow_manager.initialize(create_initial_node(wait_for_user))
 
         runner = PipelineRunner()
         await runner.run(task)
