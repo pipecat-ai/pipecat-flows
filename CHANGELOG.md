@@ -104,6 +104,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   using `FlowsFunctionSchema`s or function definition dicts entirely. See the "Added" section above
   for more details.
 
+- Deprecated `set_node()` in favor of doing the following for dynamic flows:
+
+  - Prefer "consolidated" or "direct" functions that return a tuple (result, next node) over
+    deprecated `transition_callback`s
+  - Pass your initial node to `FlowManager.initialize()`
+  - If you really need to set a node explicitly, use `set_node_from_config()`
+
+  In all of these cases, you can provide a `name` in your new node's config for debug logging
+  purposes.
+
 ### Changed
 
 - `functions` are now optional in the `NodeConfig`. Additionally, for AWS
