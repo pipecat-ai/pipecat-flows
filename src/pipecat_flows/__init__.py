@@ -64,8 +64,10 @@ from .exceptions import (
 )
 from .manager import FlowManager
 from .types import (
+    ConsolidatedFunctionResult,
     ContextStrategy,
     ContextStrategyConfig,
+    DirectFunction,
     FlowArgs,
     FlowConfig,
     FlowFunctionHandler,
@@ -85,8 +87,10 @@ __all__ = [
     "FlowConfig",
     "FlowFunctionHandler",
     "FlowResult",
+    "ConsolidatedFunctionResult",
     "FlowsFunctionSchema",
     "LegacyFunctionHandler",
+    "DirectFunction",
     "NodeConfig",
     # Exceptions
     "FlowError",

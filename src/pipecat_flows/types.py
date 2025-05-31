@@ -16,11 +16,35 @@ These types provide structure and validation for flow configurations
 and function interactions.
 """
 
+import inspect
+import types
+import uuid
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional, TypedDict, TypeVar, Union
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+    TypedDict,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
+import docstring_parser
+from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
+
+from pipecat_flows.exceptions import InvalidFunctionError
 
 T = TypeVar("T")
 TransitionHandler = Callable[[Dict[str, T], "FlowManager"], Awaitable[None]]
@@ -61,7 +85,16 @@ Example:
     }
 """
 
-LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult]]
+ConsolidatedFunctionResult = Tuple[Optional[FlowResult], Optional[Union["NodeConfig", str]]]
+"""
+Return type for "consolidated" functions that do either or both of:
+- doing some work
+- specifying the next node to transition to after the work is done, specified as either:
+    - a NodeConfig (for dynamic flows)
+    - a node name (for static flows)
+"""
+
+LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult | ConsolidatedFunctionResult]]
 """Legacy function handler that only receives arguments.
 
 Args:
@@ -71,7 +104,9 @@ Returns:
     FlowResult: Result of the function execution
 """
 
-FlowFunctionHandler = Callable[[FlowArgs, "FlowManager"], Awaitable[FlowResult]]
+FlowFunctionHandler = Callable[
+    [FlowArgs, "FlowManager"], Awaitable[FlowResult | ConsolidatedFunctionResult]
+]
 """Modern function handler that receives both arguments and flow_manager.
 
 Args:
@@ -82,8 +117,28 @@ Returns:
     FlowResult: Result of the function execution
 """
 
+
 FunctionHandler = Union[LegacyFunctionHandler, FlowFunctionHandler]
 """Union type for function handlers supporting both legacy and modern patterns."""
+
+
+class DirectFunction(Protocol):
+    """
+    \"Direct\" function whose definition is automatically extracted from the function signature and docstring.
+    This can be used in NodeConfigs directly, in lieu of a FlowsFunctionSchema or function definition dict.
+
+    Args:
+        flow_manager: Reference to the FlowManager instance
+        **kwargs: Additional keyword arguments
+
+    Returns:
+        ConsolidatedFunctionResult: Result of the function execution, which can include both a
+            FlowResult and the next node to transition to.
+    """
+
+    def __call__(
+        self, flow_manager: "FlowManager", **kwargs: Any
+    ) -> Awaitable[ConsolidatedFunctionResult]: ...
 
 
 LegacyActionHandler = Callable[[Dict[str, Any]], Awaitable[None]]
@@ -177,8 +232,13 @@ class FlowsFunctionSchema:
         properties: Dictionary defining properties types and descriptions
         required: List of required parameters
         handler: Function handler to process the function call
-        transition_to: Target node to transition to after function execution
-        transition_callback: Callback function for dynamic transitions
+        transition_to: Target node to transition to after function execution (deprecated)
+        transition_callback: Callback function for dynamic transitions (deprecated)
+
+    Deprecated:
+        0.0.18: `transition_to` and `transition_callback` are deprecated and will be removed in a
+            future version. Use a "consolidated" `handler` that returns a tuple (result, next_node)
+            instead.
     """
 
     name: str
@@ -208,6 +268,181 @@ class FlowsFunctionSchema:
         )
 
 
+class FlowsDirectFunction:
+    def __init__(self, function: Callable):
+        self.function = function
+        self._initialize_metadata()
+
+    @staticmethod
+    def validate_function(function: Callable) -> None:
+        if not inspect.iscoroutinefunction(function):
+            raise InvalidFunctionError(f"Direct function {function.__name__} must be async")
+        params = list(inspect.signature(function).parameters.items())
+        if len(params) == 0:
+            raise InvalidFunctionError(
+                f"Direct function {function.__name__} must have at least one parameter (flow_manager)"
+            )
+        first_param_name = params[0][0]
+        if first_param_name != "flow_manager":
+            raise InvalidFunctionError(
+                f"Direct function {function.__name__} first parameter must be named 'flow_manager'"
+            )
+
+    async def invoke(
+        self, args: Mapping[str, Any], flow_manager: "FlowManager"
+    ) -> ConsolidatedFunctionResult:
+        return await self.function(flow_manager=flow_manager, **args)
+
+    def to_function_schema(self) -> FunctionSchema:
+        """Convert to a standard FunctionSchema for use with LLMs.
+
+        Returns:
+            FunctionSchema without flow-specific fields
+        """
+        return FunctionSchema(
+            name=self.name,
+            description=self.description,
+            properties=self.properties,
+            required=self.required,
+        )
+
+    def _initialize_metadata(self):
+        # Get function name
+        self.name = self.function.__name__
+
+        # Parse docstring for description and parameters
+        docstring = docstring_parser.parse(inspect.getdoc(self.function))
+
+        # Get function description
+        self.description = (docstring.description or "").strip()
+
+        # Get function parameters as JSON schemas, and the list of required parameters
+        self.properties, self.required = self._get_parameters_as_jsonschema(
+            self.function, docstring.params
+        )
+
+    # TODO: maybe to better support things like enums, check if each type is a pydantic type and use its convert-to-jsonschema function
+    def _get_parameters_as_jsonschema(
+        self, func: Callable, docstring_params: List[docstring_parser.DocstringParam]
+    ) -> Tuple[Dict[str, Any], List[str]]:
+        """
+        Get function parameters as a dictionary of JSON schemas and a list of required parameters.
+        Ignore the last parameter, as it's expected to be the flow_manager.
+
+        Args:
+            func: Function to get parameters from
+
+        Returns:
+            A tuple containing:
+                - A dictionary mapping each function parameter to its JSON schema
+                - A list of required parameter names
+        """
+
+        sig = inspect.signature(func)
+        hints = get_type_hints(func)
+        properties = {}
+        required = []
+
+        for name, param in sig.parameters.items():
+            # Ignore 'self' parameter
+            if name == "self":
+                continue
+
+            # Ignore the first parameter, which is expected to be the flow_manager
+            # (We have presumably validated that this is the case in validate_function())
+            is_first_param = name == next(iter(sig.parameters))
+            if is_first_param:
+                continue
+
+            type_hint = hints.get(name)
+
+            # Convert type hint to JSON schema
+            properties[name] = self._typehint_to_jsonschema(type_hint)
+
+            # Add whether the parameter is required
+            # If the parameter has no default value, it's required
+            if param.default is inspect.Parameter.empty:
+                required.append(name)
+
+            # Add parameter description from docstring
+            for doc_param in docstring_params:
+                if doc_param.arg_name == name:
+                    properties[name]["description"] = doc_param.description or ""
+
+        return properties, required
+
+    def _typehint_to_jsonschema(self, type_hint: Any) -> Dict[str, Any]:
+        """
+        Convert a Python type hint to a JSON Schema.
+
+        Args:
+            hint: A Python type hint
+
+        Returns:
+            A dictionary representing the JSON Schema
+        """
+        if type_hint is None:
+            return {}
+
+        # Handle basic types
+        if type_hint is type(None):
+            return {"type": "null"}
+        if type_hint is str:
+            return {"type": "string"}
+        elif type_hint is int:
+            return {"type": "integer"}
+        elif type_hint is float:
+            return {"type": "number"}
+        elif type_hint is bool:
+            return {"type": "boolean"}
+        elif type_hint is dict or type_hint is Dict:
+            return {"type": "object"}
+        elif type_hint is list or type_hint is List:
+            return {"type": "array"}
+
+        # Get origin and arguments for complex types
+        origin = get_origin(type_hint)
+        args = get_args(type_hint)
+
+        # Handle Optional/Union types
+        if origin is Union or origin is types.UnionType:
+            return {"anyOf": [self._typehint_to_jsonschema(arg) for arg in args]}
+
+        # Handle List, Tuple, Set with specific item types
+        if origin in (list, List, tuple, Tuple, set, Set) and args:
+            return {"type": "array", "items": self._typehint_to_jsonschema(args[0])}
+
+        # Handle Dict with specific key/value types
+        if origin in (dict, Dict) and len(args) == 2:
+            # For JSON Schema, keys must be strings
+            return {"type": "object", "additionalProperties": self._typehint_to_jsonschema(args[1])}
+
+        # Handle TypedDict
+        if hasattr(type_hint, "__annotations__"):
+            properties = {}
+            required = []
+
+            # NOTE: this does not yet support some fields being required and others not, which could happen when:
+            # - the base class is a TypedDict with required fields (total=True or not specified) and the derived class has optional fields (total=False)
+            # - Python 3.11+ NotRequired is used
+            all_fields_required = getattr(type_hint, "__total__", True)
+
+            for field_name, field_type in get_type_hints(type_hint).items():
+                properties[field_name] = self._typehint_to_jsonschema(field_type)
+                if all_fields_required:
+                    required.append(field_name)
+
+            schema = {"type": "object", "properties": properties}
+
+            if required:
+                schema["required"] = required
+
+            return schema
+
+        # Default to any type if we can't determine the specific schema
+        return {}
+
+
 class NodeConfigRequired(TypedDict):
     """Required fields for node configuration."""
 
@@ -221,9 +456,11 @@ class NodeConfig(NodeConfigRequired, total=False):
         task_messages: List of message dicts defining the current node's objectives
 
     Optional fields:
+        name: Name of the node, useful for debug logging when returning a next node from a
+            "consolidated" function
         role_messages: List of message dicts defining the bot's role/personality
         functions: List of function definitions in provider-specific format, FunctionSchema,
-            or FlowsFunctionSchema
+            or FlowsFunctionSchema; or a "direct function" whose definition is automatically extracted
         pre_actions: Actions to execute before LLM inference
         post_actions: Actions to execute after LLM inference
         context_strategy: Strategy for updating context during transitions
@@ -250,12 +487,18 @@ class NodeConfig(NodeConfigRequired, total=False):
         }
     """
 
+    name: str
     role_messages: List[Dict[str, Any]]
-    functions: List[Union[Dict[str, Any], FlowsFunctionSchema]]
+    functions: List[Union[Dict[str, Any], FlowsFunctionSchema, DirectFunction]]
     pre_actions: List[ActionConfig]
     post_actions: List[ActionConfig]
     context_strategy: ContextStrategyConfig
     respond_immediately: bool
+
+
+def get_or_generate_node_name(node_config: NodeConfig) -> str:
+    """Get the node name from the given configuration, defaulting to a UUID if not set."""
+    return node_config.get("name", str(uuid.uuid4()))
 
 
 class FlowConfig(TypedDict):

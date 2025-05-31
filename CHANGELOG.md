@@ -7,6 +7,113 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Addded a new optional `name` field to `NodeConfig`. When using dynamic flows alongside
+  "consolidated" functions that return a tuple (result, next node), giving the next node a `name` is
+  helpful for debug logging. If you don't specify a `name`, an automatically-generated UUID is used.
+
+- Added support for providing "consolidated" functions, which are responsible
+  for both doing some work as well as specifying the next node to transition
+  to. When using consolidated functions, you don't specify `transition_to` or
+  `transition_callback`.
+
+  Usage:
+
+  ```python
+  # "Consolidated" function
+  async def do_something(args: FlowArgs) -> tuple[FlowResult, NodeConfig]:
+    foo = args["foo"]
+    bar = args.get("bar", "")
+
+    # Do some work (optional; this function may be a transition-only function)
+    result = await process(foo, bar)
+
+    # Specify next node (optional; this function may be a work-only function)
+    # This is either a NodeConfig (for dynamic flows) or a node name (for static flows)
+    next_node = create_another_node()
+
+    return result, next_node
+
+  def create_a_node() -> NodeConfig:
+    return NodeConfig(
+        task_messages=[
+          # ...
+        ],
+        functions=[FlowsFunctionSchema(
+            name="do_something",
+            description="Do something interesting.",
+            handler=do_something,
+            properties={
+              "foo": {
+                "type": "integer",
+                "description": "The foo to do something interesting with."
+              },
+              "bar": {
+                "type": "string",
+                "description": "The bar to do something interesting with."
+              }
+            },
+            required=["foo"],
+        )],
+    )
+  ```
+
+- Added support for providing "direct" functions, which don't need an
+  accompanying `FlowsFunctionSchema` or function definition dict. Instead,
+  metadata (i.e. `name`, `description`, `properties`, and `required`) are
+  automatically extracted from a combination of the function signature and
+  docstring.
+
+  Usage:
+
+  ```python
+  # "Direct" function
+  # `flow_manager` must be the first parameter
+  async def do_something(flow_manager: FlowManager, foo: int, bar: str = "") -> tuple[FlowResult, NodeConfig]:
+    """
+    Do something interesting.
+
+    Args:
+      foo (int): The foo to do something interesting with.
+      bar (string): The bar to do something interesting with.
+    """
+
+    # Do some work (optional; this function may be a transition-only function)
+    result = await process(foo, bar)
+
+    # Specify next node (optional; this function may be a work-only function)
+    # This is either a NodeConfig (for dynamic flows) or a node name (for static flows)
+    next_node = create_another_node()
+
+    return result, next_node
+
+  def create_a_node() -> NodeConfig:
+    return NodeConfig(
+      task_messages=[
+        # ...
+      ],
+      functions=[do_something]
+    )
+  ```
+
+### Deprecated
+
+- Deprecated `transition_to` and `transition_callback` in favor of "consolidated" `handler`s that
+  return a tuple (result, next node). Alternatively, you could use "direct" functions and avoid
+  using `FlowsFunctionSchema`s or function definition dicts entirely. See the "Added" section above
+  for more details.
+
+- Deprecated `set_node()` in favor of doing the following for dynamic flows:
+
+  - Prefer "consolidated" or "direct" functions that return a tuple (result, next node) over
+    deprecated `transition_callback`s
+  - Pass your initial node to `FlowManager.initialize()`
+  - If you really need to set a node explicitly, use `set_node_from_config()`
+
+  In all of these cases, you can provide a `name` in your new node's config for debug logging
+  purposes.
+
 ### Changed
 
 - `functions` are now optional in the `NodeConfig`. Additionally, for AWS

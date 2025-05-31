@@ -8,7 +8,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import aiohttp
 from dotenv import load_dotenv
@@ -23,7 +23,7 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 
-from pipecat_flows import FlowArgs, FlowManager, FlowResult, FlowsFunctionSchema, NodeConfig
+from pipecat_flows import FlowManager, FlowResult, NodeConfig
 
 sys.path.append(str(Path(__file__).parent.parent))
 import argparse
@@ -81,72 +81,54 @@ class TimeResult(FlowResult):
 
 
 # Function handlers
-async def collect_party_size(args: FlowArgs) -> tuple[PartySizeResult, NodeConfig]:
-    """Process party size collection."""
-    size = args["size"]
+async def collect_party_size(
+    flow_manager: FlowManager, size: int
+) -> tuple[PartySizeResult, NodeConfig]:
+    """
+    Record the number of people in the party.
+
+    Args:
+        size (int): Number of people in the party. Must be between 1 and 12.
+    """
+    # Result: the recorded party size
     result = PartySizeResult(size=size, status="success")
+
+    # Next node: time selection
     next_node = create_time_selection_node()
+
     return result, next_node
 
 
-async def check_availability(args: FlowArgs) -> tuple[TimeResult, NodeConfig]:
-    """Check reservation availability and return result."""
-    time = args["time"]
-    party_size = args["party_size"]
+async def check_availability(
+    flow_manager: FlowManager, time: str, party_size: int
+) -> tuple[TimeResult, NodeConfig]:
+    """
+    Check availability for requested time.
 
+    Args:
+        time (str): Requested reservation time in "HH:MM AM/PM" format. Must be between 5 PM and 10 PM.
+        party_size (int): Number of people in the party.
+    """
     # Check availability with mock API
     is_available, alternative_times = await reservation_system.check_availability(party_size, time)
 
+    # Result: availability status and alternative times, if any
     result = TimeResult(
         status="success", time=time, available=is_available, alternative_times=alternative_times
     )
 
+    # Next node: confirmation or no availability
     if is_available:
-        logger.debug("Time is available, transitioning to confirmation node")
         next_node = create_confirmation_node()
     else:
-        logger.debug(f"Time not available, storing alternatives: {result['alternative_times']}")
-        next_node = create_no_availability_node(result["alternative_times"])
+        next_node = create_no_availability_node(alternative_times)
 
     return result, next_node
 
 
-async def end_conversation(args: FlowArgs) -> tuple[None, NodeConfig]:
-    """Handle conversation end."""
+async def end_conversation(flow_manager: FlowManager) -> tuple[None, NodeConfig]:
+    """End the conversation."""
     return None, create_end_node()
-
-
-# Create function schemas
-party_size_schema = FlowsFunctionSchema(
-    name="collect_party_size",
-    description="Record the number of people in the party",
-    properties={"size": {"type": "integer", "minimum": 1, "maximum": 12}},
-    required=["size"],
-    handler=collect_party_size,
-)
-
-availability_schema = FlowsFunctionSchema(
-    name="check_availability",
-    description="Check availability for requested time",
-    properties={
-        "time": {
-            "type": "string",
-            "pattern": "^([5-9]|10):00 PM$",  # Matches "5:00 PM" through "10:00 PM"
-            "description": "Reservation time (e.g., '6:00 PM')",
-        },
-        "party_size": {"type": "integer"},
-    },
-    required=["time", "party_size"],
-    handler=check_availability,
-)
-
-end_conversation_schema = FlowsFunctionSchema(
-    name="end_conversation",
-    description="End the conversation",
-    properties={},
-    required=[],
-    handler=end_conversation,
-)
 
 
 # Node configurations
@@ -166,7 +148,7 @@ def create_initial_node(wait_for_user: bool) -> NodeConfig:
                 "content": "Warmly greet the customer and ask how many people are in their party. This is your only job for now; if the customer asks for something else, politely remind them you can't do it.",
             }
         ],
-        "functions": [party_size_schema],
+        "functions": [collect_party_size],
         "respond_immediately": not wait_for_user,
     }
 
@@ -182,7 +164,7 @@ def create_time_selection_node() -> NodeConfig:
                 "content": "Ask what time they'd like to dine. Restaurant is open 5 PM to 10 PM.",
             }
         ],
-        "functions": [availability_schema],
+        "functions": [check_availability],
     }
 
 
@@ -196,7 +178,7 @@ def create_confirmation_node() -> NodeConfig:
                 "content": "Confirm the reservation details and ask if they need anything else.",
             }
         ],
-        "functions": [end_conversation_schema],
+        "functions": [end_conversation],
     }
 
 
@@ -215,7 +197,7 @@ def create_no_availability_node(alternative_times: list[str]) -> NodeConfig:
                 ),
             }
         ],
-        "functions": [availability_schema, end_conversation_schema],
+        "functions": [check_availability, end_conversation],
     }
 
 
@@ -229,6 +211,7 @@ def create_end_node() -> NodeConfig:
                 "content": "Thank them and end the conversation.",
             }
         ],
+        "functions": [],
         "post_actions": [{"type": "end_conversation"}],
     }
 
