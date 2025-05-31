@@ -542,6 +542,16 @@ class FlowManager:
                 logger.error(f"Failed to register function {name}: {str(e)}")
                 raise FlowError(f"Function registration failed: {str(e)}") from e
 
+    async def set_node_from_config(
+        self, node_config: NodeConfig
+    ) -> None:
+        """Set up a new conversation node and transition to it.
+        
+        Args:
+            node_config: Configuration for the new node
+        """
+        await self.set_node(get_or_generate_node_name(node_config), node_config)
+
     async def set_node(self, node_id: str, node_config: NodeConfig) -> None:
         """Set up a new conversation node and transition to it.
 

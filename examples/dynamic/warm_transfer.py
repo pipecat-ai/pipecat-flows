@@ -251,7 +251,7 @@ def next_node_after_customer_task(result: FlowResult) -> NodeConfig:
 # Transitions
 async def start_human_agent_interaction(flow_manager: FlowManager):
     """Transition to the "human_agent_interaction" node."""
-    await flow_manager.set_node("human_agent_interaction", create_human_agent_interaction_node())
+    await flow_manager.set_node_from_config(create_human_agent_interaction_node())
 
 
 # Node configuration
