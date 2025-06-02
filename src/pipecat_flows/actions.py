@@ -199,9 +199,7 @@ class ActionManager:
             return
 
         try:
-            await self.tts.say(text)
-            # TODO: Update to TTSSpeakFrame once Pipecat is fixed
-            # await self.task.queue_frame(TTSSpeakFrame(text=action["text"]))
+            await self.task.queue_frame(TTSSpeakFrame(text=action["text"]))
         except Exception as e:
             logger.error(f"TTS error: {e}")
 
