@@ -100,10 +100,13 @@ class ActionManager:
                 # Run function action
                 await frame.function(frame.action, flow_manager)
             elif isinstance(frame, BotStoppedSpeakingFrame):
-                # Execute deferred post-actions if bot's turn is over
-                await self._maybe_execute_deferred_post_actions()
+                # Execute deferred post-actions if the bot's turn is over.
+                # A BotStoppedSpeakingFrame only indicates that the bot's turn is over if there are
+                # no ongoing actions (otherwise one of those actions may have been responsible for it).
+                if self._ongoing_actions_count == 0:
+                    await self._execute_deferred_post_actions()
             elif isinstance(frame, ActionFinishedFrame):
-                # Handdle action finished
+                # Handle action finished
                 self._ongoing_actions_count = max(0, self._ongoing_actions_count - 1)
                 if self._ongoing_actions_count == 0:
                     self._ongoing_actions_finished_event.set()
@@ -212,10 +215,8 @@ class ActionManager:
         """Clear any scheduled deferred post-actions."""
         self._deferred_post_actions = []
 
-    async def _maybe_execute_deferred_post_actions(self) -> None:
+    async def _execute_deferred_post_actions(self) -> None:
         """Execute deferred post-actions."""
-        if self._ongoing_actions_count > 0:
-            return
         actions = self._deferred_post_actions
         self._deferred_post_actions = []
         if actions:
