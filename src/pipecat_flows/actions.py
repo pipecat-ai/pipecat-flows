@@ -149,6 +149,7 @@ class ActionManager:
         if not actions:
             return
 
+        previous_action_type = None
         for action in actions:
             action_type = action.get("type")
             if not action_type:
@@ -159,6 +160,11 @@ class ActionManager:
                 raise ActionError(f"No handler registered for action type: {action_type}")
 
             try:
+                # Based on the type of the previous action and the one coming up, we can determine
+                # if we need to wait for ongoing actions to finish before proceeding with this next
+                # one
+                await self._maybe_wait_before_next_action(previous_action_type, action_type)
+
                 # Determine if handler can accept flow_manager argument by inspecting its signature
                 # Handlers can either take (action) or (action, flow_manager)
                 try:
@@ -187,6 +193,9 @@ class ActionManager:
                         await handler(action)
                     else:
                         handler(action)
+
+                # Record the type of the action we just executed
+                previous_action_type = action_type
                 logger.debug(f"Successfully executed action: {action_type}")
             except Exception as e:
                 raise ActionError(f"Failed to execute action {action_type}: {str(e)}") from e
@@ -211,6 +220,49 @@ class ActionManager:
         self._deferred_post_actions = []
         if actions:
             await self.execute_actions(actions)
+
+    async def _maybe_wait_before_next_action(
+        self, previous_action_type: Optional[str], upcoming_action_type: str
+    ) -> None:
+        """Wait for ongoing actions to finish before executing the next action, if needed.
+
+        This method makes the determination of whether to wait based on the types of the previous
+        and upcoming actions.
+
+        What it's trying to avoid is the upcoming action having an effect before the previous one.
+
+        In the case where it don't have enough information, it's happy to err on the side of waiting.
+        """
+        needs_wait = False
+        if previous_action_type == "tts_say":
+            # "tts_say" enqueues a TTSSpeakFrame, which has an effect when it hits the TTS node in the pipeline.
+            # As long as the upcoming action enqueues a frame with an effect *at the same point or later* in the pipeline, we don't need to wait.
+            # If the upcoming action is:
+            # - "tts_say": no need to wait (effect happens at the same point)
+            # - "end_conversation": no need to wait (effect happens at the end of the pipeline)
+            # - "function": no need to wait (effect happens at the end of the pipeline)
+            # - custom action: wait (we don't know what it will do)
+            if upcoming_action_type not in ["tts_say", "end_conversation", "function"]:
+                needs_wait = True
+        elif previous_action_type == "end_conversation":
+            # "end_conversation" enqueues an EndFrame, which has an effect at the end of the pipeline.
+            # This is a special case where we wait no matter what the upcoming action is, even if we strictly don't need to, because we know the conversation will stop.
+            needs_wait = True
+        elif previous_action_type == "function":
+            # "function" enqueues a FunctionActionFrame, which has an effect at the end of the pipeline.
+            # If the upcoming action is:
+            # - "tts_say": wait (effect happens at the TTS node, which is earlier in the pipeline)
+            # - "end_conversation": no need to wait (effect happens at the same point)
+            # - "function": no need to wait (effect happens at the end of the pipeline)
+            # - custom action: wait (we don't know what it will do)
+            if upcoming_action_type == "tts_say":
+                needs_wait = True
+            elif upcoming_action_type not in ["end_conversation", "function"]:
+                needs_wait = True
+
+        if needs_wait:
+            await self._ongoing_actions_finished_event.wait()
+            self._ongoing_actions_finished_event.clear()
 
     async def _handle_tts_action(self, action: dict) -> None:
         """Built-in handler for TTS actions.
@@ -263,14 +315,8 @@ class ActionManager:
         # the reason we're queueing a frame here is to ensure it happens after bot turn is over in
         # post_actions
         await self._queue_frame(FunctionActionFrame(action=action, function=handler))
-        await self._wait_for_ongoing_actions_finished()
 
     async def _queue_frame(self, frame: Frame) -> None:
         """Queue a frame in the pipeline, along with an ActionFinishedFrame to signal completion."""
         await self.task.queue_frame(frame)
         await self.task.queue_frame(ActionFinishedFrame())
-
-    async def _wait_for_ongoing_actions_finished(self) -> None:
-        """Wait for all previously queued actions to finish."""
-        await self._ongoing_actions_finished_event.wait()
-        self._ongoing_actions_finished_event.clear()
