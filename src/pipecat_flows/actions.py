@@ -111,17 +111,6 @@ class ActionManager:
                 if self._ongoing_actions_count == 0:
                     self._ongoing_actions_finished_event.set()
 
-        this = self
-
-        class ActionQueuedObserver(BaseObserver):
-            async def on_push_frame(self, data: FramePushed):
-                if isinstance(data.frame, ActionFinishedFrame) and isinstance(
-                    data.source, PipelineTaskSource
-                ):
-                    this._ongoing_actions_count += 1
-
-        task.add_observer(ActionQueuedObserver())
-
     def _register_action(self, action_type: str, handler: Callable) -> None:
         """Register a handler for a specific action type.
 
@@ -231,8 +220,6 @@ class ActionManager:
         and upcoming actions.
 
         What it's trying to avoid is the upcoming action having an effect before the previous one.
-
-        In the case where it don't have enough information, it's happy to err on the side of waiting.
         """
         needs_wait = False
         if previous_action_type == "tts_say":
@@ -260,10 +247,18 @@ class ActionManager:
                 needs_wait = True
             elif upcoming_action_type not in ["end_conversation", "function"]:
                 needs_wait = True
+        else:
+            # Either previous action was:
+            # - None (the upcoming action is the first one), so there's nothing to wait for.
+            # - A fully custom action, where we don't know if it enqueued a ActionFinishedFrame that
+            #   we could even wait for, so we assume it didn't (legacy behavior). The reason we
+            #   can't know here whether it enqueued an ActionFinishedFrame is that any pipeline
+            #   observer we might use to track that would not have been notified yet.
+            # In either case, we don't wait.
+            pass
 
         if needs_wait:
             await self._ongoing_actions_finished_event.wait()
-            self._ongoing_actions_finished_event.clear()
 
     async def _handle_tts_action(self, action: dict) -> None:
         """Built-in handler for TTS actions.
@@ -281,7 +276,7 @@ class ActionManager:
             return
 
         try:
-            await self._queue_frame(TTSSpeakFrame(text=action["text"]))
+            await self._queue_action_frame(TTSSpeakFrame(text=action["text"]))
         except Exception as e:
             logger.error(f"TTS error: {e}")
 
@@ -296,8 +291,8 @@ class ActionManager:
                 Optional 'text' key for a goodbye message.
         """
         if action.get("text"):  # Optional goodbye message
-            await self._queue_frame(TTSSpeakFrame(text=action["text"]))
-        await self._queue_frame(EndFrame())
+            await self.task.queue_frame(TTSSpeakFrame(text=action["text"]))
+        await self._queue_action_frame(EndFrame())
 
     async def _handle_function_action(self, action: dict) -> None:
         """Built-in handler for queuing functions to run "inline" in the pipeline (i.e. when the pipeline is done with all the work queued before it).
@@ -315,9 +310,14 @@ class ActionManager:
             return
         # the reason we're queueing a frame here is to ensure it happens after bot turn is over in
         # post_actions
-        await self._queue_frame(FunctionActionFrame(action=action, function=handler))
+        await self._queue_action_frame(FunctionActionFrame(action=action, function=handler))
 
-    async def _queue_frame(self, frame: Frame) -> None:
+    async def _queue_action_frame(self, frame: Frame) -> None:
         """Queue a frame in the pipeline, along with an ActionFinishedFrame to signal completion."""
         await self.task.queue_frame(frame)
         await self.task.queue_frame(ActionFinishedFrame())
+
+        # Increment ongoing actions count and reset the finished event if this is the first action
+        self._ongoing_actions_count += 1
+        if self._ongoing_actions_count == 1:
+            self._ongoing_actions_finished_event.clear()
