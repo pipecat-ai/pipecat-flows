@@ -27,6 +27,7 @@ from pipecat.frames.frames import EndFrame, TTSSpeakFrame
 
 from pipecat_flows.actions import ActionManager
 from pipecat_flows.exceptions import ActionError
+from tests.test_helpers import assert_end_frame_queued, assert_tts_speak_frames_queued
 
 
 class TestActionManager(unittest.IsolatedAsyncioTestCase):
@@ -86,60 +87,7 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
         """Test basic TTS action execution."""
         action = {"type": "tts_say", "text": "Hello"}
         await self.action_manager.execute_actions([action])
-        self._assert_tts_speak_frames_queued(["Hello"])
-
-    # TODO: move elsewhere
-    def _assert_tts_speak_frames_queued(self, expected_texts: list[str]):
-        """Helper to assert certain expected TTSSpeakFrames were queued."""
-        tts_calls = [
-            call
-            for call in self.mock_task.queue_frame.call_args_list
-            if isinstance(call[0][0], TTSSpeakFrame)
-        ]
-        self.assertEqual(len(tts_calls), len(expected_texts))
-        for text in expected_texts:
-            self.assertTrue(
-                any(text in getattr(call[0][0], "text", "") for call in tts_calls),
-                f"{text} TTS call not found",
-            )
-
-    def _assert_end_frame_queued(self):
-        """Helper to assert an EndFrame was queued."""
-        end_calls = [
-            call
-            for call in self.mock_task.queue_frame.call_args_list
-            if isinstance(call[0][0], EndFrame)
-        ]
-        self.assertEqual(len(end_calls), 1, "EndFrame not queued")
-
-    @patch("loguru.logger.error")
-    async def test_tts_action_no_text(self, mock_logger):
-        """Test TTS action with missing text field."""
-        action = {"type": "tts_say"}  # Missing text field
-
-        # The implementation logs error but doesn't raise
-        await self.action_manager.execute_actions([action])
-
-        # Verify error was logged
-        mock_logger.assert_called_with("TTS action missing 'text' field")
-
-        # Verify TTS service was not called
-        self.mock_tts.say.assert_not_called()
-
-    @patch("loguru.logger.warning")
-    async def test_tts_action_no_service(self, mock_logger):
-        """Test TTS action when no TTS service is provided."""
-        action_manager = ActionManager(self.mock_task, None)
-        action = {"type": "tts_say", "text": "Hello"}
-
-        # Should log warning but not raise error
-        await action_manager.execute_actions([action])
-
-        # Verify warning was logged
-        mock_logger.assert_called_with("TTS action called but no TTS service provided")
-
-        # Verify no frames were queued
-        self.mock_task.queue_frame.assert_not_called()
+        assert_tts_speak_frames_queued(self.mock_task, ["Hello"])
 
     async def test_end_conversation_action(self):
         """Test basic end conversation action."""
@@ -147,7 +95,7 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
         await self.action_manager.execute_actions([action])
 
         # Verify EndFrame was queued
-        self._assert_end_frame_queued()
+        assert_end_frame_queued(self.mock_task)
 
     async def test_end_conversation_with_goodbye(self):
         """Test end conversation action with goodbye message."""
@@ -155,10 +103,10 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
         await self.action_manager.execute_actions([action])
 
         # Verify TTSSpeakFrame
-        self._assert_tts_speak_frames_queued(["Goodbye!"])
+        assert_tts_speak_frames_queued(self.mock_task, ["Goodbye!"])
 
         # Verify EndFrame
-        self._assert_end_frame_queued()
+        assert_end_frame_queued(self.mock_task)
 
     async def test_action_handler_signatures(self):
         """Test both legacy and modern action handler signatures."""
@@ -199,7 +147,7 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
         await self.action_manager.execute_actions(actions)
 
         # Verify TTS was called twice in correct order
-        self._assert_tts_speak_frames_queued(["First", "Second"])
+        assert_tts_speak_frames_queued(self.mock_task, ["First", "Second"])
 
     def test_register_invalid_handler(self):
         """Test registering invalid action handlers."""

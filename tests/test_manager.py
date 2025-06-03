@@ -34,6 +34,7 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat_flows.exceptions import FlowError, FlowTransitionError
 from pipecat_flows.manager import FlowConfig, FlowManager, NodeConfig
 from pipecat_flows.types import FlowArgs, FlowResult
+from tests.test_helpers import assert_tts_speak_frames_queued
 
 
 class TestFlowManager(unittest.IsolatedAsyncioTestCase):
@@ -378,27 +379,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Set node with actions
         await flow_manager.set_node("test", node_with_actions)
 
-        # Collect all calls where TTSSpeakFrame was passed as the first argument
-        tts_calls = [
-            call
-            for call in self.mock_task.queue_frame.call_args_list
-            if isinstance(call[0][0], TTSSpeakFrame)
-        ]
-
-        # Assert that two such calls exist
-        self.assertEqual(len(tts_calls), 2)
-
-        # Assert that one of the calls is for the pre-action
-        # Check that "Pre action" is present in the TTSSpeakFrame calls
-        self.assertTrue(
-            any("Pre action" in getattr(call[0][0], "text", "") for call in tts_calls),
-            "Pre action TTS call not found",
-        )
-        # Check that "Post action" is present in the TTSSpeakFrame calls
-        self.assertTrue(
-            any("Post action" in getattr(call[0][0], "text", "") for call in tts_calls),
-            "Post action TTS call not found",
-        )
+        assert_tts_speak_frames_queued(self.mock_task, ["Pre action", "Post action"])
 
     async def test_error_handling(self):
         """Test error handling in flow manager.
