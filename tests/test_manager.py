@@ -22,7 +22,12 @@ import unittest
 from typing import Dict
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-from pipecat.frames.frames import LLMMessagesAppendFrame, LLMMessagesUpdateFrame, LLMSetToolsFrame
+from pipecat.frames.frames import (
+    LLMMessagesAppendFrame,
+    LLMMessagesUpdateFrame,
+    LLMSetToolsFrame,
+    TTSSpeakFrame,
+)
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 
@@ -46,6 +51,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         """Set up test fixtures before each test."""
         self.mock_task = AsyncMock()
+        self.mock_task.queue_frame = AsyncMock()
         self.mock_task.event_handler = Mock()
         self.mock_task.set_reached_downstream_filter = Mock()
         self.mock_llm = OpenAILLMService(api_key="")
@@ -367,15 +373,32 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         }
 
         # Reset mock to clear initialization calls
-        self.mock_tts.say.reset_mock()
+        self.mock_task.queue_frame.reset_mock()
 
         # Set node with actions
         await flow_manager.set_node("test", node_with_actions)
 
-        # Verify TTS was called for both actions
-        self.assertEqual(self.mock_tts.say.call_count, 2)
-        self.mock_tts.say.assert_any_call("Pre action")
-        self.mock_tts.say.assert_any_call("Post action")
+        # Collect all calls where TTSSpeakFrame was passed as the first argument
+        tts_calls = [
+            call
+            for call in self.mock_task.queue_frame.call_args_list
+            if isinstance(call[0][0], TTSSpeakFrame)
+        ]
+
+        # Assert that two such calls exist
+        self.assertEqual(len(tts_calls), 2)
+
+        # Assert that one of the calls is for the pre-action
+        # Check that "Pre action" is present in the TTSSpeakFrame calls
+        self.assertTrue(
+            any("Pre action" in getattr(call[0][0], "text", "") for call in tts_calls),
+            "Pre action TTS call not found",
+        )
+        # Check that "Post action" is present in the TTSSpeakFrame calls
+        self.assertTrue(
+            any("Post action" in getattr(call[0][0], "text", "") for call in tts_calls),
+            "Post action TTS call not found",
+        )
 
     async def test_error_handling(self):
         """Test error handling in flow manager.
