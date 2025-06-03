@@ -370,7 +370,7 @@ class FlowManager:
                         await on_context_updated_node()
 
                 properties = FunctionCallResultProperties(
-                    run_llm=not is_edge_function,
+                    run_llm=False if is_edge_function else None,
                     on_context_updated=on_context_updated,
                 )
                 await params.result_callback(result, properties=properties)
