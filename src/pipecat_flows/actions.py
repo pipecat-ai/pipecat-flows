@@ -31,9 +31,11 @@ from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
     ControlFrame,
     EndFrame,
+    Frame,
     TTSSpeakFrame,
 )
-from pipecat.pipeline.task import PipelineTask
+from pipecat.observers.base_observer import BaseObserver, FramePushed
+from pipecat.pipeline.task import PipelineTask, PipelineTaskSource
 
 from .exceptions import ActionError
 from .types import ActionConfig, FlowActionHandler
@@ -43,6 +45,11 @@ from .types import ActionConfig, FlowActionHandler
 class FunctionActionFrame(ControlFrame):
     action: dict
     function: FlowActionHandler
+
+
+@dataclass
+class ActionFinishedFrame(ControlFrame):
+    pass
 
 
 class ActionManager:
@@ -73,7 +80,8 @@ class ActionManager:
         self.task = task
         self._flow_manager = flow_manager
         self.tts = tts
-        self.function_finished_event = asyncio.Event()
+        self._ongoing_actions_count = 0
+        self._ongoing_actions_finished_event = asyncio.Event()
         self._deferred_post_actions: List[ActionConfig] = []
 
         # Register built-in actions
@@ -81,16 +89,35 @@ class ActionManager:
         self._register_action("end_conversation", self._handle_end_action)
         self._register_action("function", self._handle_function_action)
 
-        # Wire up function actions
-        task.set_reached_downstream_filter((FunctionActionFrame, BotStoppedSpeakingFrame))
+        # Add pipeline observation
+        task.set_reached_downstream_filter(
+            (ActionFinishedFrame, FunctionActionFrame, BotStoppedSpeakingFrame)
+        )
 
         @task.event_handler("on_frame_reached_downstream")
         async def on_frame_reached_downstream(task, frame):
             if isinstance(frame, FunctionActionFrame):
+                # Run function action
                 await frame.function(frame.action, flow_manager)
-                self.function_finished_event.set()
             elif isinstance(frame, BotStoppedSpeakingFrame):
-                await self._execute_deferred_post_actions()
+                # Execute deferred post-actions if bot's turn is over
+                await self._maybe_execute_deferred_post_actions()
+            elif isinstance(frame, ActionFinishedFrame):
+                # Handdle action finished
+                self._ongoing_actions_count = max(0, self._ongoing_actions_count - 1)
+                if self._ongoing_actions_count == 0:
+                    self._ongoing_actions_finished_event.set()
+
+        this = self
+
+        class ActionQueuedObserver(BaseObserver):
+            async def on_push_frame(self, data: FramePushed):
+                if isinstance(data.frame, ActionFinishedFrame) and isinstance(
+                    data.source, PipelineTaskSource
+                ):
+                    this._ongoing_actions_count += 1
+
+        asyncio.create_task(task.add_observer(ActionQueuedObserver()))
 
     def _register_action(self, action_type: str, handler: Callable) -> None:
         """Register a handler for a specific action type.
@@ -176,8 +203,10 @@ class ActionManager:
         """Clear any scheduled deferred post-actions."""
         self._deferred_post_actions = []
 
-    async def _execute_deferred_post_actions(self) -> None:
+    async def _maybe_execute_deferred_post_actions(self) -> None:
         """Execute deferred post-actions."""
+        if self._ongoing_actions_count > 0:
+            return
         actions = self._deferred_post_actions
         self._deferred_post_actions = []
         if actions:
@@ -199,7 +228,7 @@ class ActionManager:
             return
 
         try:
-            await self.task.queue_frame(TTSSpeakFrame(text=action["text"]))
+            await self._queue_frame(TTSSpeakFrame(text=action["text"]))
         except Exception as e:
             logger.error(f"TTS error: {e}")
 
@@ -214,8 +243,8 @@ class ActionManager:
                 Optional 'text' key for a goodbye message.
         """
         if action.get("text"):  # Optional goodbye message
-            await self.task.queue_frame(TTSSpeakFrame(text=action["text"]))
-        await self.task.queue_frame(EndFrame())
+            await self._queue_frame(TTSSpeakFrame(text=action["text"]))
+        await self._queue_frame(EndFrame())
 
     async def _handle_function_action(self, action: dict) -> None:
         """Built-in handler for queuing functions to run "inline" in the pipeline (i.e. when the pipeline is done with all the work queued before it).
@@ -233,6 +262,15 @@ class ActionManager:
             return
         # the reason we're queueing a frame here is to ensure it happens after bot turn is over in
         # post_actions
-        await self.task.queue_frame(FunctionActionFrame(action=action, function=handler))
-        await self.function_finished_event.wait()
-        self.function_finished_event.clear()
+        await self._queue_frame(FunctionActionFrame(action=action, function=handler))
+        await self._wait_for_ongoing_actions_finished()
+
+    async def _queue_frame(self, frame: Frame) -> None:
+        """Queue a frame in the pipeline, along with an ActionFinishedFrame to signal completion."""
+        await self.task.queue_frame(frame)
+        await self.task.queue_frame(ActionFinishedFrame())
+
+    async def _wait_for_ongoing_actions_finished(self) -> None:
+        """Wait for all previously queued actions to finish."""
+        await self._ongoing_actions_finished_event.wait()
+        self._ongoing_actions_finished_event.clear()
