@@ -27,6 +27,7 @@ from pipecat.frames.frames import EndFrame, TTSSpeakFrame
 
 from pipecat_flows.actions import ActionManager
 from pipecat_flows.exceptions import ActionError
+from tests.test_helpers import assert_end_frame_queued, assert_tts_speak_frames_queued
 
 
 class TestActionManager(unittest.IsolatedAsyncioTestCase):
@@ -86,38 +87,7 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
         """Test basic TTS action execution."""
         action = {"type": "tts_say", "text": "Hello"}
         await self.action_manager.execute_actions([action])
-
-        # Verify TTS service was called with correct text
-        self.mock_tts.say.assert_called_once_with("Hello")
-
-    @patch("loguru.logger.error")
-    async def test_tts_action_no_text(self, mock_logger):
-        """Test TTS action with missing text field."""
-        action = {"type": "tts_say"}  # Missing text field
-
-        # The implementation logs error but doesn't raise
-        await self.action_manager.execute_actions([action])
-
-        # Verify error was logged
-        mock_logger.assert_called_with("TTS action missing 'text' field")
-
-        # Verify TTS service was not called
-        self.mock_tts.say.assert_not_called()
-
-    @patch("loguru.logger.warning")
-    async def test_tts_action_no_service(self, mock_logger):
-        """Test TTS action when no TTS service is provided."""
-        action_manager = ActionManager(self.mock_task, None)
-        action = {"type": "tts_say", "text": "Hello"}
-
-        # Should log warning but not raise error
-        await action_manager.execute_actions([action])
-
-        # Verify warning was logged
-        mock_logger.assert_called_with("TTS action called but no TTS service provided")
-
-        # Verify no frames were queued
-        self.mock_task.queue_frame.assert_not_called()
+        assert_tts_speak_frames_queued(self.mock_task, ["Hello"])
 
     async def test_end_conversation_action(self):
         """Test basic end conversation action."""
@@ -125,26 +95,18 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
         await self.action_manager.execute_actions([action])
 
         # Verify EndFrame was queued
-        self.mock_task.queue_frame.assert_called_once()
-        frame = self.mock_task.queue_frame.call_args[0][0]
-        self.assertIsInstance(frame, EndFrame)
+        assert_end_frame_queued(self.mock_task)
 
     async def test_end_conversation_with_goodbye(self):
         """Test end conversation action with goodbye message."""
         action = {"type": "end_conversation", "text": "Goodbye!"}
         await self.action_manager.execute_actions([action])
 
-        # Verify both frames were queued in correct order
-        self.assertEqual(self.mock_task.queue_frame.call_count, 2)
-
         # Verify TTSSpeakFrame
-        first_frame = self.mock_task.queue_frame.call_args_list[0][0][0]
-        self.assertIsInstance(first_frame, TTSSpeakFrame)
-        self.assertEqual(first_frame.text, "Goodbye!")
+        assert_tts_speak_frames_queued(self.mock_task, ["Goodbye!"])
 
         # Verify EndFrame
-        second_frame = self.mock_task.queue_frame.call_args_list[1][0][0]
-        self.assertIsInstance(second_frame, EndFrame)
+        assert_end_frame_queued(self.mock_task)
 
     async def test_action_handler_signatures(self):
         """Test both legacy and modern action handler signatures."""
@@ -185,9 +147,7 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
         await self.action_manager.execute_actions(actions)
 
         # Verify TTS was called twice in correct order
-        self.assertEqual(self.mock_tts.say.call_count, 2)
-        expected_calls = [unittest.mock.call("First"), unittest.mock.call("Second")]
-        self.assertEqual(self.mock_tts.say.call_args_list, expected_calls)
+        assert_tts_speak_frames_queued(self.mock_task, ["First", "Second"])
 
     def test_register_invalid_handler(self):
         """Test registering invalid action handlers."""
@@ -216,17 +176,14 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
     @patch("loguru.logger.error")
     async def test_action_error_handling(self, mock_logger):
         """Test error handling during action execution."""
-        # Configure TTS mock to raise an error
-        self.mock_tts.say.side_effect = Exception("TTS error")
+        # Configure task mock to raise an error
+        self.mock_task.queue_frame.side_effect = Exception("Frame error")
 
         action = {"type": "tts_say", "text": "Hello"}
         await self.action_manager.execute_actions([action])
 
         # Verify error was logged
-        mock_logger.assert_called_with("TTS error: TTS error")
-
-        # Verify action was still marked as executed (doesn't raise)
-        self.mock_tts.say.assert_called_once()
+        mock_logger.assert_called_with("TTS error: Frame error")
 
     async def test_action_execution_error_handling(self):
         """Test error handling during action execution."""

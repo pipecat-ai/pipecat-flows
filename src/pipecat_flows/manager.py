@@ -574,7 +574,6 @@ class FlowManager:
                     await self._execute_actions(post_actions=post_actions)
                 else:
                     # Schedule post-actions for execution after first LLM response in this node
-                    print("[pk] Scheduling post-actions for execution after LLM response")
                     self._schedule_deferred_post_actions(post_actions=post_actions)
 
             logger.debug(f"Successfully set node: {node_id}")
