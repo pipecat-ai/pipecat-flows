@@ -117,7 +117,7 @@ class ActionManager:
                 ):
                     this._ongoing_actions_count += 1
 
-        asyncio.create_task(task.add_observer(ActionQueuedObserver()))
+        task.add_observer(ActionQueuedObserver())
 
     def _register_action(self, action_type: str, handler: Callable) -> None:
         """Register a handler for a specific action type.
