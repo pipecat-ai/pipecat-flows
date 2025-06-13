@@ -54,12 +54,20 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.mock_llm = OpenAILLMService(api_key="")
         self.mock_llm.register_function = MagicMock()
 
+        # Create mock assistant aggregator with function call tracking
+        self.mock_assistant_aggregator = MagicMock()
+        self.mock_assistant_aggregator._function_calls_in_progress = {}
+
         # Create mock context aggregator
         self.mock_context_aggregator = MagicMock()
         self.mock_context_aggregator.user = MagicMock()
         self.mock_context_aggregator.user.return_value = MagicMock()
         self.mock_context_aggregator.user.return_value.get_context_frame = MagicMock(
             return_value=MagicMock()
+        )
+
+        self.mock_context_aggregator.assistant = MagicMock(
+            return_value=self.mock_assistant_aggregator
         )
 
         self.mock_result_callback = AsyncMock()
@@ -255,6 +263,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         await func(params)
 
+        self.mock_assistant_aggregator._function_calls_in_progress = {}
+
         # Execute the context_updated callback
         self.assertIsNotNone(context_updated_callback, "Context updated callback not set")
         await context_updated_callback()
@@ -296,6 +306,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             result_callback=result_callback,
         )
         await func(params)
+
+        self.mock_assistant_aggregator._function_calls_in_progress = {}
 
         # Execute the context_updated callback
         self.assertIsNotNone(context_updated_callback, "Context updated callback not set")
@@ -652,6 +664,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Call function
         await transition_func(params)
 
+        self.mock_assistant_aggregator._function_calls_in_progress = {}
+
         # Execute the context updated callback which should trigger the error
         self.assertIsNotNone(context_updated_callback, "Context updated callback not set")
         try:
@@ -659,13 +673,10 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         except ValueError:
             pass  # Expected error
 
-        # Verify error handling - should have two results:
-        # 1. The initial acknowledged status
-        # 2. The error status after the callback fails
-        self.assertEqual(len(final_results), 2)
+        # Verify error handling - should have only one result (the initial acknowledged status)
+        # The error handling in our new implementation doesn't call result_callback again
+        self.assertEqual(len(final_results), 1)
         self.assertEqual(final_results[0]["status"], "acknowledged")
-        self.assertEqual(final_results[1]["status"], "error")
-        self.assertIn("Transition error", final_results[1]["error"])
 
     async def test_register_function_error_handling(self):
         """Test error handling in function registration."""
@@ -1320,3 +1331,100 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             if any(isinstance(frame, LLMSetToolsFrame) for frame in call[0][0])
         ]
         self.assertTrue(len(tools_frames_call) > 0, "Should have called LLMSetToolsFrame")
+
+    async def test_multiple_edge_functions_single_transition(self):
+        """Test that multiple edge functions coordinate properly and only transition once."""
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+        )
+        await flow_manager.initialize()
+
+        transitions_executed = 0
+
+        async def transition_callback(args, flow_manager):
+            nonlocal transitions_executed
+            transitions_executed += 1
+
+        # Create real async handler functions instead of AsyncMock
+        async def edge_handler_1(args):
+            return {"status": "success", "function": "edge_func_1"}
+
+        async def edge_handler_2(args):
+            return {"status": "success", "function": "edge_func_2"}
+
+        # Create node with multiple edge functions pointing to same transition
+        node_config: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Test"}],
+            "functions": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "edge_func_1",
+                        "handler": edge_handler_1,
+                        "description": "Edge function 1",
+                        "parameters": {},
+                        "transition_callback": transition_callback,
+                    },
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "edge_func_2",
+                        "handler": edge_handler_2,
+                        "description": "Edge function 2",
+                        "parameters": {},
+                        "transition_callback": transition_callback,
+                    },
+                },
+            ],
+        }
+
+        await flow_manager._set_node("test", node_config)
+
+        # Get both registered functions
+        func1 = None
+        func2 = None
+        for call_args in self.mock_llm.register_function.call_args_list:
+            name, func = call_args[0]
+            if name == "edge_func_1":
+                func1 = func
+            elif name == "edge_func_2":
+                func2 = func
+
+        self.assertIsNotNone(func1, "edge_func_1 should be registered")
+        self.assertIsNotNone(func2, "edge_func_2 should be registered")
+
+        # Simulate both functions being called
+        context_callbacks = []
+
+        async def result_callback(result, properties=None):
+            if properties and properties.on_context_updated:
+                context_callbacks.append(properties.on_context_updated)
+
+        # Call both functions
+        await func1(FunctionCallParams("edge_func_1", "id1", {}, None, None, result_callback))
+        await func2(FunctionCallParams("edge_func_2", "id2", {}, None, None, result_callback))
+
+        # Verify both functions created context callbacks
+        self.assertEqual(
+            len(context_callbacks), 2, "Both functions should create context callbacks"
+        )
+
+        # Initially both functions are "in progress"
+        self.mock_assistant_aggregator._function_calls_in_progress = {"id1": True, "id2": True}
+
+        # First function completes - should not transition yet
+        self.mock_assistant_aggregator._function_calls_in_progress = {"id2": True}
+        await context_callbacks[0]()
+        self.assertEqual(
+            transitions_executed, 0, "Should not transition while functions still pending"
+        )
+
+        # Second function completes - should transition now
+        self.mock_assistant_aggregator._function_calls_in_progress = {}
+        await context_callbacks[1]()
+        self.assertEqual(
+            transitions_executed, 1, "Should transition exactly once when all functions complete"
+        )
