@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   you to either omit `functions` for nodes, which is common for the end node,
   or specify an empty function call list, if desired.
 
+### Fixed
+
+- Fixed an issue where if run_in_parallel=False was set for the LLM, the bot
+  would trigger N completions for each sequential function call. Now, Flows
+  uses Pipecat's internal function tracking to determine when there are more
+  edge functions to call.
+
 ## [0.0.17] - 2025-05-16
 
 ### Added
