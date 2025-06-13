@@ -92,24 +92,19 @@ async def check_kitchen_status(action: dict) -> None:
 
 # Functions
 async def choose_pizza(flow_manager: FlowManager) -> tuple[None, str]:
-    """
-    User wants to order pizza. Let's get that order started.
-    """
+    """User wants to order pizza. Let's get that order started."""
     return None, "choose_pizza"
 
 
 async def choose_sushi(flow_manager: FlowManager) -> tuple[None, str]:
-    """
-    User wants to order sushi. Let's get that order started.
-    """
+    """User wants to order sushi. Let's get that order started."""
     return None, "choose_sushi"
 
 
 async def select_pizza_order(
     flow_manager: FlowManager, size: str, pizza_type: str
 ) -> tuple[PizzaOrderResult, str]:
-    """
-    Record the pizza order details.
+    """Record the pizza order details.
 
     Args:
         size (str): Size of the pizza. Must be one of "small", "medium", or "large".
@@ -125,8 +120,7 @@ async def select_pizza_order(
 async def select_sushi_order(
     flow_manager: FlowManager, count: int, roll_type: str
 ) -> tuple[SushiOrderResult, str]:
-    """
-    Record the sushi order details.
+    """Record the sushi order details.
 
     Args:
         count (int): Number of sushi rolls to order. Must be between 1 and 10.
@@ -139,16 +133,12 @@ async def select_sushi_order(
 
 
 async def complete_order(flow_manager: FlowManager) -> tuple[None, str]:
-    """
-    User confirms the order is correct.
-    """
+    """User confirms the order is correct."""
     return None, "end"
 
 
 async def revise_order(flow_manager: FlowManager) -> tuple[None, str]:
-    """
-    User wants to make changes to their order.
-    """
+    """User wants to make changes to their order."""
     return None, "start"
 
 

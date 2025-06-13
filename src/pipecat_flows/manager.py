@@ -123,7 +123,7 @@ class FlowManager:
         self.adapter = create_adapter(llm)
         self.initialized = False
         self._context_aggregator = context_aggregator
-        self._pending_function_calls = 0
+        self._pending_transition: Optional[Dict[str, Any]] = None
         self._context_strategy = context_strategy or ContextStrategyConfig(
             strategy=ContextStrategy.APPEND
         )
@@ -290,6 +290,56 @@ class FlowManager:
             # Modern handler with args and flow_manager
             return await handler(args, self)
 
+    async def _check_and_execute_transition(self) -> None:
+        """Check if all functions are complete and execute transition if so."""
+        if not self._pending_transition:
+            return
+
+        # Check if all function calls are complete using Pipecat's state
+        assistant_aggregator = self._context_aggregator.assistant()
+        if not assistant_aggregator._function_calls_in_progress:
+            # All functions complete, execute transition
+            transition_info = self._pending_transition
+            self._pending_transition = None
+
+            await self._execute_transition(transition_info)
+
+    async def _execute_transition(self, transition_info: Dict[str, Any]) -> None:
+        """Execute the stored transition."""
+        next_node = transition_info.get("next_node")
+        transition_to = transition_info.get("transition_to")
+        transition_callback = transition_info.get("transition_callback")
+        function_name = transition_info.get("function_name")
+        arguments = transition_info.get("arguments")
+        result = transition_info.get("result")
+
+        try:
+            if next_node:  # Function-returned next node (consolidated function)
+                if isinstance(next_node, str):  # Static flow
+                    node_name = next_node
+                    node = self.nodes[next_node]
+                else:  # Dynamic flow
+                    node_name = get_or_generate_node_name(next_node)
+                    node = next_node
+                logger.debug(f"Transition to function-returned node: {node_name}")
+                await self._set_node(node_name, node)
+            elif transition_to:  # Static flow (deprecated)
+                logger.debug(f"Static transition to: {transition_to}")
+                await self._set_node(transition_to, self.nodes[transition_to])
+            elif transition_callback:  # Dynamic flow (deprecated)
+                logger.debug(f"Dynamic transition for: {function_name}")
+                # Check callback signature
+                sig = inspect.signature(transition_callback)
+                if len(sig.parameters) == 2:
+                    # Old style: (args, flow_manager)
+                    await transition_callback(arguments, self)
+                else:
+                    # New style: (args, result, flow_manager)
+                    await transition_callback(arguments, result, self)
+        except Exception as e:
+            logger.error(f"Error executing transition: {str(e)}")
+            raise
+
     async def _create_transition_func(
         self,
         name: str,
@@ -320,87 +370,10 @@ class FlowManager:
         if transition_callback:
             self._validate_transition_callback(name, transition_callback)
 
-        def decrease_pending_function_calls() -> None:
-            """Decrease the pending function calls counter if greater than zero."""
-            if self._pending_function_calls > 0:
-                self._pending_function_calls -= 1
-                logger.debug(
-                    f"Function call completed: {name} (remaining: {self._pending_function_calls})"
-                )
-
-        async def on_context_updated_edge(
-            next_node: Optional[NodeConfig | str],
-            args: Optional[Dict[str, Any]],
-            result: Optional[Any],
-            result_callback: Callable,
-        ) -> None:
-            """
-            Handle context updates for edge functions with transitions.
-
-            If `next_node` is provided:
-            - Ignore `args` and `result` and just transition to it.
-
-            Otherwise, if `transition_to` is available:
-            - Use it to look up the next node.
-
-            Otherwise, if `transition_callback` is provided:
-            - Call it with `args` and `result` to determine the next node.
-            """
-            try:
-                decrease_pending_function_calls()
-
-                # Only process transition if this was the last pending call
-                if self._pending_function_calls == 0:
-                    if next_node:  # Function-returned next node (as opposed to next node specified by transition_*)
-                        if isinstance(next_node, str):  # Static flow
-                            node_name = next_node
-                            node = self.nodes[next_node]
-                        else:  # Dynamic flow
-                            node_name = get_or_generate_node_name(next_node)
-                            node = next_node
-                        logger.debug(f"Transition to function-returned node: {node_name}")
-                        await self._set_node(node_name, node)
-                    elif transition_to:  # Static flow
-                        logger.debug(f"Static transition to: {transition_to}")
-                        await self._set_node(transition_to, self.nodes[transition_to])
-                    elif transition_callback:  # Dynamic flow
-                        logger.debug(f"Dynamic transition for: {name}")
-                        # Check callback signature
-                        sig = inspect.signature(transition_callback)
-                        if len(sig.parameters) == 2:
-                            # Old style: (args, flow_manager)
-                            await transition_callback(args, self)
-                        else:
-                            # New style: (args, result, flow_manager)
-                            await transition_callback(args, result, self)
-                    # Reset counter after transition completes
-                    self._pending_function_calls = 0
-                    logger.debug("Reset pending function calls counter")
-                else:
-                    logger.debug(
-                        f"Skipping transition, {self._pending_function_calls} calls still pending"
-                    )
-            except Exception as e:
-                logger.error(f"Error in transition: {str(e)}")
-                self._pending_function_calls = 0
-                await result_callback(
-                    {"status": "error", "error": str(e)},
-                    properties=None,  # Clear properties to prevent further callbacks
-                )
-                raise  # Re-raise to prevent further processing
-
-        async def on_context_updated_node() -> None:
-            """Handle context updates for node functions without transitions."""
-            decrease_pending_function_calls()
-
         async def transition_func(params: FunctionCallParams) -> None:
             """Inner function that handles the actual tool invocation."""
             try:
-                # Track pending function call
-                self._pending_function_calls += 1
-                logger.debug(
-                    f"Function call pending: {name} (total: {self._pending_function_calls})"
-                )
+                logger.debug(f"Function called: {name}")
 
                 # Execute handler if present
                 is_transition_only_function = False
@@ -430,42 +403,42 @@ class FlowManager:
                     result = acknowledged_result
                     next_node = None
                     is_transition_only_function = True
+
                 logger.debug(
                     f"{'Transition-only function called for' if is_transition_only_function else 'Function handler completed for'} {name}"
                 )
 
-                # For edge functions, prevent LLM completion until transition (run_llm=False)
-                # For node functions, allow immediate completion (run_llm=True)
+                # Determine if this is an edge function
                 has_explicit_transition = bool(transition_to) or bool(transition_callback)
-
-                async def on_context_updated() -> None:
-                    if next_node:
-                        await on_context_updated_edge(
-                            next_node=next_node,
-                            args=None,
-                            result=None,
-                            result_callback=params.result_callback,
-                        )
-                    elif has_explicit_transition:
-                        await on_context_updated_edge(
-                            next_node=None,
-                            args=params.arguments,
-                            result=result,
-                            result_callback=params.result_callback,
-                        )
-                    else:
-                        await on_context_updated_node()
-
                 is_edge_function = bool(next_node) or has_explicit_transition
-                properties = FunctionCallResultProperties(
-                    run_llm=not is_edge_function,
-                    on_context_updated=on_context_updated,
-                )
+
+                if is_edge_function:
+                    # Store transition info for coordinated execution
+                    transition_info = {
+                        "next_node": next_node,
+                        "transition_to": transition_to,
+                        "transition_callback": transition_callback,
+                        "function_name": name,
+                        "arguments": params.arguments,
+                        "result": result,
+                    }
+                    self._pending_transition = transition_info
+
+                    properties = FunctionCallResultProperties(
+                        run_llm=False,  # Don't run LLM until transition completes
+                        on_context_updated=self._check_and_execute_transition,
+                    )
+                else:
+                    # Node function - run LLM immediately
+                    properties = FunctionCallResultProperties(
+                        run_llm=True,
+                        on_context_updated=None,
+                    )
+
                 await params.result_callback(result, properties=properties)
 
             except Exception as e:
                 logger.error(f"Error in transition function {name}: {str(e)}")
-                self._pending_function_calls = 0
                 error_result = {"status": "error", "error": str(e)}
                 await params.result_callback(error_result)
 
@@ -605,6 +578,8 @@ In all of these cases, you can provide a `name` in your new node's config for de
             raise FlowTransitionError(f"{self.__class__.__name__} must be initialized first")
 
         try:
+            self._pending_transition = None
+
             self._validate_node_config(node_id, node_config)
             logger.debug(f"Setting node: {node_id}")
 
