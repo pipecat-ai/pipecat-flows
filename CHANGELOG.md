@@ -130,6 +130,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed an issue where if `run_in_parallel=False` was set for the LLM, the bot
+  would trigger N completions for each sequential function call. Now, Flows
+  uses Pipecat's internal function tracking to determine when there are more
+  edge functions to call.
+
 - Overhauled `pre_actions` and `post_actions` timing logic, making their timing more predictable and
   eliminating some bugs. For example, now `tts_say` actions will always run after the bot response,
   when used in `post_actions`.
