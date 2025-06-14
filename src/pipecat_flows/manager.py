@@ -410,7 +410,7 @@ class FlowManager:
 
         # Check if all function calls are complete using Pipecat's state
         assistant_aggregator = self._context_aggregator.assistant()
-        if not assistant_aggregator._function_calls_in_progress:
+        if not assistant_aggregator.has_function_calls_in_progress:
             # All functions complete, execute transition
             transition_info = self._pending_transition
             self._pending_transition = None

@@ -20,7 +20,7 @@ include mocked dependencies for PipelineTask, LLM services, and TTS.
 
 import unittest
 from typing import Dict
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from pipecat.frames.frames import (
     LLMMessagesAppendFrame,
@@ -54,9 +54,11 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.mock_llm = OpenAILLMService(api_key="")
         self.mock_llm.register_function = MagicMock()
 
-        # Create mock assistant aggregator with function call tracking
+        # Create mock assistant aggregator with public property only
         self.mock_assistant_aggregator = MagicMock()
-        self.mock_assistant_aggregator._function_calls_in_progress = {}
+        type(self.mock_assistant_aggregator).has_function_calls_in_progress = PropertyMock(
+            return_value=False  # Default to no functions in progress
+        )
 
         # Create mock context aggregator
         self.mock_context_aggregator = MagicMock()
@@ -263,7 +265,9 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         await func(params)
 
-        self.mock_assistant_aggregator._function_calls_in_progress = {}
+        # Set up the property mock to return False (no functions in progress)
+        property_mock = PropertyMock(return_value=False)
+        type(self.mock_assistant_aggregator).has_function_calls_in_progress = property_mock
 
         # Execute the context_updated callback
         self.assertIsNotNone(context_updated_callback, "Context updated callback not set")
@@ -307,7 +311,9 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         )
         await func(params)
 
-        self.mock_assistant_aggregator._function_calls_in_progress = {}
+        # Set up the property mock to return False (no functions in progress)
+        property_mock = PropertyMock(return_value=False)
+        type(self.mock_assistant_aggregator).has_function_calls_in_progress = property_mock
 
         # Execute the context_updated callback
         self.assertIsNotNone(context_updated_callback, "Context updated callback not set")
@@ -664,7 +670,9 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Call function
         await transition_func(params)
 
-        self.mock_assistant_aggregator._function_calls_in_progress = {}
+        # Set up the property mock to return False (no functions in progress)
+        property_mock = PropertyMock(return_value=False)
+        type(self.mock_assistant_aggregator).has_function_calls_in_progress = property_mock
 
         # Execute the context updated callback which should trigger the error
         self.assertIsNotNone(context_updated_callback, "Context updated callback not set")
@@ -1412,18 +1420,19 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             len(context_callbacks), 2, "Both functions should create context callbacks"
         )
 
-        # Initially both functions are "in progress"
-        self.mock_assistant_aggregator._function_calls_in_progress = {"id1": True, "id2": True}
+        # Create a mock property that we can control dynamically
+        property_mock = PropertyMock()
+        type(self.mock_assistant_aggregator).has_function_calls_in_progress = property_mock
 
-        # First function completes - should not transition yet
-        self.mock_assistant_aggregator._function_calls_in_progress = {"id2": True}
+        # First function completes - should not transition yet (functions still in progress)
+        property_mock.return_value = True
         await context_callbacks[0]()
         self.assertEqual(
             transitions_executed, 0, "Should not transition while functions still pending"
         )
 
-        # Second function completes - should transition now
-        self.mock_assistant_aggregator._function_calls_in_progress = {}
+        # Second function completes - should transition now (no functions in progress)
+        property_mock.return_value = False
         await context_callbacks[1]()
         self.assertEqual(
             transitions_executed, 1, "Should transition exactly once when all functions complete"
