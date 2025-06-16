@@ -588,6 +588,10 @@ In all of these cases, you can provide a `name` in your new node's config for de
             raise FlowTransitionError(f"{self.__class__.__name__} must be initialized first")
 
         try:
+            # Clear any pending transition state when starting a new node
+            # This ensures clean state regardless of how we arrived here:
+            # - Normal transition flow (already cleared in _check_and_execute_transition)
+            # - Direct calls to set_node/set_node_from_config
             self._pending_transition = None
 
             self._validate_node_config(node_id, node_config)
