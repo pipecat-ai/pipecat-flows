@@ -20,7 +20,7 @@ include mocked dependencies for PipelineTask, LLM services, and TTS.
 
 import unittest
 from typing import Dict
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from pipecat.frames.frames import (
     LLMMessagesAppendFrame,
@@ -54,12 +54,22 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.mock_llm = OpenAILLMService(api_key="")
         self.mock_llm.register_function = MagicMock()
 
+        # Create mock assistant aggregator with public property only
+        self.mock_assistant_aggregator = MagicMock()
+        type(self.mock_assistant_aggregator).has_function_calls_in_progress = PropertyMock(
+            return_value=False  # Default to no functions in progress
+        )
+
         # Create mock context aggregator
         self.mock_context_aggregator = MagicMock()
         self.mock_context_aggregator.user = MagicMock()
         self.mock_context_aggregator.user.return_value = MagicMock()
         self.mock_context_aggregator.user.return_value.get_context_frame = MagicMock(
             return_value=MagicMock()
+        )
+
+        self.mock_context_aggregator.assistant = MagicMock(
+            return_value=self.mock_assistant_aggregator
         )
 
         self.mock_result_callback = AsyncMock()
@@ -85,8 +95,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.static_flow_config = {
             "initial_node": "start",
             "nodes": {
-                "start": self.sample_node,
-                "next_node": self.sample_node,
+                "start": {"name": "start", **self.sample_node},
+                "next_node": {"name": "next_node", **self.sample_node},
             },
         }
 
@@ -158,7 +168,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # In static flows, transitions happen through set_node with a
         # predefined node configuration from the flow_config
-        await flow_manager._set_node("next_node", flow_manager.nodes["next_node"])
+        await flow_manager.set_node_from_config(flow_manager.nodes["next_node"])
 
         # Verify node transition occurred
         self.assertEqual(flow_manager.current_node, "next_node")
@@ -232,7 +242,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         }
 
         # Test old style callback
-        await flow_manager._set_node("old_style", old_style_node)
+        await flow_manager.set_node_from_config(old_style_node)
         func = flow_manager.llm.register_function.call_args[0][1]
 
         # Store the context_updated callback
@@ -254,6 +264,10 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         )
 
         await func(params)
+
+        # Set up the property mock to return False (no functions in progress)
+        property_mock = PropertyMock(return_value=False)
+        type(self.mock_assistant_aggregator).has_function_calls_in_progress = property_mock
 
         # Execute the context_updated callback
         self.assertIsNotNone(context_updated_callback, "Context updated callback not set")
@@ -280,7 +294,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         }
 
         # Test new style callback
-        await flow_manager._set_node("new_style", new_style_node)
+        await flow_manager.set_node_from_config(new_style_node)
         func = flow_manager.llm.register_function.call_args[0][1]
 
         # Reset context_updated callback
@@ -296,6 +310,10 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             result_callback=result_callback,
         )
         await func(params)
+
+        # Set up the property mock to return False (no functions in progress)
+        property_mock = PropertyMock(return_value=False)
+        type(self.mock_assistant_aggregator).has_function_calls_in_progress = property_mock
 
         # Execute the context_updated callback
         self.assertIsNotNone(context_updated_callback, "Context updated callback not set")
@@ -317,12 +335,12 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Test missing task_messages
         invalid_config = {"functions": []}
         with self.assertRaises(FlowError) as context:
-            await flow_manager._set_node("test", invalid_config)
+            await flow_manager.set_node_from_config(invalid_config)
         self.assertIn("missing required 'task_messages' field", str(context.exception))
 
         # Test valid config
-        valid_config = {"task_messages": []}
-        await flow_manager._set_node("test", valid_config)
+        valid_config = {"name": "test", "task_messages": []}
+        await flow_manager.set_node_from_config(valid_config)
 
         self.assertEqual(flow_manager.current_node, "test")
         self.assertEqual(flow_manager.current_functions, set())
@@ -340,7 +358,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.mock_llm.register_function.reset_mock()
 
         # Set node with function
-        await flow_manager._set_node("test", self.sample_node)
+        await flow_manager.set_node_from_config(self.sample_node)
 
         # Verify function was registered
         self.mock_llm.register_function.assert_called_once()
@@ -370,7 +388,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.mock_task.queue_frame.reset_mock()
 
         # Set node with actions
-        await flow_manager._set_node("test", node_with_actions)
+        await flow_manager.set_node_from_config(node_with_actions)
 
         assert_tts_speak_frames_queued(self.mock_task, ["Pre action", "Post action"])
 
@@ -390,7 +408,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Test setting node before initialization
         with self.assertRaises(FlowTransitionError):
-            await flow_manager._set_node("test", self.sample_node)
+            await flow_manager.set_node_from_config(self.sample_node)
 
         # Initialize normally
         await flow_manager.initialize()
@@ -399,7 +417,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Test node setting error
         self.mock_task.queue_frames.side_effect = Exception("Queue error")
         with self.assertRaises(FlowError):
-            await flow_manager._set_node("test", self.sample_node)
+            await flow_manager.set_node_from_config(self.sample_node)
 
         # Verify flow manager remains initialized despite error
         self.assertTrue(flow_manager.initialized)
@@ -421,7 +439,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.mock_task.queue_frames.reset_mock()
 
         # Verify state persists across node transitions
-        await flow_manager._set_node("test", self.sample_node)
+        await flow_manager.set_node_from_config(self.sample_node)
         self.assertEqual(flow_manager.state["test_key"], test_value)
 
     async def test_multiple_function_registration(self):
@@ -449,7 +467,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             ],
         }
 
-        await flow_manager._set_node("test", node_config)
+        await flow_manager.set_node_from_config(node_config)
 
         # Verify all functions were registered
         self.assertEqual(self.mock_llm.register_function.call_count, 3)
@@ -559,11 +577,12 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             "functions": [{"type": "function"}],  # Missing name
         }
         with self.assertRaises(FlowError) as context:
-            await flow_manager._set_node("test", invalid_config)
+            await flow_manager.set_node_from_config(invalid_config)
         self.assertIn("invalid format", str(context.exception))
 
         # Test node function without handler or transition_to
         invalid_config = {
+            "name": "test",
             "task_messages": [{"role": "system", "content": "Test"}],
             "functions": [
                 {
@@ -585,7 +604,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             warning_message = msg
 
         with patch("loguru.logger.warning", side_effect=capture_warning):
-            await flow_manager._set_node("test", invalid_config)
+            await flow_manager.set_node_from_config(invalid_config)
             self.assertIsNotNone(warning_message)
             self.assertIn(
                 "Function 'test_func' in node 'test' has neither handler, transition_to, nor transition_callback",
@@ -627,7 +646,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         }
 
         # Set up node and get registered function
-        await flow_manager._set_node("test", test_node)
+        await flow_manager.set_node_from_config(test_node)
         transition_func = flow_manager.llm.register_function.call_args[0][1]
 
         # Track the result and context_updated callback
@@ -652,6 +671,10 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Call function
         await transition_func(params)
 
+        # Set up the property mock to return False (no functions in progress)
+        property_mock = PropertyMock(return_value=False)
+        type(self.mock_assistant_aggregator).has_function_calls_in_progress = property_mock
+
         # Execute the context updated callback which should trigger the error
         self.assertIsNotNone(context_updated_callback, "Context updated callback not set")
         try:
@@ -659,13 +682,10 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         except ValueError:
             pass  # Expected error
 
-        # Verify error handling - should have two results:
-        # 1. The initial acknowledged status
-        # 2. The error status after the callback fails
-        self.assertEqual(len(final_results), 2)
+        # Verify error handling - should have only one result (the initial acknowledged status)
+        # The error handling in our new implementation doesn't call result_callback again
+        self.assertEqual(len(final_results), 1)
         self.assertEqual(final_results[0]["status"], "acknowledged")
-        self.assertEqual(final_results[1]["status"], "error")
-        self.assertIn("Transition error", final_results[1]["error"])
 
     async def test_register_function_error_handling(self):
         """Test error handling in function registration."""
@@ -702,7 +722,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Should raise FlowError due to invalid actions
         with self.assertRaises(FlowError):
-            await flow_manager._set_node("test", node_config)
+            await flow_manager.set_node_from_config(node_config)
 
         # Verify error handling for pre and post actions separately
         with self.assertRaises(FlowError):
@@ -766,7 +786,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         }
 
         # Set node and verify function registration
-        await flow_manager._set_node("test", node_config)
+        await flow_manager.set_node_from_config(node_config)
 
         # Verify both functions were registered
         self.assertIn("test1", flow_manager.current_functions)
@@ -806,7 +826,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
                 ],
             }
 
-            await flow_manager._set_node("test", node_config)
+            await flow_manager.set_node_from_config(node_config)
             self.assertIn("test_function", flow_manager.current_functions)
 
         finally:
@@ -838,7 +858,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         }
 
         with self.assertRaises(FlowError) as context:
-            await flow_manager._set_node("test", node_config)
+            await flow_manager.set_node_from_config(node_config)
 
         self.assertIn("Function 'nonexistent_handler' not found", str(context.exception))
 
@@ -879,7 +899,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
                 ],
             }
 
-            await flow_manager._set_node("test", node_config)
+            await flow_manager.set_node_from_config(node_config)
 
             # Get the registered function and test it
             name, func = self.mock_llm.register_function.call_args[0]
@@ -928,7 +948,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         }
 
         # Set first node and verify UpdateFrame
-        await flow_manager._set_node("first", first_node)
+        await flow_manager.set_node_from_config(first_node)
         first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
         first_frames = first_call[0][0]
         update_frames = [f for f in first_frames if isinstance(f, LLMMessagesUpdateFrame)]
@@ -940,7 +960,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Reset mock and set second node
         self.mock_task.queue_frames.reset_mock()
-        await flow_manager._set_node("second", second_node)
+        await flow_manager.set_node_from_config(second_node)
 
         # Verify AppendFrame for second node
         first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
@@ -966,7 +986,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         }
 
         # First node should use UpdateFrame
-        await flow_manager._set_node("first", test_node)
+        await flow_manager.set_node_from_config(test_node)
         first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
         first_frames = first_call[0][0]
         self.assertTrue(
@@ -982,7 +1002,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.mock_task.queue_frames.reset_mock()
 
         # Second node should use AppendFrame
-        await flow_manager._set_node("second", test_node)
+        await flow_manager.set_node_from_config(test_node)
         first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
         second_frames = first_call[0][0]
         self.assertTrue(
@@ -1144,8 +1164,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.mock_task.queue_frames.reset_mock()
         self.mock_context_aggregator.user().get_context_frame.reset_mock()
 
-        await flow_manager._set_node(
-            "initial",
+        await flow_manager.set_node_from_config(
             {
                 "task_messages": [{"role": "system", "content": "Test"}],
                 "functions": [],
@@ -1170,7 +1189,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.mock_task.queue_frames.reset_mock()
         self.mock_context_aggregator.user().get_context_frame.reset_mock()
 
-        await flow_manager._set_node("next", next_node)
+        await flow_manager.set_node_from_config(next_node)
 
         # Should see context update and completion trigger again
         self.assertTrue(self.mock_task.queue_frames.called)
@@ -1211,7 +1230,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Should raise error when trying to use both
         with self.assertRaises(FlowError) as context:
-            await flow_manager._set_node("test", test_node)
+            await flow_manager.set_node_from_config(test_node)
         self.assertIn(
             "Cannot specify both transition_to and transition_callback", str(context.exception)
         )
@@ -1279,7 +1298,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         }
 
         # Set node and verify it works without error
-        await flow_manager._set_node("no_functions", node_config)
+        await flow_manager.set_node_from_config(node_config)
 
         # Verify current_functions is empty set
         self.assertEqual(flow_manager.current_functions, set())
@@ -1308,7 +1327,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         }
 
         # Set node and verify it works without error
-        await flow_manager._set_node("empty_functions", node_config)
+        await flow_manager.set_node_from_config(node_config)
 
         # Verify current_functions is empty set
         self.assertEqual(flow_manager.current_functions, set())
@@ -1320,3 +1339,101 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             if any(isinstance(frame, LLMSetToolsFrame) for frame in call[0][0])
         ]
         self.assertTrue(len(tools_frames_call) > 0, "Should have called LLMSetToolsFrame")
+
+    async def test_multiple_edge_functions_single_transition(self):
+        """Test that multiple edge functions coordinate properly and only transition once."""
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+        )
+        await flow_manager.initialize()
+
+        transitions_executed = 0
+
+        async def transition_callback(args, flow_manager):
+            nonlocal transitions_executed
+            transitions_executed += 1
+
+        # Create real async handler functions instead of AsyncMock
+        async def edge_handler_1(args):
+            return {"status": "success", "function": "edge_func_1"}
+
+        async def edge_handler_2(args):
+            return {"status": "success", "function": "edge_func_2"}
+
+        # Create node with multiple edge functions pointing to same transition
+        node_config: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Test"}],
+            "functions": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "edge_func_1",
+                        "handler": edge_handler_1,
+                        "description": "Edge function 1",
+                        "parameters": {},
+                        "transition_callback": transition_callback,
+                    },
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "edge_func_2",
+                        "handler": edge_handler_2,
+                        "description": "Edge function 2",
+                        "parameters": {},
+                        "transition_callback": transition_callback,
+                    },
+                },
+            ],
+        }
+
+        await flow_manager.set_node_from_config(node_config)
+
+        # Get both registered functions
+        func1 = None
+        func2 = None
+        for call_args in self.mock_llm.register_function.call_args_list:
+            name, func = call_args[0]
+            if name == "edge_func_1":
+                func1 = func
+            elif name == "edge_func_2":
+                func2 = func
+
+        self.assertIsNotNone(func1, "edge_func_1 should be registered")
+        self.assertIsNotNone(func2, "edge_func_2 should be registered")
+
+        # Simulate both functions being called
+        context_callbacks = []
+
+        async def result_callback(result, properties=None):
+            if properties and properties.on_context_updated:
+                context_callbacks.append(properties.on_context_updated)
+
+        # Call both functions
+        await func1(FunctionCallParams("edge_func_1", "id1", {}, None, None, result_callback))
+        await func2(FunctionCallParams("edge_func_2", "id2", {}, None, None, result_callback))
+
+        # Verify both functions created context callbacks
+        self.assertEqual(
+            len(context_callbacks), 2, "Both functions should create context callbacks"
+        )
+
+        # Create a mock property that we can control dynamically
+        property_mock = PropertyMock()
+        type(self.mock_assistant_aggregator).has_function_calls_in_progress = property_mock
+
+        # First function completes - should not transition yet (functions still in progress)
+        property_mock.return_value = True
+        await context_callbacks[0]()
+        self.assertEqual(
+            transitions_executed, 0, "Should not transition while functions still pending"
+        )
+
+        # Second function completes - should transition now (no functions in progress)
+        property_mock.return_value = False
+        await context_callbacks[1]()
+        self.assertEqual(
+            transitions_executed, 1, "Should transition exactly once when all functions complete"
+        )
