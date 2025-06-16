@@ -368,8 +368,9 @@ class FlowManager:
                 )
 
                 # Determine if this is an edge function
-                has_explicit_transition = bool(transition_to) or bool(transition_callback)
-                is_edge_function = bool(next_node) or has_explicit_transition
+                is_edge_function = (
+                    bool(next_node) or bool(transition_to) or bool(transition_callback)
+                )
 
                 if is_edge_function:
                     # Store transition info for coordinated execution
