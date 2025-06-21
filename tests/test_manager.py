@@ -18,6 +18,7 @@ The tests use unittest.IsolatedAsyncioTestCase for async support and
 include mocked dependencies for PipelineTask, LLM services, and TTS.
 """
 
+import inspect
 import unittest
 from typing import Dict
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -34,6 +35,12 @@ from pipecat_flows.exceptions import FlowError, FlowTransitionError
 from pipecat_flows.manager import FlowConfig, FlowManager, NodeConfig
 from pipecat_flows.types import FlowArgs, FlowResult, FlowsFunctionSchema
 from tests.test_helpers import assert_tts_speak_frames_queued, make_mock_task
+
+
+# Top-level function for testing _lookup_function
+def test_top_level_function():
+    """A simple top-level function for testing lookup functionality."""
+    return "top_level_function_called"
 
 
 class TestFlowManager(unittest.IsolatedAsyncioTestCase):
@@ -1291,6 +1298,58 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             if any(isinstance(frame, LLMSetToolsFrame) for frame in call[0][0])
         ]
         self.assertTrue(len(tools_frames_call) > 0, "Should have called LLMSetToolsFrame")
+
+    def test_lookup_function_top_level_module_function(self):
+        """Test looking up a function at the top level of a module."""
+        import sys
+        
+        # Create a simple mock FlowManager with lookup_scope_default
+        mock_flow_manager = MagicMock()
+        mock_flow_manager.lookup_scope_default = sys.modules[__name__]
+        
+        # Test the lookup - should find the top-level function defined in this module
+        result = FlowManager._lookup_function(mock_flow_manager, "test_top_level_function")
+        
+        # Verify the correct function was found
+        self.assertIs(result, test_top_level_function)
+
+    def test_lookup_function_class_method(self):
+        """Test looking up a function that's a method on a class."""
+        # Create a test class with a method
+        class TestClass:
+            def test_method(self, arg1 = "default"):
+                return "method_called"
+        
+        test_instance = TestClass()
+        
+        # Create a simple mock FlowManager with the instance as lookup scope
+        mock_flow_manager = MagicMock()
+        mock_flow_manager.lookup_scope_default = test_instance
+        
+        # Test the lookup - should find the method on the instance
+        result = FlowManager._lookup_function(mock_flow_manager, "test_method")
+        sig_result = inspect.signature(result)
+        sig_og = inspect.signature(test_instance.test_method)
+
+        # Verify the correct method was found
+        self.assertEqual(result, test_instance.test_method)
+        self.assertEqual(sig_result, sig_og, "Method signature should match the instance method signature")
+
+    def test_lookup_function_not_found(self):
+        """Test error handling when function is not found."""
+        import sys
+        
+        # Create a simple mock FlowManager
+        mock_flow_manager = MagicMock()
+        mock_flow_manager.lookup_scope_default = sys.modules[__name__]
+        
+        # Test lookup of non-existent function
+        with self.assertRaises(FlowError) as context:
+            FlowManager._lookup_function(mock_flow_manager, "nonexistent_function")
+        
+        # Verify error message contains expected text
+        error_message = str(context.exception)
+        self.assertIn("Function 'nonexistent_function' not found", error_message)
 
     async def test_node_with_empty_functions(self):
         """Test node configuration with empty functions list."""
