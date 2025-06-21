@@ -100,6 +100,7 @@ class FlowManager:
         flow_config: Optional[FlowConfig] = None,
         context_strategy: Optional[ContextStrategyConfig] = None,
         transport: Optional[BaseTransport] = None,
+        lookup_scope_default = sys.modules["__main__"]
     ):
         """Initialize the flow manager.
 
@@ -137,6 +138,7 @@ class FlowManager:
             strategy=ContextStrategy.APPEND
         )
         self.transport = transport
+        self.lookup_scope_default = lookup_scope_default
 
         # Set up static or dynamic mode
         if flow_config:
@@ -492,16 +494,16 @@ class FlowManager:
         Raises:
             FlowError: If function is not found
         """
-        main_module = sys.modules["__main__"]
-        handler = getattr(main_module, func_name, None)
+        lookup_scope = self.lookup_scope_default
+        handler = getattr(lookup_scope, func_name, None)
 
         if handler is not None:
-            logger.debug(f"Found function '{func_name}' in main module")
+            logger.debug(f"Found function '{func_name}' in lookup scope")
             return handler
 
         error_message = (
-            f"Function '{func_name}' not found in main module.\n"
-            "Ensure the function is defined in your main script "
+            f"Function '{func_name}' not found in lookup scope.\n"
+            "Ensure the function is defined in your lookup scope (e.g., main module) "
             "or imported into it."
         )
 
