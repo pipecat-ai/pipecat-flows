@@ -279,14 +279,8 @@ class FlowManager:
         # Get the function signature
         sig = inspect.signature(handler)
 
-        # Check if handler is a method (has self parameter)
-        is_method = inspect.ismethod(handler)
-
-        # Calculate effective parameter count (excluding 'self' if method)
-        if is_method:
-            effective_param_count = len(sig.parameters) - 1
-        else:
-            effective_param_count = len(sig.parameters)
+        # Calculate effective parameter count
+        effective_param_count = len(sig.parameters)
 
         # Handle different function signatures
         if effective_param_count == 0:
