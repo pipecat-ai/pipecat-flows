@@ -29,7 +29,7 @@ from pipecat.adapters.services.bedrock_adapter import AWSBedrockLLMAdapter
 from pipecat.adapters.services.gemini_adapter import GeminiLLMAdapter
 from pipecat.adapters.services.open_ai_adapter import OpenAILLMAdapter
 
-from .types import FlowsDirectFunction, FlowsFunctionSchema
+from .types import FlowsDirectFunctionWrapper, FlowsFunctionSchema
 
 
 class LLMAdapter:
@@ -407,7 +407,7 @@ class GeminiAdapter(LLMAdapter):
                     )
                 elif isinstance(func_config, Callable):
                     # Convert direct function to Gemini format
-                    direct_func = FlowsDirectFunction(function=func_config)
+                    direct_func = FlowsDirectFunctionWrapper(function=func_config)
                     gemini_functions.append(
                         {
                             "name": direct_func.name,
