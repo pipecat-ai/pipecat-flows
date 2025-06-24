@@ -4,7 +4,7 @@ from typing import Optional, TypedDict, Union
 
 from pipecat_flows.exceptions import InvalidFunctionError
 from pipecat_flows.manager import FlowManager
-from pipecat_flows.types import FlowsDirectFunction
+from pipecat_flows.types import FlowsDirectFunctionWrapper
 
 # Copyright (c) 2025, Daily
 #
@@ -21,8 +21,8 @@ class TestFlowsDirectFunction(unittest.TestCase):
         async def my_function(flow_manager: FlowManager):
             return {"status": "success"}, None
 
-        self.assertIsNone(FlowsDirectFunction.validate_function(my_function))
-        func = FlowsDirectFunction(function=my_function)
+        self.assertIsNone(FlowsDirectFunctionWrapper.validate_function(my_function))
+        func = FlowsDirectFunctionWrapper(function=my_function)
         self.assertEqual(func.name, "my_function")
 
     def test_description_is_set_from_function(self):
@@ -32,8 +32,10 @@ class TestFlowsDirectFunction(unittest.TestCase):
             """This is a test function."""
             return {"status": "success"}, None
 
-        self.assertIsNone(FlowsDirectFunction.validate_function(my_function_short_description))
-        func = FlowsDirectFunction(function=my_function_short_description)
+        self.assertIsNone(
+            FlowsDirectFunctionWrapper.validate_function(my_function_short_description)
+        )
+        func = FlowsDirectFunctionWrapper(function=my_function_short_description)
         self.assertEqual(func.description, "This is a test function.")
 
         async def my_function_long_description(flow_manager: FlowManager):
@@ -46,8 +48,10 @@ class TestFlowsDirectFunction(unittest.TestCase):
             """
             return {"status": "success"}, None
 
-        self.assertIsNone(FlowsDirectFunction.validate_function(my_function_long_description))
-        func = FlowsDirectFunction(function=my_function_long_description)
+        self.assertIsNone(
+            FlowsDirectFunctionWrapper.validate_function(my_function_long_description)
+        )
+        func = FlowsDirectFunctionWrapper(function=my_function_long_description)
         self.assertEqual(
             func.description,
             "This is a test function.\n\nIt does some really cool stuff.\n\nTrust me, you'll want to use it.",
@@ -59,8 +63,8 @@ class TestFlowsDirectFunction(unittest.TestCase):
         async def my_function_no_params(flow_manager: FlowManager):
             return {"status": "success"}, None
 
-        self.assertIsNone(FlowsDirectFunction.validate_function(my_function_no_params))
-        func = FlowsDirectFunction(function=my_function_no_params)
+        self.assertIsNone(FlowsDirectFunctionWrapper.validate_function(my_function_no_params))
+        func = FlowsDirectFunctionWrapper(function=my_function_no_params)
         self.assertEqual(func.properties, {})
 
         async def my_function_simple_params(
@@ -68,8 +72,8 @@ class TestFlowsDirectFunction(unittest.TestCase):
         ):
             return {"status": "success"}, None
 
-        self.assertIsNone(FlowsDirectFunction.validate_function(my_function_simple_params))
-        func = FlowsDirectFunction(function=my_function_simple_params)
+        self.assertIsNone(FlowsDirectFunctionWrapper.validate_function(my_function_simple_params))
+        func = FlowsDirectFunctionWrapper(function=my_function_simple_params)
         self.assertEqual(
             func.properties,
             {
@@ -87,8 +91,8 @@ class TestFlowsDirectFunction(unittest.TestCase):
         ):
             return {"status": "success"}, None
 
-        self.assertIsNone(FlowsDirectFunction.validate_function(my_function_complex_params))
-        func = FlowsDirectFunction(function=my_function_complex_params)
+        self.assertIsNone(FlowsDirectFunctionWrapper.validate_function(my_function_complex_params))
+        func = FlowsDirectFunctionWrapper(function=my_function_complex_params)
         self.assertEqual(
             func.properties,
             {
@@ -118,8 +122,10 @@ class TestFlowsDirectFunction(unittest.TestCase):
         ):
             return {"status": "success"}, None
 
-        self.assertIsNone(FlowsDirectFunction.validate_function(my_function_complex_type_params))
-        func = FlowsDirectFunction(function=my_function_complex_type_params)
+        self.assertIsNone(
+            FlowsDirectFunctionWrapper.validate_function(my_function_complex_type_params)
+        )
+        func = FlowsDirectFunctionWrapper(function=my_function_complex_type_params)
         self.assertEqual(
             func.properties,
             {
@@ -147,8 +153,8 @@ class TestFlowsDirectFunction(unittest.TestCase):
         async def my_function_no_params(flow_manager: FlowManager):
             return {"status": "success"}, None
 
-        self.assertIsNone(FlowsDirectFunction.validate_function(my_function_no_params))
-        func = FlowsDirectFunction(function=my_function_no_params)
+        self.assertIsNone(FlowsDirectFunctionWrapper.validate_function(my_function_no_params))
+        func = FlowsDirectFunctionWrapper(function=my_function_no_params)
         self.assertEqual(func.required, [])
 
         async def my_function_simple_params(
@@ -156,8 +162,8 @@ class TestFlowsDirectFunction(unittest.TestCase):
         ):
             return {"status": "success"}, None
 
-        self.assertIsNone(FlowsDirectFunction.validate_function(my_function_simple_params))
-        func = FlowsDirectFunction(function=my_function_simple_params)
+        self.assertIsNone(FlowsDirectFunctionWrapper.validate_function(my_function_simple_params))
+        func = FlowsDirectFunctionWrapper(function=my_function_simple_params)
         self.assertEqual(func.required, ["name", "age"])
 
         async def my_function_complex_params(
@@ -168,8 +174,8 @@ class TestFlowsDirectFunction(unittest.TestCase):
         ):
             return {"status": "success"}, None
 
-        self.assertIsNone(FlowsDirectFunction.validate_function(my_function_complex_params))
-        func = FlowsDirectFunction(function=my_function_complex_params)
+        self.assertIsNone(FlowsDirectFunctionWrapper.validate_function(my_function_complex_params))
+        func = FlowsDirectFunctionWrapper(function=my_function_complex_params)
         self.assertEqual(func.required, ["address_lines"])
 
     def test_property_descriptions_are_set_from_function(self):
@@ -188,8 +194,8 @@ class TestFlowsDirectFunction(unittest.TestCase):
             """
             return {"status": "success"}, None
 
-        self.assertIsNone(FlowsDirectFunction.validate_function(my_function))
-        func = FlowsDirectFunction(function=my_function)
+        self.assertIsNone(FlowsDirectFunctionWrapper.validate_function(my_function))
+        func = FlowsDirectFunctionWrapper(function=my_function)
 
         # Validate that the function description is still set correctly even with the longer docstring
         self.assertEqual(func.description, "This is a test function.")
@@ -214,19 +220,19 @@ class TestFlowsDirectFunction(unittest.TestCase):
             return {"status": "success"}, None
 
         with self.assertRaises(InvalidFunctionError):
-            FlowsDirectFunction.validate_function(my_function_non_async)
+            FlowsDirectFunctionWrapper.validate_function(my_function_non_async)
 
         async def my_function_missing_flow_manager():
             return {"status": "success"}, None
 
         with self.assertRaises(InvalidFunctionError):
-            FlowsDirectFunction.validate_function(my_function_missing_flow_manager)
+            FlowsDirectFunctionWrapper.validate_function(my_function_missing_flow_manager)
 
         async def my_function_misplaced_flow_manager(foo: str, flow_manager: FlowManager):
             return {"status": "success"}, None
 
         with self.assertRaises(InvalidFunctionError):
-            FlowsDirectFunction.validate_function(my_function_misplaced_flow_manager)
+            FlowsDirectFunctionWrapper.validate_function(my_function_misplaced_flow_manager)
 
     def test_invoke_calls_function_with_args_and_flow_manager(self):
         """Test that FlowsDirectFunction.invoke calls the function with correct args and flow_manager."""
@@ -242,7 +248,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
             called["age"] = age
             return {"status": "success"}, None
 
-        func = FlowsDirectFunction(function=my_function)
+        func = FlowsDirectFunctionWrapper(function=my_function)
         flow_manager = DummyFlowManager()
         args = {"name": "Alice", "age": 30}
 
