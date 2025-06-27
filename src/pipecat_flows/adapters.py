@@ -462,18 +462,30 @@ class GeminiAdapter(LLMAdapter):
     ) -> Optional[str]:
         """Generate summary using Google's API directly."""
         try:
-            # Format messages for Gemini
+            from google.genai.types import Content, GenerateContentConfig, Part
+
+            # Format conversation history as user message
             contents = [
-                {
-                    "role": "user",
-                    "parts": [{"text": (f"{summary_prompt}\n\nConversation history: {messages}")}],
-                }
+                Content(role="user", parts=[Part(text=f"Conversation history: {messages}")])
             ]
 
-            # Use non-streaming completion
-            response = await llm._client.generate_content_async(contents=contents, stream=False)
+            # Use summary_prompt as system instruction
+            generation_config = GenerateContentConfig(system_instruction=summary_prompt)
 
-            return response.text
+            # Use the new google-genai client's async method
+            response = await llm._client.aio.models.generate_content(
+                model=llm._model_name,
+                contents=contents,
+                config=generation_config,
+            )
+
+            # Extract text from response
+            if response.candidates and response.candidates[0].content:
+                for part in response.candidates[0].content.parts:
+                    if part.text:
+                        return part.text
+
+            return None
 
         except Exception as e:
             logger.error(f"Google summary generation failed: {e}", exc_info=True)
