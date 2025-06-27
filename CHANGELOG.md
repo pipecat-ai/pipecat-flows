@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Addded a new optional `name` field to `NodeConfig`. When using dynamic flows alongside
-  "consolidated" functions that return a tuple (result, next node), giving the next node a `name` is
-  helpful for debug logging. If you don't specify a `name`, an automatically-generated UUID is used.
+- Addded a new optional `name` field to `NodeConfig`. When using dynamic flows
+  alongside "consolidated" functions that return a tuple (result, next node),
+  giving the next node a `name` is helpful for debug logging. If you don't
+  specify a `name`, an automatically-generated UUID is used.
 
 - Added support for providing "consolidated" functions, which are responsible
   for both doing some work as well as specifying the next node to transition
@@ -30,7 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     result = await process(foo, bar)
 
     # Specify next node (optional; this function may be a work-only function)
-    # This is either a NodeConfig (for dynamic flows) or a node name (for static flows)
+    # This is either a NodeConfig (for dynamic flows) or a node name (for
+    # static flows)
     next_node = create_another_node()
 
     return result, next_node
@@ -97,23 +99,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     )
   ```
 
-### Deprecated
-
-- Deprecated `transition_to` and `transition_callback` in favor of "consolidated" `handler`s that
-  return a tuple (result, next node). Alternatively, you could use "direct" functions and avoid
-  using `FlowsFunctionSchema`s or function definition dicts entirely. See the "Added" section above
-  for more details.
-
-- Deprecated `set_node()` in favor of doing the following for dynamic flows:
-
-  - Prefer "consolidated" or "direct" functions that return a tuple (result, next node) over
-    deprecated `transition_callback`s
-  - Pass your initial node to `FlowManager.initialize()`
-  - If you really need to set a node explicitly, use `set_node_from_config()`
-
-  In all of these cases, you can provide a `name` in your new node's config for debug logging
-  purposes.
-
 ### Changed
 
 - `functions` are now optional in the `NodeConfig`. Additionally, for AWS
@@ -128,16 +113,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   be removed in a future version. The `tts_say` action now pushes a
   `TTSSpeakFrame`.
 
+- Deprecated `transition_to` and `transition_callback` in favor of
+  "consolidated" `handler`s that return a tuple (result, next node).
+  Alternatively, you could use "direct" functions and avoid using
+  `FlowsFunctionSchema`s or function definition dicts entirely. See the "Added"
+  section above for more details.
+
+- Deprecated `set_node()` in favor of doing the following for dynamic flows:
+
+  - Prefer "consolidated" or "direct" functions that return a tuple (result,
+    next node) over deprecated `transition_callback`s
+  - Pass your initial node to `FlowManager.initialize()`
+  - If you really need to set a node explicitly, use `set_node_from_config()`
+
+  In all of these cases, you can provide a `name` in your new node's config for
+  debug logging purposes.
+
 ### Fixed
+
+- Fixed an issue where `RESET_WITH_SUMMARY` wasn't working for the
+  `GeminiAdapter`. Now, the `GeminiAdapter` uses the `google-genai` package,
+  aligning with the package used by `pipecat-ai`.
 
 - Fixed an issue where if `run_in_parallel=False` was set for the LLM, the bot
   would trigger N completions for each sequential function call. Now, Flows
   uses Pipecat's internal function tracking to determine when there are more
   edge functions to call.
 
-- Overhauled `pre_actions` and `post_actions` timing logic, making their timing more predictable and
-  eliminating some bugs. For example, now `tts_say` actions will always run after the bot response,
-  when used in `post_actions`.
+- Overhauled `pre_actions` and `post_actions` timing logic, making their timing
+  more predictable and eliminating some bugs. For example, now `tts_say`
+  actions will always run after the bot response, when used in `post_actions`.
 
 ## [0.0.17] - 2025-05-16
 
