@@ -524,6 +524,83 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         result = await flow_manager._call_handler(handler_no_args, {})
         self.assertEqual(result["status"], "success")
 
+        # Test handler with FlowManager parameter (2+ parameters)
+        async def handler_with_flow_manager(args, flow_manager_param):
+            return {
+                "status": "success",
+                "has_flow_manager": True,
+                "flow_manager": flow_manager_param,  # Return for verification
+                "args": args
+            }
+
+        result = await flow_manager._call_handler(handler_with_flow_manager, {"test": "value"})
+        self.assertEqual(result["status"], "success")
+        self.assertTrue(result["has_flow_manager"])
+        self.assertIs(result["flow_manager"], flow_manager)  # Verify it's the same instance
+        self.assertTrue(isinstance(result["flow_manager"], FlowManager))
+        self.assertEqual(result["args"]["test"], "value")
+
+        # Test instance method handler
+        class TestHandlerClass:
+            def __init__(self):
+                self.instance_data = "test_instance"
+            
+            async def instance_method_handler(self, args):
+                return {"status": "success", "instance_data": self.instance_data, "args": args}
+            
+            async def instance_method_with_flow_manager(self, args, flow_manager_param):
+                return {
+                    "status": "success",
+                    "has_flow_manager": True,
+                    "flow_manager": flow_manager_param,  # Return for verification
+                    "instance_data": self.instance_data,
+                    "args": args
+                }
+            
+            @classmethod
+            async def class_method_handler(cls, args):
+                return {"status": "success", "class_data": "test_class", "args": args}
+            
+            @classmethod
+            async def class_method_with_flow_manager(cls, args, flow_manager_param):
+                return {
+                    "status": "success",
+                    "has_flow_manager": True,
+                    "flow_manager": flow_manager_param,  # Return for verification
+                    "class_data": "test_class",
+                    "args": args
+                }
+
+        test_instance = TestHandlerClass()
+
+        # Test instance method (1 parameter after self)
+        result = await flow_manager._call_handler(test_instance.instance_method_handler, {"test": "value"})
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["instance_data"], "test_instance")
+        self.assertEqual(result["args"]["test"], "value")
+
+        # Test instance method with FlowManager (2+ parameters after self)
+        result = await flow_manager._call_handler(test_instance.instance_method_with_flow_manager, {"test": "value"})
+        self.assertEqual(result["status"], "success")
+        self.assertTrue(result["has_flow_manager"])
+        self.assertIs(result["flow_manager"], flow_manager)  # Verify it's the same instance
+        self.assertEqual(result["instance_data"], "test_instance")
+        self.assertEqual(result["args"]["test"], "value")
+
+        # Test classmethod (1 parameter after cls)
+        result = await flow_manager._call_handler(TestHandlerClass.class_method_handler, {"test": "value"})
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["class_data"], "test_class")
+        self.assertEqual(result["args"]["test"], "value")
+
+        # Test classmethod with FlowManager (2+ parameters after cls)
+        result = await flow_manager._call_handler(TestHandlerClass.class_method_with_flow_manager, {"test": "value"})
+        self.assertEqual(result["status"], "success")
+        self.assertTrue(result["has_flow_manager"])
+        self.assertIs(result["flow_manager"], flow_manager)  # Verify it's the same instance
+        self.assertEqual(result["class_data"], "test_class")
+        self.assertEqual(result["args"]["test"], "value")
+
     async def test_transition_func_error_handling(self):
         """Test error handling in transition functions."""
         flow_manager = FlowManager(
