@@ -4,89 +4,88 @@
 
 [![PyPI](https://img.shields.io/pypi/v/pipecat-ai-flows)](https://pypi.org/project/pipecat-ai-flows) [![Docs](https://img.shields.io/badge/Documentation-blue)](https://docs.pipecat.ai/guides/features/pipecat-flows) [![Discord](https://img.shields.io/discord/1239284677165056021)](https://discord.gg/pipecat)
 
-Pipecat Flows provides a framework for building structured conversations in your AI applications. It enables you to create both predefined conversation paths and dynamically generated flows while handling the complexities of state management and LLM interactions.
+Pipecat Flows is an add-on framework for [Pipecat](https://github.com/pipecat-ai/pipecat/tree/main#readme) that allows you to build structured conversations in your AI applications. It enables you to create both predefined conversation paths and dynamically generated flows while handling the complexities of state management and LLM interactions.
 
 The framework consists of:
 
 - A Python module for building conversation flows with Pipecat
-- A visual editor for designing and exporting flow configurations
+- A [visual editor](#Pipecat-Flows-Editor) for designing and exporting flow configurations
 
 ### When to Use Pipecat Flows
 
 - **Static Flows**: When your conversation structure is known upfront and follows predefined paths. Perfect for customer service scripts, intake forms, or guided experiences.
 - **Dynamic Flows**: When conversation paths need to be determined at runtime based on user input, external data, or business logic. Ideal for personalized experiences or complex decision trees.
 
+## Dependencies
+
+- Python 3.10 or higher
+- [Pipecat](https://github.com/pipecat-ai/pipecat?tab=readme-ov-file#-getting-started)
+
 ## Installation
 
-If you're already using Pipecat:
-
+Setup virtual environment
 ```bash
-pip install pipecat-ai-flows
+python3 -m venv venv
+source venv/bin/activate
 ```
 
-If you're starting fresh:
-
+Install
 ```bash
-# Basic installation
 pip install pipecat-ai-flows
-
-# Install Pipecat with specific LLM provider options:
-pip install "pipecat-ai[daily,openai,deepgram,cartesia]"     # For OpenAI
-pip install "pipecat-ai[daily,anthropic,deepgram,cartesia]"  # For Anthropic
-pip install "pipecat-ai[daily,google,deepgram,cartesia]"     # For Google
 ```
 
 ## Quick Start
 
-Here's a basic example of setting up a static conversation flow:
+This is a basic example of setting up a flow:
 
 ```python
 from pipecat_flows import FlowManager, FlowsFunctionSchema
 
-# Define a function with FlowsFunctionSchema
-collect_name_schema = FlowsFunctionSchema(
-    name="collect_name",
-    description="Record user's name",
-    properties={"name": {"type": "string"}},
-    required=["name"],
-    handler=collect_name_handler,
-    transition_to="next_step"
-)
+def create_initial_node() -> NodeConfig:
+    collect_name_schema = FlowsFunctionSchema(
+        name="collect_name",
+        description="Collect user's name.",
+        required=["name"],
+        handler=handle_collect_name,
+        properties={"name": {"type": "string"}},
+    )
 
-# Initialize flow manager with static configuration
-flow_config = {
-    "initial_node": "greeting",
-    "nodes": {
-        "greeting": {
-            "role_messages": [
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant. Your responses will be converted to audio."
-                }
-            ],
-            "task_messages": [
-                {
-                    "role": "system",
-                    "content": "Start by greeting the user and asking for their name."
-                }
-            ],
-            "functions": [collect_name_schema]
-        },
-        # Additional nodes...
+    return {
+        "name": "initial",
+        "role_messages": [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant. Your responses will be converted to audio."
+            }
+        ],
+        "task_messages": [
+            {
+                "role": "system",
+                "content": "Start by greeting the user and asking for their name.",
+            }
+        ],
+        "functions": [collect_name_schema]
     }
-}
 
-flow_manager = FlowManager(
-    task=task,
-    llm=llm,
-    context_aggregator=context_aggregator,
-    flow_config=flow_config,
-)
+    # Initialize flow manager
+    flow_manager = FlowManager(
+        task=task,
+        llm=llm,
+        context_aggregator=context_aggregator,
+        transport=transport,
+    )
 
-@transport.event_handler("on_first_participant_joined")
-async def on_first_participant_joined(transport, participant):
-    await transport.capture_participant_transcription(participant["id"])
-    await flow_manager.initialize()
+    @transport.event_handler("on_client_connected")
+    async def on_client_connected(transport, client):
+        await flow_manager.initialize(create_initial_node())
+
+```
+
+This example illustrates a full basic Pipecat Flow with two nodes:
+
+```bash
+pip install -r examples/quickstart/requirements.txt
+python examples/quickstart/hello_world.py -t daily
 ```
 
 For more detailed examples and guides, visit our [documentation](https://docs.pipecat.ai/guides/features/pipecat-flows).
