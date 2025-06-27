@@ -56,7 +56,7 @@ from .types import (
     FlowArgs,
     FlowConfig,
     FlowResult,
-    FlowsDirectFunction,
+    FlowsDirectFunctionWrapper,
     FlowsFunctionSchema,
     FunctionHandler,
     NodeConfig,
@@ -296,7 +296,7 @@ class FlowManager:
     async def _create_transition_func(
         self,
         name: str,
-        handler: Optional[Callable | FlowsDirectFunction],
+        handler: Optional[Callable | FlowsDirectFunctionWrapper],
         transition_to: Optional[str],
         transition_callback: Optional[Callable] = None,
     ) -> Callable:
@@ -333,7 +333,7 @@ class FlowManager:
                 acknowledged_result = {"status": "acknowledged"}
                 if handler:
                     # Invoke the handler with the provided arguments
-                    if isinstance(handler, FlowsDirectFunction):
+                    if isinstance(handler, FlowsDirectFunctionWrapper):
                         handler_response = await handler.invoke(params.arguments, self)
                     else:
                         handler_response = await self._call_handler(handler, params.arguments)
@@ -348,7 +348,7 @@ class FlowManager:
                         result = handler_response
                         next_node = None
                         # FlowsDirectFunctions should always be "consolidated" functions that return a tuple
-                        if isinstance(handler, FlowsDirectFunction):
+                        if isinstance(handler, FlowsDirectFunctionWrapper):
                             raise InvalidFunctionError(
                                 f"Direct function {name} expected to return a tuple (result, next_node) but got {type(result)}"
                             )
@@ -479,7 +479,7 @@ class FlowManager:
         self,
         name: str,
         new_functions: Set[str],
-        handler: Optional[Callable | FlowsDirectFunction],
+        handler: Optional[Callable | FlowsDirectFunctionWrapper],
         transition_to: Optional[str] = None,
         transition_callback: Optional[Callable] = None,
     ) -> None:
@@ -613,7 +613,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
             messages.extend(node_config["task_messages"])
 
             # Register functions and prepare tools
-            tools: List[FlowsFunctionSchema | FlowsDirectFunction] = []
+            tools: List[FlowsFunctionSchema | FlowsDirectFunctionWrapper] = []
             new_functions: Set[str] = set()
 
             # Get functions list with default empty list if not provided
@@ -632,7 +632,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
 
             async def register_direct_function(func):
                 """Helper to register a single direct function."""
-                direct_function = FlowsDirectFunction(function=func)
+                direct_function = FlowsDirectFunctionWrapper(function=func)
                 tools.append(direct_function)
                 await self._register_function(
                     name=direct_function.name,
@@ -830,7 +830,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
         for func in functions_list:
             # If the function is callable, validate using FlowsDirectFunction
             if callable(func):
-                FlowsDirectFunction.validate_function(func)
+                FlowsDirectFunctionWrapper.validate_function(func)
                 continue
 
             # Extract function name using adapter (handles all formats)
