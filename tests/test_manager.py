@@ -530,7 +530,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
                 "status": "success",
                 "has_flow_manager": True,
                 "flow_manager": flow_manager_param,  # Return for verification
-                "args": args
+                "args": args,
             }
 
         result = await flow_manager._call_handler(handler_with_flow_manager, {"test": "value"})
@@ -544,23 +544,23 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         class TestHandlerClass:
             def __init__(self):
                 self.instance_data = "test_instance"
-            
+
             async def instance_method_handler(self, args):
                 return {"status": "success", "instance_data": self.instance_data, "args": args}
-            
+
             async def instance_method_with_flow_manager(self, args, flow_manager_param):
                 return {
                     "status": "success",
                     "has_flow_manager": True,
                     "flow_manager": flow_manager_param,  # Return for verification
                     "instance_data": self.instance_data,
-                    "args": args
+                    "args": args,
                 }
-            
+
             @classmethod
             async def class_method_handler(cls, args):
                 return {"status": "success", "class_data": "test_class", "args": args}
-            
+
             @classmethod
             async def class_method_with_flow_manager(cls, args, flow_manager_param):
                 return {
@@ -568,19 +568,23 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
                     "has_flow_manager": True,
                     "flow_manager": flow_manager_param,  # Return for verification
                     "class_data": "test_class",
-                    "args": args
+                    "args": args,
                 }
 
         test_instance = TestHandlerClass()
 
         # Test instance method (1 parameter after self)
-        result = await flow_manager._call_handler(test_instance.instance_method_handler, {"test": "value"})
+        result = await flow_manager._call_handler(
+            test_instance.instance_method_handler, {"test": "value"}
+        )
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["instance_data"], "test_instance")
         self.assertEqual(result["args"]["test"], "value")
 
         # Test instance method with FlowManager (2+ parameters after self)
-        result = await flow_manager._call_handler(test_instance.instance_method_with_flow_manager, {"test": "value"})
+        result = await flow_manager._call_handler(
+            test_instance.instance_method_with_flow_manager, {"test": "value"}
+        )
         self.assertEqual(result["status"], "success")
         self.assertTrue(result["has_flow_manager"])
         self.assertIs(result["flow_manager"], flow_manager)  # Verify it's the same instance
@@ -588,13 +592,17 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["args"]["test"], "value")
 
         # Test classmethod (1 parameter after cls)
-        result = await flow_manager._call_handler(TestHandlerClass.class_method_handler, {"test": "value"})
+        result = await flow_manager._call_handler(
+            TestHandlerClass.class_method_handler, {"test": "value"}
+        )
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["class_data"], "test_class")
         self.assertEqual(result["args"]["test"], "value")
 
         # Test classmethod with FlowManager (2+ parameters after cls)
-        result = await flow_manager._call_handler(TestHandlerClass.class_method_with_flow_manager, {"test": "value"})
+        result = await flow_manager._call_handler(
+            TestHandlerClass.class_method_with_flow_manager, {"test": "value"}
+        )
         self.assertEqual(result["status"], "success")
         self.assertTrue(result["has_flow_manager"])
         self.assertIs(result["flow_manager"], flow_manager)  # Verify it's the same instance
