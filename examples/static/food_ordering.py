@@ -12,6 +12,7 @@ from pathlib import Path
 import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
+from pipecat.audio.mixers.soundfile_mixer import SoundfileMixer
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -311,6 +312,10 @@ async def main():
     async with aiohttp.ClientSession() as session:
         (room_url, _) = await configure(session)
 
+        OFFICE_SOUND_FILE = os.path.join(
+            os.path.dirname(__file__), "assets", "office-ambience-24000-mono.mp3"
+        )
+
         # Initialize services
         transport = DailyTransport(
             room_url,
@@ -319,6 +324,11 @@ async def main():
             DailyParams(
                 audio_in_enabled=True,
                 audio_out_enabled=True,
+                audio_out_mixer=SoundfileMixer(
+                    sound_files={"office": OFFICE_SOUND_FILE},
+                    default_sound="office",
+                    volume=2.0,
+                ),
                 vad_analyzer=SileroVADAnalyzer(),
             ),
         )
