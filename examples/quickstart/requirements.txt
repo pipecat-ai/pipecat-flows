@@ -1,0 +1,4 @@
+pipecat-ai[daily,silero,webrtc,websocket]
+pipecat-ai-flows
+python-dotenv
+uvicorn
