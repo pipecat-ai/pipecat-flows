@@ -7,20 +7,12 @@
 """Core conversation flow management system.
 
 This module provides the FlowManager class which orchestrates conversations
-across different LLM providers. It supports:
-- Static flows with predefined paths
-- Dynamic flows with runtime-determined transitions
-- State management and transitions
-- Function registration and execution
-- Action handling
-- Cross-provider compatibility
+across different LLM providers. It supports static flows with predefined paths,
+dynamic flows with runtime-determined transitions, state management and transitions,
+function registration and execution, action handling, and cross-provider compatibility.
 
-The flow manager coordinates all aspects of a conversation, including:
-- LLM context management
-- Function registration
-- State transitions
-- Action execution
-- Error handling
+The flow manager coordinates all aspects of a conversation including LLM context
+management, function registration, state transitions, action execution, and error handling.
 """
 
 import asyncio
@@ -40,15 +32,15 @@ from pipecat.pipeline.task import PipelineTask
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.base_transport import BaseTransport
 
-from .actions import ActionError, ActionManager
-from .adapters import create_adapter
-from .exceptions import (
+from pipecat_flows.actions import ActionError, ActionManager
+from pipecat_flows.adapters import create_adapter
+from pipecat_flows.exceptions import (
     FlowError,
     FlowInitializationError,
     FlowTransitionError,
     InvalidFunctionError,
 )
-from .types import (
+from pipecat_flows.types import (
     ActionConfig,
     ConsolidatedFunctionResult,
     ContextStrategy,
@@ -74,20 +66,16 @@ else:
 
 
 class FlowManager:
-    """Manages conversation flows, supporting both static and dynamic configurations.
+    """Manages conversation flows supporting both static and dynamic configurations.
 
     The FlowManager orchestrates conversation flows by managing state transitions,
     function registration, and message handling across different LLM providers.
+    It supports both predefined static flows and runtime-determined dynamic flows
+    with comprehensive action handling and error management.
 
-    Attributes:
-        task: Pipeline task for frame queueing
-        llm: LLM service instance (OpenAI, Anthropic, or Google)
-        tts: Optional TTS service for voice actions
-        state: Shared state dictionary across nodes
-        current_node: Currently active node identifier
-        initialized: Whether the manager has been initialized
-        nodes: Node configurations for static flows
-        current_functions: Currently registered function names
+    The manager coordinates all aspects of a conversation including LLM context
+    management, function registration, state transitions, action execution, and
+    provider-specific format handling.
     """
 
     def __init__(
@@ -104,20 +92,22 @@ class FlowManager:
         """Initialize the flow manager.
 
         Args:
-            task: PipelineTask instance for queueing frames
-            llm: LLM service instance (e.g., OpenAI, Anthropic)
-            context_aggregator: Context aggregator for updating user context
-            tts: Optional TTS service for voice actions
-            flow_config: Optional static flow configuration. If provided,
-                operates in static mode with predefined nodes
-            context_strategy: Optional context strategy configuration
-            transport: Optional transport
+            task: PipelineTask instance for queueing frames.
+            llm: LLM service instance (e.g., OpenAI, Anthropic, Google).
+            context_aggregator: Context aggregator for updating user context.
+            tts: Text-to-speech service for voice actions.
+
+                .. deprecated:: 0.0.18
+                    The tts parameter is deprecated and will be removed in a future version.
+
+            flow_config: Static flow configuration. If provided, operates in static
+                mode with predefined nodes.
+            context_strategy: Context strategy configuration for managing conversation
+                context during transitions.
+            transport: Transport instance for communication.
 
         Raises:
-            ValueError: If any transition handler is not a valid async callable
-
-        Deprecated:
-            0.0.18: The `tts` parameter is deprecated and will be removed in a future version.
+            ValueError: If any transition handler is not a valid async callable.
         """
         if tts is not None:
             warnings.warn(
@@ -171,7 +161,14 @@ class FlowManager:
             raise ValueError(f"Transition callback for {name} must be async")
 
     async def initialize(self, initial_node: Optional[NodeConfig] = None) -> None:
-        """Initialize the flow manager."""
+        """Initialize the flow manager.
+
+        Args:
+            initial_node: Optional initial node configuration for dynamic flows.
+
+        Raises:
+            FlowInitializationError: If initialization fails.
+        """
         if self.initialized:
             logger.warning(f"{self.__class__.__name__} already initialized")
             return
@@ -213,7 +210,7 @@ class FlowManager:
             user messages, and assistant responses.
 
         Raises:
-            FlowError: If context aggregator is not available
+            FlowError: If context aggregator is not available.
         """
         if not self._context_aggregator:
             raise FlowError("No context aggregator available")
@@ -224,10 +221,11 @@ class FlowManager:
         """Register a handler for a specific action type.
 
         Args:
-            action_type: String identifier for the action (e.g., "tts_say")
-            handler: Async or sync function that handles the action
+            action_type: String identifier for the action (e.g., "tts_say").
+            handler: Async or sync function that handles the action.
 
-        Example:
+        Example::
+
             async def custom_notification(action: dict):
                 text = action.get("text", "")
                 await notify_user(text)
@@ -240,10 +238,10 @@ class FlowManager:
         """Register an action handler from action configuration.
 
         Args:
-            action: Action configuration dictionary containing type and optional handler
+            action: Action configuration dictionary containing type and optional handler.
 
         Raises:
-            ActionError: If action type is not registered and no valid handler provided
+            ActionError: If action type is not registered and no valid handler provided.
         """
         action_type = action.get("type")
         handler = action.get("handler")
@@ -270,11 +268,11 @@ class FlowManager:
         calls it accordingly to maintain backward compatibility with legacy handlers.
 
         Args:
-            handler: The function handler to call (either legacy or modern format)
-            args: Arguments dictionary from the function call
+            handler: The function handler to call (either legacy or modern format).
+            args: Arguments dictionary from the function call.
 
         Returns:
-            FlowResult: The result returned by the handler
+            The result returned by the handler.
         """
         # Get the function signature
         sig = inspect.signature(handler)
@@ -303,16 +301,16 @@ class FlowManager:
         """Create a transition function for the given name and handler.
 
         Args:
-            name: Name of the function being registered
-            handler: Optional function to process data
-            transition_to: Optional node to transition to (static flows)
-            transition_callback: Optional callback for dynamic transitions
+            name: Name of the function being registered.
+            handler: Optional function to process data.
+            transition_to: Optional node to transition to (static flows).
+            transition_callback: Optional callback for dynamic transitions.
 
         Returns:
-            Callable: Async function that handles the tool invocation
+            Async function that handles the tool invocation.
 
         Raises:
-            ValueError: If both transition_to and transition_callback are specified
+            ValueError: If both transition_to and transition_callback are specified.
         """
         if transition_to and transition_callback:
             raise ValueError(
@@ -524,24 +522,29 @@ class FlowManager:
         """Set up a new conversation node and transition to it.
 
         Args:
-            node_config: Configuration for the new node
+            node_config: Configuration for the new node.
 
         Raises:
-            FlowTransitionError: If manager not initialized
-            FlowError: If node setup fails
+            FlowTransitionError: If manager not initialized.
+            FlowError: If node setup fails.
         """
         await self._set_node(get_or_generate_node_name(node_config), node_config)
 
     async def set_node(self, node_id: str, node_config: NodeConfig) -> None:
         """Set up a new conversation node and transition to it.
 
+        .. deprecated:: 0.0.18
+            This method is deprecated and will be removed in a future version.
+            Use set_node_from_config() instead, or prefer "consolidated" functions
+            that return a tuple (result, next_node).
+
         Args:
-            node_id: Identifier for the new node
-            node_config: Configuration for the new node
+            node_id: Identifier for the new node.
+            node_config: Configuration for the new node.
 
         Raises:
-            FlowTransitionError: If manager not initialized
-            FlowError: If node setup fails
+            FlowTransitionError: If manager not initialized.
+            FlowError: If node setup fails.
         """
         if not self._showed_deprecation_warning_for_set_node:
             self._showed_deprecation_warning_for_set_node = True
@@ -571,12 +574,12 @@ In all of these cases, you can provide a `name` in your new node's config for de
         7. Execute post-actions (if any)
 
         Args:
-            node_id: Identifier for the new node
-            node_config: Complete configuration for the node
+            node_id: Identifier for the new node.
+            node_config: Complete configuration for the node.
 
         Raises:
-            FlowTransitionError: If manager not initialized
-            FlowError: If node setup fails
+            FlowTransitionError: If manager not initialized.
+            FlowError: If node setup fails.
         """
         if not self.initialized:
             raise FlowTransitionError(f"{self.__class__.__name__} must be initialized first")
@@ -724,12 +727,12 @@ In all of these cases, you can provide a `name` in your new node's config for de
         """Update LLM context with new messages and functions.
 
         Args:
-            messages: New messages to add to context
-            functions: New functions to make available
-            strategy: Optional context update configuration
+            messages: New messages to add to context.
+            functions: New functions to make available.
+            strategy: Optional context update configuration.
 
         Raises:
-            FlowError: If context update fails
+            FlowError: If context update fails.
         """
         try:
             update_config = strategy or self._context_strategy
@@ -793,8 +796,8 @@ In all of these cases, you can provide a `name` in your new node's config for de
         """Execute pre and post actions.
 
         Args:
-            pre_actions: Actions to execute before context update
-            post_actions: Actions to execute after context update
+            pre_actions: Actions to execute before context update.
+            post_actions: Actions to execute after context update.
         """
         if pre_actions:
             await self.action_manager.execute_actions(pre_actions)
@@ -813,11 +816,11 @@ In all of these cases, you can provide a `name` in your new node's config for de
         3. Edge functions (matching node names) are allowed without handlers/transitions
 
         Args:
-            node_id: Identifier for the node being validated
-            config: Complete node configuration to validate
+            node_id: Identifier for the node being validated.
+            config: Complete node configuration to validate.
 
         Raises:
-            ValueError: If configuration is invalid or missing required fields
+            ValueError: If configuration is invalid or missing required fields.
         """
         # Check required fields
         if "task_messages" not in config:

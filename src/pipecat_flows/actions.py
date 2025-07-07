@@ -7,74 +7,76 @@
 """Action management system for conversation flows.
 
 This module provides the ActionManager class which handles execution of actions
-during conversation state transitions. It supports:
-- Built-in actions (TTS, conversation ending)
-- Custom action registration
-- Synchronous and asynchronous handlers
-- Pre and post-transition actions
-- Error handling and validation
+during conversation state transitions. It supports built-in actions, custom action
+registration, synchronous and asynchronous handlers, pre and post-transition actions,
+and comprehensive error handling and validation.
 
-Actions are used to perform side effects during conversations, such as:
-- Text-to-speech output
-- Database updates
-- External API calls
-- Custom integrations
+Actions are used to perform side effects during conversations, such as text-to-speech
+output, database updates, external API calls, and custom integrations.
 """
 
 import asyncio
 import inspect
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 
 from loguru import logger
 from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
     ControlFrame,
     EndFrame,
-    Frame,
     TTSSpeakFrame,
 )
-from pipecat.observers.base_observer import BaseObserver, FramePushed
-from pipecat.pipeline.task import PipelineTask, PipelineTaskSource
+from pipecat.pipeline.task import PipelineTask
 
-from .exceptions import ActionError
-from .types import ActionConfig, FlowActionHandler
+from pipecat_flows.exceptions import ActionError
+from pipecat_flows.types import ActionConfig, FlowActionHandler
+
+if TYPE_CHECKING:
+    from pipecat_flows.manager import FlowManager
 
 
 @dataclass
 class FunctionActionFrame(ControlFrame):
+    """Frame containing a function action to be executed.
+
+    Parameters:
+        action: Action configuration dictionary.
+        function: Function handler to execute.
+    """
+
     action: dict
     function: FlowActionHandler
 
 
 @dataclass
 class ActionFinishedFrame(ControlFrame):
+    """Frame indicating that an action has completed execution."""
+
     pass
 
 
 class ActionManager:
     """Manages the registration and execution of flow actions.
 
-    Actions are executed during state transitions and can include:
-    - Text-to-speech output
-    - Database updates
-    - External API calls
-    - Custom user-defined actions
+    Actions are executed during state transitions and can include text-to-speech
+    output, database updates, external API calls, and custom user-defined actions.
+    Supports both synchronous and asynchronous handlers with pre and post-transition
+    action execution.
 
     Built-in actions:
+
     - tts_say: Speak text using TTS
     - end_conversation: End the current conversation
-
-    Custom actions can be registered using register_action().
+    - function: Execute inline functions in the pipeline
     """
 
     def __init__(self, task: PipelineTask, flow_manager: "FlowManager"):
         """Initialize the action manager.
 
         Args:
-            task: PipelineTask instance used to queue frames
-            flow_manager: FlowManager instance that this ActionManager is part of
-            tts: Optional TTS service for voice actions
+            task: PipelineTask instance used to queue frames.
+            flow_manager: FlowManager instance that this ActionManager is part of.
         """
         self.action_handlers: Dict[str, Callable] = {}
         self.task = task
@@ -113,11 +115,11 @@ class ActionManager:
         """Register a handler for a specific action type.
 
         Args:
-            action_type: String identifier for the action (e.g., "tts_say")
-            handler: Async or sync function that handles the action
+            action_type: String identifier for the action (e.g., "tts_say").
+            handler: Async or sync function that handles the action.
 
         Raises:
-            ValueError: If handler is not callable
+            ValueError: If handler is not callable.
         """
         if not callable(handler):
             raise ValueError("Action handler must be callable")
@@ -128,13 +130,13 @@ class ActionManager:
         """Execute a list of actions.
 
         Args:
-            actions: List of action configurations to execute
+            actions: List of action configurations to execute.
 
         Raises:
-            ActionError: If action execution fails
+            ActionError: If action execution fails.
 
         Note:
-            Each action must have a 'type' field matching a registered handler
+            Each action must have a 'type' field matching a registered handler.
         """
         if not actions:
             return
@@ -207,10 +209,10 @@ class ActionManager:
         await self._maybe_wait_for_ongoing_actions_to_finish(previous_action_type, None)
 
     def schedule_deferred_post_actions(self, post_actions: List[ActionConfig]) -> None:
-        """Schedule "deferred" post-actions to be executed after next LLM completion.
+        """Schedule deferred post-actions to be executed after next LLM completion.
 
         Args:
-            post_actions: List of actions to execute
+            post_actions: List of actions to execute after LLM response.
         """
         self._deferred_post_actions = post_actions
 
@@ -228,14 +230,16 @@ class ActionManager:
     async def _maybe_wait_for_ongoing_actions_to_finish(
         self, previous_action_type: str, upcoming_action_type: Optional[str]
     ) -> None:
-        """Wait for ongoing actions to finish before executing the next action or moving on from
-        this set of actions, if needed.
+        """Wait for ongoing actions to finish before executing the next action if needed.
 
-        This method makes the determination of whether to wait based on the types of the previous
-        and upcoming actions.
+        This method determines whether to wait based on the types of the previous
+        and upcoming actions to avoid the upcoming action having an effect before
+        the previous one is done.
 
-        What it's trying to avoid is the upcoming action having an effect before the previous one is
-        done.
+        Args:
+            previous_action_type: Type of the previously executed action.
+            upcoming_action_type: Type of the next action to execute, or None if
+                this is the end of the action sequence.
         """
         needs_wait = False
         if previous_action_type == "tts_say":
@@ -279,7 +283,7 @@ class ActionManager:
         """Built-in handler for TTS actions.
 
         Args:
-            action: Action configuration containing 'text' to speak
+            action: Action configuration containing 'text' to speak.
         """
         text = action.get("text")
         if not text:
@@ -306,8 +310,8 @@ class ActionManager:
         includes a 'text' key, it will queue that text to be spoken before ending.
 
         Args:
-            action: Dictionary containing the action configuration.
-                Optional 'text' key for a goodbye message.
+            action: Action configuration dictionary. Optional 'text' key for a
+                goodbye message.
         """
         # Mark that we're starting the action
         self._increment_ongoing_actions_count()
@@ -321,14 +325,15 @@ class ActionManager:
         # EndFrame ensures that it'll never get delivered to our observer
 
     async def _handle_function_action(self, action: dict) -> None:
-        """Built-in handler for queuing functions to run "inline" in the pipeline (i.e. when the pipeline is done with all the work queued before it).
+        """Built-in handler for queuing functions to run inline in the pipeline.
 
-        This handler queues a FunctionFrame.
-        It expects a 'handler' key in the action, containing the function to execute.
+        This handler queues a FunctionActionFrame to be executed when the pipeline
+        is done with all the work queued before it. It expects a 'handler' key in
+        the action containing the function to execute.
 
         Args:
-            action: Dictionary containing the action configuration.
-                Required 'handler' key containing the function to execute.
+            action: Action configuration dictionary. Required 'handler' key
+                containing the function to execute.
         """
         handler = action.get("handler")
         if not handler:

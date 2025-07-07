@@ -7,14 +7,10 @@
 """LLM provider adapters for normalizing function and message formats.
 
 This module provides adapters that normalize interactions between different
-LLM providers (OpenAI, Anthropic, Gemini). It handles:
-- Function name extraction
-- Argument parsing
-- Message content formatting
-- Provider-specific schema conversion
-
-The adapter system allows the flow manager to work with different LLM
-providers while maintaining a consistent internal format.
+LLM providers (OpenAI, Anthropic, Gemini, AWS Bedrock). It handles function
+name extraction, argument parsing, message content formatting, and
+provider-specific schema conversion to allow the flow manager to work
+consistently across providers.
 """
 
 import sys
@@ -29,20 +25,23 @@ from pipecat.adapters.services.bedrock_adapter import AWSBedrockLLMAdapter
 from pipecat.adapters.services.gemini_adapter import GeminiLLMAdapter
 from pipecat.adapters.services.open_ai_adapter import OpenAILLMAdapter
 
-from .types import FlowsDirectFunctionWrapper, FlowsFunctionSchema
+from pipecat_flows.types import FlowsDirectFunctionWrapper, FlowsFunctionSchema
 
 
 class LLMAdapter:
     """Base adapter for LLM-specific format handling.
 
-    Adapters normalize differences between LLM providers:
+    Adapters normalize differences between LLM providers to allow the flow system
+    to work consistently across different providers while handling format differences
+    internally. Each provider has specific requirements for function calling,
+    message formatting, and tool definitions.
+
+    Supported providers:
+
     - OpenAI: Uses function calling format
     - Anthropic: Uses native function format
-    - Google: Uses function declarations format
-
-    This allows the flow system to work consistently across
-    different LLM providers while handling format differences
-    internally.
+    - Google Gemini: Uses function declarations format
+    - AWS Bedrock: Uses Anthropic-compatible format
     """
 
     def __init__(self):
@@ -53,10 +52,10 @@ class LLMAdapter:
         """Extract function name from provider-specific function definition or schema.
 
         Args:
-            function_def: Provider-specific function definition or schema
+            function_def: Provider-specific function definition or schema.
 
         Returns:
-            Function name
+            Function name extracted from the definition.
         """
         if isinstance(function_def, (FlowsFunctionSchema)):
             return function_def.name
@@ -66,10 +65,13 @@ class LLMAdapter:
         """Extract function name from provider-specific function definition.
 
         Args:
-            function_def: Provider-specific function definition dictionary
+            function_def: Provider-specific function definition dictionary.
 
         Returns:
-            Function name
+            Function name extracted from the definition.
+
+        Raises:
+            NotImplementedError: Must be implemented by subclasses.
         """
         raise NotImplementedError("Subclasses must implement this method")
 
@@ -81,11 +83,11 @@ class LLMAdapter:
         """Format functions for provider-specific use.
 
         Args:
-            functions: List of function definitions (dicts or schema objects)
-            original_configs: Optional original node configs, used by some adapters
+            functions: List of function definitions (dicts or schema objects).
+            original_configs: Optional original node configs, used by some adapters.
 
         Returns:
-            List of functions formatted for the provider
+            List of functions formatted for the provider.
         """
         # Return empty list if no functions
         if not functions:
@@ -135,10 +137,13 @@ class LLMAdapter:
         """Format a summary as a message appropriate for this LLM provider.
 
         Args:
-            summary: The generated summary text
+            summary: The generated summary text.
 
         Returns:
-            A properly formatted message for this provider
+            A properly formatted message for this provider.
+
+        Raises:
+            NotImplementedError: Must be implemented by subclasses.
         """
         raise NotImplementedError("Subclasses must implement this method")
 
@@ -148,12 +153,15 @@ class LLMAdapter:
         """Generate a summary using the LLM provider's API directly.
 
         Args:
-            llm: LLM service instance containing client/credentials
-            summary_prompt: Prompt text to guide summary generation
-            messages: List of messages to summarize
+            llm: LLM service instance containing client/credentials.
+            summary_prompt: Prompt text to guide summary generation.
+            messages: List of messages to summarize.
 
         Returns:
-            Generated summary text, or None if generation fails
+            Generated summary text, or None if generation fails.
+
+        Raises:
+            NotImplementedError: Must be implemented by subclasses.
         """
         raise NotImplementedError("Subclasses must implement this method")
 
@@ -161,10 +169,13 @@ class LLMAdapter:
         """Convert a provider-specific function definition to FlowsFunctionSchema.
 
         Args:
-            function_def: Provider-specific function definition
+            function_def: Provider-specific function definition.
 
         Returns:
-            FlowsFunctionSchema equivalent
+            FlowsFunctionSchema equivalent.
+
+        Raises:
+            NotImplementedError: Must be implemented by subclasses.
         """
         raise NotImplementedError("Subclasses must implement this method")
 
@@ -185,21 +196,37 @@ class OpenAIAdapter(LLMAdapter):
         """Extract function name from OpenAI function definition.
 
         Args:
-            function_def: OpenAI-formatted function definition dictionary
+            function_def: OpenAI-formatted function definition dictionary.
 
         Returns:
-            Function name from the definition
+            Function name from the definition.
         """
         return function_def["function"]["name"]
 
     def format_summary_message(self, summary: str) -> dict:
-        """Format summary as a system message for OpenAI."""
+        """Format summary as a system message for OpenAI.
+
+        Args:
+            summary: The generated summary text.
+
+        Returns:
+            OpenAI-formatted system message containing the summary.
+        """
         return {"role": "system", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     async def generate_summary(
         self, llm: Any, summary_prompt: str, messages: List[dict]
     ) -> Optional[str]:
-        """Generate summary using OpenAI's API directly."""
+        """Generate summary using OpenAI's API directly.
+
+        Args:
+            llm: OpenAI LLM service instance.
+            summary_prompt: Prompt text to guide summary generation.
+            messages: List of messages to summarize.
+
+        Returns:
+            Generated summary text, or None if generation fails.
+        """
         try:
             prompt_messages = [
                 {
@@ -229,10 +256,10 @@ class OpenAIAdapter(LLMAdapter):
         """Convert OpenAI function definition to FlowsFunctionSchema.
 
         Args:
-            function_def: OpenAI function definition
+            function_def: OpenAI function definition.
 
         Returns:
-            FlowsFunctionSchema equivalent with flow-specific fields
+            FlowsFunctionSchema equivalent with flow-specific fields.
         """
         func_data = function_def["function"]
         name = func_data["name"]
@@ -273,21 +300,37 @@ class AnthropicAdapter(LLMAdapter):
         """Extract function name from Anthropic function definition.
 
         Args:
-            function_def: Anthropic-formatted function definition dictionary
+            function_def: Anthropic-formatted function definition dictionary.
 
         Returns:
-            Function name from the definition
+            Function name from the definition.
         """
         return function_def["name"]
 
     def format_summary_message(self, summary: str) -> dict:
-        """Format summary as a user message for Anthropic."""
+        """Format summary as a user message for Anthropic.
+
+        Args:
+            summary: The generated summary text.
+
+        Returns:
+            Anthropic-formatted user message containing the summary.
+        """
         return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     async def generate_summary(
         self, llm: Any, summary_prompt: str, messages: List[dict]
     ) -> Optional[str]:
-        """Generate summary using Anthropic's API directly."""
+        """Generate summary using Anthropic's API directly.
+
+        Args:
+            llm: Anthropic LLM service instance.
+            summary_prompt: Prompt text to guide summary generation.
+            messages: List of messages to summarize.
+
+        Returns:
+            Generated summary text, or None if generation fails.
+        """
         try:
             prompt_messages = [
                 {
@@ -315,10 +358,10 @@ class AnthropicAdapter(LLMAdapter):
         """Convert Anthropic function definition to FlowsFunctionSchema.
 
         Args:
-            function_def: Anthropic function definition
+            function_def: Anthropic function definition.
 
         Returns:
-            FlowsFunctionSchema equivalent with flow-specific fields
+            FlowsFunctionSchema equivalent with flow-specific fields.
         """
         name = function_def["name"]
         description = function_def.get("description", "")
@@ -358,10 +401,10 @@ class GeminiAdapter(LLMAdapter):
         """Extract function name from Gemini function definition.
 
         Args:
-            function_def: Gemini-formatted function definition dictionary
+            function_def: Gemini-formatted function definition dictionary.
 
         Returns:
-            Function name from the first declaration, or empty string if none found
+            Function name from the first declaration, or empty string if none found.
         """
         logger.debug(f"Getting function name from: {function_def}")
         if "function_declarations" in function_def:
@@ -381,11 +424,11 @@ class GeminiAdapter(LLMAdapter):
         to ensure Gemini's specific format is preserved when possible.
 
         Args:
-            functions: List of function definitions (dicts or schema objects)
-            original_configs: Optional original node configs, used to preserve native formats
+            functions: List of function definitions (dicts or schema objects).
+            original_configs: Optional original node configs, used to preserve native formats.
 
         Returns:
-            List of functions formatted for Gemini
+            List of functions formatted for Gemini.
         """
         gemini_functions = []
 
@@ -454,13 +497,29 @@ class GeminiAdapter(LLMAdapter):
         return [{"function_declarations": gemini_functions}]
 
     def format_summary_message(self, summary: str) -> dict:
-        """Format summary as a user message for Gemini."""
+        """Format summary as a user message for Gemini.
+
+        Args:
+            summary: The generated summary text.
+
+        Returns:
+            Gemini-formatted user message containing the summary.
+        """
         return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     async def generate_summary(
         self, llm: Any, summary_prompt: str, messages: List[dict]
     ) -> Optional[str]:
-        """Generate summary using Google's API directly."""
+        """Generate summary using Google's API directly.
+
+        Args:
+            llm: Google LLM service instance.
+            summary_prompt: Prompt text to guide summary generation.
+            messages: List of messages to summarize.
+
+        Returns:
+            Generated summary text, or None if generation fails.
+        """
         try:
             from google.genai.types import Content, GenerateContentConfig, Part
 
@@ -495,10 +554,10 @@ class GeminiAdapter(LLMAdapter):
         """Convert Gemini function definition to FlowsFunctionSchema.
 
         Args:
-            function_def: Gemini function definition
+            function_def: Gemini function definition.
 
         Returns:
-            FlowsFunctionSchema equivalent with flow-specific fields
+            FlowsFunctionSchema equivalent with flow-specific fields.
         """
         if "function_declarations" in function_def:
             # Use first declaration if there are multiple
@@ -547,16 +606,23 @@ class AWSBedrockAdapter(LLMAdapter):
         """Extract function name from Bedrock function definition.
 
         Args:
-            function_def: Bedrock-formatted function definition dictionary
+            function_def: Bedrock-formatted function definition dictionary.
 
         Returns:
-            Function name from the definition
+            Function name from the definition.
         """
         # Bedrock uses the same format as Anthropic for tools
         return function_def["name"]
 
     def format_summary_message(self, summary: str) -> dict:
-        """Format summary as a user message for Bedrock models."""
+        """Format summary as a user message for Bedrock models.
+
+        Args:
+            summary: The generated summary text.
+
+        Returns:
+            Bedrock-formatted user message containing the summary.
+        """
         return {
             "role": "user",
             "content": [{"text": f"Here's a summary of the conversation:\n{summary}"}],
@@ -565,7 +631,16 @@ class AWSBedrockAdapter(LLMAdapter):
     async def generate_summary(
         self, llm: Any, summary_prompt: str, messages: List[dict]
     ) -> Optional[str]:
-        """Generate summary using AWS Bedrock API directly."""
+        """Generate summary using AWS Bedrock API directly.
+
+        Args:
+            llm: Bedrock LLM service instance.
+            summary_prompt: Prompt text to guide summary generation.
+            messages: List of messages to summarize.
+
+        Returns:
+            Generated summary text, or None if generation fails.
+        """
         try:
             # Determine if we're using Claude or Nova based on model ID
             model_id = llm.model_name
@@ -615,10 +690,10 @@ class AWSBedrockAdapter(LLMAdapter):
         """Convert Bedrock function definition to FlowsFunctionSchema.
 
         Args:
-            function_def: Bedrock function definition
+            function_def: Bedrock function definition.
 
         Returns:
-            FlowsFunctionSchema equivalent with flow-specific fields
+            FlowsFunctionSchema equivalent with flow-specific fields.
         """
         # Initialize with default values
         name = ""
@@ -678,13 +753,13 @@ def create_adapter(llm) -> LLMAdapter:
     the appropriate adapter for any LLM service.
 
     Args:
-        llm: LLM service instance
+        llm: LLM service instance.
 
     Returns:
-        LLMAdapter: Provider-specific adapter
+        Provider-specific adapter instance.
 
     Raises:
-        ValueError: If LLM type is not supported or required dependency not installed
+        ValueError: If LLM type is not supported or required dependency not installed.
     """
     llm_type = type(llm).__name__
     llm_class = type(llm)
