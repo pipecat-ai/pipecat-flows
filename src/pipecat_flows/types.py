@@ -379,7 +379,8 @@ class NodeConfig(NodeConfigRequired, total=False):
             "functions": [...],
             "pre_actions": [...],
             "post_actions": [...],
-            "context_strategy": ContextStrategyConfig(strategy=ContextStrategy.APPEND)
+            "context_strategy": ContextStrategyConfig(strategy=ContextStrategy.APPEND),
+            "respond_immediately": true,
         }
     """
 
@@ -406,6 +407,9 @@ def get_or_generate_node_name(node_config: NodeConfig) -> str:
 
 class FlowConfig(TypedDict):
     """Configuration for the entire conversation flow.
+
+    Note:
+        FlowConfig applies to static flows only.
 
     Parameters:
         initial_node: Name of the starting node.

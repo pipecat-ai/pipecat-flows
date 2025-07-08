@@ -168,6 +168,23 @@ class FlowManager:
 
         Raises:
             FlowInitializationError: If initialization fails.
+
+        Examples:
+            Static flow::
+
+                flow_manager = FlowManager(
+                    ... # Initialization parameters
+                )
+                # Static flow: no initialization args required
+                flow_manager.initialize()
+
+            Dynamic flow::
+
+                flow_manager = FlowManager(
+                    ... # Initialization parameters
+                )
+                # Dynamic flow: Initialize with the initial node configuration
+                flow_manager.initialize(create_initial_node())
         """
         if self.initialized:
             logger.warning(f"{self.__class__.__name__} already initialized")
@@ -520,6 +537,8 @@ class FlowManager:
 
     async def set_node_from_config(self, node_config: NodeConfig) -> None:
         """Set up a new conversation node and transition to it.
+
+        Used to manually transition between nodes in a dynamic flow.
 
         Args:
             node_config: Configuration for the new node.
