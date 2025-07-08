@@ -521,7 +521,7 @@ The package includes a comprehensive test suite covering the core functionality.
 
 2. **Install Test Dependencies**:
    ```bash
-   pip install -r dev-requirements.txt -r test-requirements.txt
+   pip install -r dev-requirements.txt
    pip install "pipecat-ai[google,openai,anthropic]"
    pip install -e .
    ```
