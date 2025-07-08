@@ -51,8 +51,6 @@ ignore = [
 "examples/**/*.py" = ["D"]
 "tests/**/*.py" = ["D"]
 "docs/**/*.py" = ["D"]
-# Skip D104 (missing docstring in public package) for __init__.py files
-"**/__init__.py" = ["D104"]
 
 [tool.ruff.pydocstyle]
 convention = "google"
