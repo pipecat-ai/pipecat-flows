@@ -52,5 +52,5 @@ ignore = [
 "tests/**/*.py" = ["D"]
 "docs/**/*.py" = ["D"]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
