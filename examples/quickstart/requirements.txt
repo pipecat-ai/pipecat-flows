@@ -1,4 +1,5 @@
 pipecat-ai[daily,silero,webrtc,websocket,cartesia,google]
 pipecat-ai-flows
+pipecat_ai_small_webrtc_prebuilt
 python-dotenv
 uvicorn
