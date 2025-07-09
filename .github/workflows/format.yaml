@@ -39,8 +39,8 @@ jobs:
         run: |
           source .venv/bin/activate
           ruff format --diff
-      - name: Ruff linter (docstrings and imports)
+      - name: Ruff linter (all rules)
         id: ruff-check
         run: |
           source .venv/bin/activate
-          ruff check --select D,I
+          ruff check
