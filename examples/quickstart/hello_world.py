@@ -33,7 +33,6 @@ from pipecat.utils.text.markdown_text_filter import MarkdownTextFilter
 from pipecat_flows import (
     FlowArgs,
     FlowManager,
-    FlowResult,
     FlowsFunctionSchema,
     NodeConfig,
 )
