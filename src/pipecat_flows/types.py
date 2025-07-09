@@ -6,10 +6,16 @@
 
 """Type definitions for the conversation flow system.
 
-This module defines the core types used throughout the flow system including
-function return types, argument types, node configurations, and flow configurations.
-These types provide structure and validation for flow configurations and function
-interactions across different LLM providers.
+This module defines the core types used throughout the flow system:
+
+- FlowResult: Function return type
+- FlowArgs: Function argument type
+- NodeConfig: Node configuration type
+- FlowConfig: Complete flow configuration type
+- FlowsFunctionSchema: A uniform schema for function calls in flows
+
+These types provide structure and validation for flow configurations
+and function interactions.
 """
 
 import uuid
@@ -292,9 +298,11 @@ class FlowsFunctionSchema:
 class FlowsDirectFunctionWrapper(BaseDirectFunctionWrapper):
     """Wrapper around a FlowsDirectFunction for metadata extraction and invocation.
 
-    Extracts metadata from the function signature and docstring, generates a
-    corresponding FunctionSchema, and provides function invocation capabilities
-    specifically for Flows direct functions.
+    The wrapper:
+
+    - extracts metadata from the function signature and docstring
+    - generates a corresponding FunctionSchema
+    - helps with function invocation
     """
 
     @classmethod

@@ -7,12 +7,22 @@
 """Core conversation flow management system.
 
 This module provides the FlowManager class which orchestrates conversations
-across different LLM providers. It supports static flows with predefined paths,
-dynamic flows with runtime-determined transitions, state management and transitions,
-function registration and execution, action handling, and cross-provider compatibility.
+across different LLM providers. It supports:
 
-The flow manager coordinates all aspects of a conversation including LLM context
-management, function registration, state transitions, action execution, and error handling.
+- Static flows with predefined paths
+- Dynamic flows with runtime-determined transitions
+- State management and transitions
+- Function registration and execution
+- Action handling
+- Cross-provider compatibility
+
+The flow manager coordinates all aspects of a conversation, including:
+
+- LLM context management
+- Function registration
+- State transitions
+- Action execution
+- Error handling
 """
 
 import asyncio

@@ -7,10 +7,15 @@
 """LLM provider adapters for normalizing function and message formats.
 
 This module provides adapters that normalize interactions between different
-LLM providers (OpenAI, Anthropic, Gemini, AWS Bedrock). It handles function
-name extraction, argument parsing, message content formatting, and
-provider-specific schema conversion to allow the flow manager to work
-consistently across providers.
+LLM providers (OpenAI, Anthropic, Gemini, AWS Bedrock). It handles:
+
+- Function name extraction
+- Argument parsing
+- Message content formatting
+- Provider-specific schema conversion
+
+The adapter system allows the flow manager to work with different LLM
+providers while maintaining a consistent internal format.
 """
 
 import sys

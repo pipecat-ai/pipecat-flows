@@ -7,12 +7,20 @@
 """Action management system for conversation flows.
 
 This module provides the ActionManager class which handles execution of actions
-during conversation state transitions. It supports built-in actions, custom action
-registration, synchronous and asynchronous handlers, pre and post-transition actions,
-and comprehensive error handling and validation.
+during conversation state transitions. It supports:
 
-Actions are used to perform side effects during conversations, such as text-to-speech
-output, database updates, external API calls, and custom integrations.
+- Built-in actions (TTS, conversation ending)
+- Custom action registration
+- Synchronous and asynchronous handlers
+- Pre and post-transition actions
+- Error handling and validation
+
+Actions are used to perform side effects during conversations, such as:
+
+- Text-to-speech output
+- Database updates
+- External API calls
+- Custom integrations
 """
 
 import asyncio
@@ -59,16 +67,20 @@ class ActionFinishedFrame(ControlFrame):
 class ActionManager:
     """Manages the registration and execution of flow actions.
 
-    Actions are executed during state transitions and can include text-to-speech
-    output, database updates, external API calls, and custom user-defined actions.
-    Supports both synchronous and asynchronous handlers with pre and post-transition
-    action execution.
+    Actions are executed during state transitions and can include:
+
+    - Text-to-speech output
+    - Database updates
+    - External API calls
+    - Custom user-defined actions
 
     Built-in actions:
 
     - tts_say: Speak text using TTS
     - end_conversation: End the current conversation
     - function: Execute inline functions in the pipeline
+
+    Custom actions can be registered using register_action().
     """
 
     def __init__(self, task: PipelineTask, flow_manager: "FlowManager"):
@@ -209,7 +221,7 @@ class ActionManager:
         await self._maybe_wait_for_ongoing_actions_to_finish(previous_action_type, None)
 
     def schedule_deferred_post_actions(self, post_actions: List[ActionConfig]) -> None:
-        """Schedule deferred post-actions to be executed after next LLM completion.
+        """Schedule "deferred" post-actions to be executed after next LLM completion.
 
         Args:
             post_actions: List of actions to execute after LLM response.
