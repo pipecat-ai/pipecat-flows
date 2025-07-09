@@ -22,7 +22,7 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 
-from pipecat_flows import FlowArgs, FlowConfig, FlowManager, FlowResult
+from pipecat_flows import FlowConfig, FlowManager, FlowResult
 
 sys.path.append(str(Path(__file__).parent.parent))
 from runner import configure

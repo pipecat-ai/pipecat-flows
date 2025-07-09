@@ -8,7 +8,6 @@ import asyncio
 import os
 import sys
 from pathlib import Path
-from typing import Dict
 
 import aiohttp
 from dotenv import load_dotenv
