@@ -63,9 +63,9 @@ npm-debug.log*
 *.sln
 *.sw?
 
-# JSDoc documentation
-docs/
-
+# Auto-generated docs
+docs/api
+docs/_build/
 
 # Python
 __pycache__/

@@ -34,7 +34,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 
 [tool.ruff]
-exclude = [".git", "*_pb2.py"]
+exclude = [".git"]
 line-length = 100
 
 [tool.ruff.lint]
@@ -42,6 +42,15 @@ select = [
     "D", # Docstring rules
     "I", # Import rules
 ]
+ignore = [
+    "D105",  # Missing docstring in magic methods (__str__, __repr__, etc.)
+]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.per-file-ignores]
+# Skip docstring checks for non-source code
+"examples/**/*.py" = ["D"]
+"tests/**/*.py" = ["D"]
+"docs/**/*.py" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
 convention = "google"

@@ -24,12 +24,14 @@ The framework consists of:
 ## Installation
 
 Setup virtual environment
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
 Install
+
 ```bash
 pip install pipecat-ai-flows
 ```
@@ -506,6 +508,35 @@ To run these examples:
    python examples/static/food_ordering.py -u YOUR_DAILY_ROOM_URL
    ```
 
+## Hacking on the framework
+
+1. Set up a virtual environment before following these instructions. From the root of the repo:
+
+   ```shell
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+2. Install the development dependencies:
+
+   ```shell
+   pip install -r dev-requirements.txt
+   ```
+
+3. Install the git pre-commit hooks (these help ensure your code follows project rules):
+
+   ```shell
+   pre-commit install
+   ```
+
+4. Install the `pipecat-ai-flows` package locally in editable mode:
+
+   ```shell
+   pip install -e .
+   ```
+
+   > The `-e` or `--editable` option allows you to modify the code without reinstalling.
+
 ## Tests
 
 The package includes a comprehensive test suite covering the core functionality.
@@ -521,7 +552,7 @@ The package includes a comprehensive test suite covering the core functionality.
 
 2. **Install Test Dependencies**:
    ```bash
-   pip install -r dev-requirements.txt -r test-requirements.txt
+   pip install -r dev-requirements.txt
    pip install "pipecat-ai[google,openai,anthropic]"
    pip install -e .
    ```

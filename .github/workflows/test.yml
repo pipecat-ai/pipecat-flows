@@ -30,7 +30,7 @@ jobs:
       - name: Cache virtual environment
         uses: actions/cache@v3
         with:
-          key: venv-${{ runner.os }}-${{ steps.setup_python.outputs.python-version}}-${{ hashFiles('dev-requirements.txt') }}-${{ hashFiles('test-requirements.txt') }}
+          key: venv-${{ runner.os }}-${{ steps.setup_python.outputs.python-version}}-${{ hashFiles('dev-requirements.txt') }}
           path: .venv
 
       - name: Setup virtual environment
@@ -41,7 +41,7 @@ jobs:
         run: |
           source .venv/bin/activate
           python -m pip install --upgrade pip
-          pip install -r dev-requirements.txt -r test-requirements.txt
+          pip install -r dev-requirements.txt
           pip uninstall -y google-generativeai google-genai google-ai-generativelanguage
           pip install "google-genai==0.7.0"
           pip install "pipecat-ai[google,openai,anthropic]"
