@@ -36,7 +36,7 @@ Install
 pip install pipecat-ai-flows
 ```
 
-## Quick Start
+## Basic Example
 
 This is a basic example of setting up a flow:
 
@@ -83,12 +83,9 @@ def create_initial_node() -> NodeConfig:
 
 ```
 
-This example illustrates a full basic Pipecat Flow with two nodes:
+## Quick Start
 
-```bash
-pip install -r examples/quickstart/requirements.txt
-python examples/quickstart/hello_world.py -t daily
-```
+See [Quick Start README](./examples/quickstart/README.md).
 
 For more detailed examples and guides, visit our [documentation](https://docs.pipecat.ai/guides/features/pipecat-flows).
 
