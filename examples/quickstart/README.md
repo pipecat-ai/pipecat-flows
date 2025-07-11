@@ -28,7 +28,7 @@ pip install pipecat-ai-flows
 pip install -r requirements.txt
 ```
 
-4. Update your .env file with API keys for [Cartesia](https://play.cartesia.ai/sign-up) and [Google Gemini](https://ai.google.dev/).
+4. Update your .env file with API keys for [Cartesia](https://play.cartesia.ai/sign-up) and [Google Gemini](https://ai.google.dev/). You can find the environment variable names in the [env.example](https://github.com/pipecat-ai/pipecat-flows/blob/main/env.example).
 
 ## Run the example
 
