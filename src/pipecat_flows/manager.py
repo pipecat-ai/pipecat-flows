@@ -155,6 +155,21 @@ class FlowManager:
         self._showed_deprecation_warning_for_transition_fields = False
         self._showed_deprecation_warning_for_set_node = False
 
+    def switch_llm(self, llm: LLMService, context_aggregator: Any) -> None:
+        """Switch to another llm and reset tools and nodes but keep state.
+        
+        Args:
+            llm : LLM service instance (e.g., OpenAI, Anthropic)
+            context_aggregator: Context aggregator for updating user context 
+        """
+        self.llm = llm
+        self._context_aggregator = context_aggregator
+        self.action_manager = ActionManager(self.task, flow_manager=self)
+        self.adapter = create_adapter(llm)
+        self._pending_function_calls = 0
+        self.current_functions: Set[str] = set()  # Track registered functions
+        self.current_node: Optional[str] = None
+
     def _validate_transition_callback(self, name: str, callback: Any) -> None:
         """Validate a transition callback.
 
