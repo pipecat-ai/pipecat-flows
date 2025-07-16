@@ -198,7 +198,7 @@ flow_config: FlowConfig = {
             ],
             "task_messages": [
                 {
-                    "role": "system",
+                    "role": "user",
                     "content": "Start by introducing yourself to Chad Bailey, then ask for their date of birth, including the year. Once they provide their birthday, use verify_birthday to check it. If verified (1983-01-01), proceed to prescriptions.",
                 }
             ],
@@ -227,7 +227,7 @@ flow_config: FlowConfig = {
         "get_prescriptions": {
             "task_messages": [
                 {
-                    "role": "system",
+                    "role": "user",
                     "content": "This step is for collecting prescriptions. Ask them what prescriptions they're taking, including the dosage. After recording prescriptions (or confirming none), proceed to allergies.",
                 }
             ],
@@ -270,7 +270,7 @@ flow_config: FlowConfig = {
         "get_allergies": {
             "task_messages": [
                 {
-                    "role": "system",
+                    "role": "user",
                     "content": "Collect allergy information. Ask about any allergies they have. After recording allergies (or confirming none), proceed to medical conditions.",
                 }
             ],
@@ -308,7 +308,7 @@ flow_config: FlowConfig = {
         "get_conditions": {
             "task_messages": [
                 {
-                    "role": "system",
+                    "role": "user",
                     "content": "Collect medical condition information. Ask about any medical conditions they have. After recording conditions (or confirming none), proceed to visit reasons.",
                 }
             ],
@@ -346,7 +346,7 @@ flow_config: FlowConfig = {
         "get_visit_reasons": {
             "task_messages": [
                 {
-                    "role": "system",
+                    "role": "user",
                     "content": "Collect information about the reason for their visit. Ask what brings them to the doctor today. After recording their reasons, proceed to verification.",
                 }
             ],
@@ -384,7 +384,7 @@ flow_config: FlowConfig = {
         "verify": {
             "task_messages": [
                 {
-                    "role": "system",
+                    "role": "user",
                     "content": """Review all collected information with the patient. Follow these steps:
 1. Summarize their prescriptions, allergies, conditions, and visit reasons
 2. Ask if everything is correct
@@ -423,7 +423,7 @@ Be thorough in reviewing all details and wait for explicit confirmation.""",
         "confirm": {
             "task_messages": [
                 {
-                    "role": "system",
+                    "role": "user",
                     "content": "Once confirmed, thank them, then use the complete_intake function to end the conversation.",
                 }
             ],
@@ -443,7 +443,7 @@ Be thorough in reviewing all details and wait for explicit confirmation.""",
         "end": {
             "task_messages": [
                 {
-                    "role": "system",
+                    "role": "user",
                     "content": "Thank them for their time and end the conversation.",
                 }
             ],

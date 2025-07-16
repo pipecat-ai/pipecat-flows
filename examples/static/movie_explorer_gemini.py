@@ -347,7 +347,7 @@ flow_config: FlowConfig = {
             ],
             "task_messages": [
                 {
-                    "role": "system",
+                    "role": "user",
                     "content": "Start by greeting the user and asking if they'd like to know about movies currently in theaters or upcoming releases. Wait for their choice before using either get_current_movies or get_upcoming_movies.",
                 }
             ],
@@ -373,7 +373,7 @@ flow_config: FlowConfig = {
         "explore_movie": {
             "task_messages": [
                 {
-                    "role": "system",
+                    "role": "user",
                     "content": """Help the user learn more about movies. You can:
 - Use get_movie_details when they express interest in a specific movie
 - Use get_similar_movies to show recommendations
@@ -436,7 +436,7 @@ After showing details or recommendations, ask if they'd like to explore another 
         "end": {
             "task_messages": [
                 {
-                    "role": "system",
+                    "role": "user",
                     "content": "Thank the user warmly and mention they can return anytime to discover more movies.",
                 }
             ],
