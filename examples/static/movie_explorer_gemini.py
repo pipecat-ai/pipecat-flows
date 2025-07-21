@@ -348,7 +348,7 @@ flow_config: FlowConfig = {
             "task_messages": [
                 {
                     "role": "system",
-                    "content": "Start by greeting the user and asking if they'd like to know about movies currently in theaters or upcoming releases. Wait for their choice before using either get_current_movies or get_upcoming_movies.",
+                    "content": "Start by greeting the user and asking if they'd like to know about movies currently in theaters or upcoming releases. Wait for their choice before using either get_current_movies_then_explore or get_upcoming_movies_then_explore.",
                 }
             ],
             "functions": [
