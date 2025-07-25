@@ -14,7 +14,6 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import STTMuteFrame
 from pipecat.pipeline.parallel_pipeline import ParallelPipeline
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -28,11 +27,9 @@ from pipecat.services.google.llm import GoogleLLMService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 
-from pipecat_flows import FlowArgs, FlowManager, FlowResult, FlowsFunctionSchema, NodeConfig
-from pipecat_flows.types import ActionConfig
+from pipecat_flows import FlowManager, FlowResult, NodeConfig
 
 sys.path.append(str(Path(__file__).parent.parent))
-import argparse
 
 from runner import configure
 
