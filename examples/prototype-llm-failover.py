@@ -8,7 +8,6 @@ import asyncio
 import os
 import sys
 from pathlib import Path
-from typing import Dict
 
 import aiohttp
 from dotenv import load_dotenv
@@ -23,6 +22,7 @@ from pipecat.processors.aggregators.llm_response_universal import LLMContextAggr
 from pipecat.processors.filters.function_filter import FunctionFilter
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
+
 from pipecat.services.google.llm import GoogleLLMService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
@@ -59,6 +59,13 @@ async def openai_filter(frame) -> bool:
 async def google_filter(frame) -> bool:
     return current_llm == "Google"
 
+async def get_current_weather(flow_manager: FlowManager) -> tuple[FlowResult, None]:
+    """Get the current weather information."""
+    # This is a placeholder for the actual implementation
+    # In a real scenario, you would call an API to get the weather data
+    weather_info = "The current weather is sunny with a temperature of 75 degrees Fahrenheit."
+    return FlowResult(status="success", response=weather_info), None
+
 
 def create_initial_node() -> NodeConfig:
     return {
@@ -76,7 +83,7 @@ def create_initial_node() -> NodeConfig:
                 "content": "Say a brief hello.",
             }
         ],
-        "functions": [switch_llm],
+        "functions": [switch_llm, get_current_weather],
     }
 
 
