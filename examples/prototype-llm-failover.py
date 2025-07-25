@@ -105,7 +105,7 @@ async def main():
 
         # Shared context and aggregators for both LLMs
         context = LLMContext()
-        context_aggregator = LLMContextAggregatorPair(context)
+        context_aggregator = LLMContextAggregatorPair.create(context)
 
         # Primary LLM service
         llm_openai = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
