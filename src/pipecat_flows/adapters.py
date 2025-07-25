@@ -22,13 +22,9 @@ import sys
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from loguru import logger
-from pipecat.adapters.base_llm_adapter import BaseLLMAdapter
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
-from pipecat.adapters.services.anthropic_adapter import AnthropicLLMAdapter
-from pipecat.adapters.services.bedrock_adapter import AWSBedrockLLMAdapter
-from pipecat.adapters.services.gemini_adapter import GeminiLLMAdapter
-from pipecat.adapters.services.open_ai_adapter import OpenAILLMAdapter
+from pipecat.processors.aggregators.llm_context import LLMContextMessage
 
 from pipecat_flows.types import FlowsDirectFunctionWrapper, FlowsFunctionSchema
 
@@ -48,10 +44,6 @@ class LLMAdapter:
     - Google Gemini: Uses function declarations format
     - AWS Bedrock: Uses Anthropic-compatible format
     """
-
-    def __init__(self):
-        """Initialize the adapter."""
-        self._provider_adapter: Optional[BaseLLMAdapter] = None
 
     def get_function_name(self, function_def: Union[Dict[str, Any], FlowsFunctionSchema]) -> str:
         """Extract function name from provider-specific function definition or schema.
@@ -133,10 +125,7 @@ class LLMAdapter:
             return []
 
         # Create ToolsSchema with all functions
-        tools_schema = ToolsSchema(standard_tools=standard_functions)
-
-        # Use the provider adapter to format the functions
-        return self._provider_adapter.to_provider_tools_format(tools_schema)
+        return ToolsSchema(standard_tools=standard_functions)
 
     def format_summary_message(self, summary: str) -> dict:
         """Format a summary as a message appropriate for this LLM provider.
@@ -184,6 +173,31 @@ class LLMAdapter:
         """
         raise NotImplementedError("Subclasses must implement this method")
 
+class MultiLLMAdapter(LLMAdapter):
+    def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
+        raise RuntimeError("Provider-specific function definitions are not supported in multi-LLM flows.")
+    
+    def format_summary_message(self, summary: str) -> dict:
+        """Format summary as a system message for multi-LLM flows.
+
+        Args:
+            summary: The generated summary text.
+
+        Returns:
+            A system message containing the summary.
+        """
+        # The standard format in multi-LLM flows is the LLMContextMessage 
+        # format, which is based on OpenAI
+        return {"role": "system", "content": f"Here's a summary of the conversation:\n{summary}"}
+    
+    def generate_summary(self, llm, summary_prompt, messages):
+        # TODO: figure this out. We might need a refactor wherein the LLM
+        # service itself can be invoked directly without reaching into its internals
+        raise NotImplementedError(
+            "MultiLLMAdapter does not yet support summary generation.")
+    
+    def convert_to_function_schema(self, function_def):
+        raise RuntimeError("Provider-specific function definitions are not supported in multi-LLM flows.")
 
 class OpenAIAdapter(LLMAdapter):
     """Format adapter for OpenAI.
@@ -191,11 +205,6 @@ class OpenAIAdapter(LLMAdapter):
     Handles OpenAI's function calling format, which is used as the default format
     in the flow system.
     """
-
-    def __init__(self):
-        """Initialize the OpenAI adapter."""
-        super().__init__()
-        self._provider_adapter = OpenAILLMAdapter()
 
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from OpenAI function definition.
@@ -296,11 +305,6 @@ class AnthropicAdapter(LLMAdapter):
     and Anthropic's as needed.
     """
 
-    def __init__(self):
-        """Initialize the Anthropic adapter."""
-        super().__init__()
-        self._provider_adapter = AnthropicLLMAdapter()
-
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from Anthropic function definition.
 
@@ -397,11 +401,6 @@ class GeminiAdapter(LLMAdapter):
     and Gemini's as needed.
     """
 
-    def __init__(self):
-        """Initialize the Gemini adapter."""
-        super().__init__()
-        self._provider_adapter = GeminiLLMAdapter()
-
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from Gemini function definition.
 
@@ -435,6 +434,7 @@ class GeminiAdapter(LLMAdapter):
         Returns:
             List of functions formatted for Gemini.
         """
+        # TODO: here we should always be formatting into FunctionSchemas, not provider-specific format
         gemini_functions = []
 
         # If original_configs is provided, extract functions from it
@@ -602,11 +602,6 @@ class AWSBedrockAdapter(LLMAdapter):
     converting between OpenAI's format and Bedrock's as needed.
     """
 
-    def __init__(self):
-        """Initialize the Bedrock adapter."""
-        super().__init__()
-        self._provider_adapter = AWSBedrockLLMAdapter()
-
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from Bedrock function definition.
 
@@ -751,14 +746,19 @@ class AWSBedrockAdapter(LLMAdapter):
         )
 
 
-def create_adapter(llm) -> LLMAdapter:
+def create_adapter(llms) -> LLMAdapter:
     """Create appropriate adapter based on LLM service type or inheritance.
 
     Checks both direct class types and inheritance hierarchies to determine
     the appropriate adapter for any LLM service.
 
+    If only a single LLM service is provided (the typical case), create a 
+    provider-specific adapter, allowing the user to specify functions in a 
+    provider-specific format if they want to. Otherwise, create a generic 
+    adapter that expects functions in the standard FlowsFunctionSchema format.
+
     Args:
-        llm: LLM service instance.
+        llms: List of LLM service instances.
 
     Returns:
         Provider-specific adapter instance.
@@ -766,6 +766,11 @@ def create_adapter(llm) -> LLMAdapter:
     Raises:
         ValueError: If LLM type is not supported or required dependency not installed.
     """
+    if len(llms) > 1:
+        logger.debug("Creating generic adapter for multiple LLMs")
+        return MultiLLMAdapter()
+
+    llm = llms[0]
     llm_type = type(llm).__name__
     llm_class = type(llm)
 

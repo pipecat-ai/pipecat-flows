@@ -92,7 +92,7 @@ class FlowManager:
         self,
         *,
         task: PipelineTask,
-        llm: LLMService,
+        llms: List[LLMService],
         context_aggregator: Any,
         tts: Optional[Any] = None,
         flow_config: Optional[FlowConfig] = None,
@@ -103,7 +103,8 @@ class FlowManager:
 
         Args:
             task: PipelineTask instance for queueing frames.
-            llm: LLM service instance (e.g., OpenAI, Anthropic, Google).
+            llms: List of LLM service instances (e.g., OpenAI, Anthropic, Google). 
+                Typically there will only be one.
             context_aggregator: Context aggregator for updating user context.
             tts: Text-to-speech service for voice actions.
 
@@ -132,7 +133,7 @@ class FlowManager:
             )
 
         self._task = task
-        self._llm = llm
+        self._llms = llms
         self._action_manager = ActionManager(task, flow_manager=self)
         self._adapter = create_adapter(llm)
         self._initialized = False
@@ -663,10 +664,11 @@ class FlowManager:
                 )
 
                 # Register function with LLM
-                self._llm.register_function(
-                    name,
-                    transition_func,
-                )
+                for llm in self._llms:
+                    llm.register_function(
+                        name,
+                        transition_func,
+                    )
 
                 new_functions.add(name)
                 logger.debug(f"Registered function: {name}")
@@ -874,7 +876,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
         self, summary_prompt: str, messages: List[dict]
     ) -> Optional[str]:
         """Generate a conversation summary from messages."""
-        return await self._adapter.generate_summary(self._llm, summary_prompt, messages)
+        return await self.adapter.generate_summary(self._llms[0], summary_prompt, messages)
 
     async def _update_llm_context(
         self,

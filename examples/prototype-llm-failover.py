@@ -39,6 +39,7 @@ logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
 
 current_llm = "OpenAI"
+# current_llm = "Google"
 
 
 async def switch_llm(flow_manager: FlowManager, llm: str) -> tuple[FlowResult, None]:
@@ -143,7 +144,7 @@ async def main():
         # Initialize flow manager
         flow_manager = FlowManager(
             task=task,
-            llm=llm_openai,  # TODO: update to take list of LLMs
+            llms=[llm_openai, llm_google],
             context_aggregator=context_aggregator,
         )
 
