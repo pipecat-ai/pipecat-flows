@@ -20,9 +20,9 @@ from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.processors.filters.function_filter import FunctionFilter
+from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
-
 from pipecat.services.google.llm import GoogleLLMService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
@@ -59,6 +59,7 @@ async def openai_filter(frame) -> bool:
 
 async def google_filter(frame) -> bool:
     return current_llm == "Google"
+
 
 async def get_current_weather(flow_manager: FlowManager) -> tuple[FlowResult, None]:
     """Get the current weather information."""
@@ -128,10 +129,15 @@ async def main():
                 context_aggregator.user(),
                 ParallelPipeline(
                     [
-                        FunctionFilter(openai_filter),
+                        FunctionFilter(openai_filter, direction=FrameDirection.DOWNSTREAM),
                         llm_openai,
+                        FunctionFilter(openai_filter, direction=FrameDirection.UPSTREAM),
                     ],
-                    [FunctionFilter(google_filter), llm_google],
+                    [
+                        FunctionFilter(google_filter, direction=FrameDirection.DOWNSTREAM),
+                        llm_google,
+                        FunctionFilter(google_filter, direction=FrameDirection.UPSTREAM),
+                    ],
                 ),
                 tts,
                 transport.output(),
