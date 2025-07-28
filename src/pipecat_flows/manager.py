@@ -92,7 +92,7 @@ class FlowManager:
         self,
         *,
         task: PipelineTask,
-        llm: LLMService,
+        llms: List[LLMService],
         context_aggregator: Any,
         tts: Optional[Any] = None,
         flow_config: Optional[FlowConfig] = None,
@@ -103,7 +103,8 @@ class FlowManager:
 
         Args:
             task: PipelineTask instance for queueing frames.
-            llm: LLM service instance (e.g., OpenAI, Anthropic, Google).
+            llms: List of LLM service instances (e.g., OpenAI, Anthropic, Google). 
+                Typically there will only be one.
             context_aggregator: Context aggregator for updating user context.
             tts: Text-to-speech service for voice actions.
 
@@ -127,9 +128,9 @@ class FlowManager:
             )
 
         self.task = task
-        self.llm = llm
+        self.llms = llms
         self.action_manager = ActionManager(task, flow_manager=self)
-        self.adapter = create_adapter(llm)
+        self.adapter = create_adapter(llms)
         self.initialized = False
         self._context_aggregator = context_aggregator
         self._pending_transition: Optional[Dict[str, Any]] = None
@@ -534,10 +535,11 @@ class FlowManager:
                 )
 
                 # Register function with LLM
-                self.llm.register_function(
-                    name,
-                    transition_func,
-                )
+                for llm in self.llms:
+                    llm.register_function(
+                        name,
+                        transition_func,
+                    )
 
                 new_functions.add(name)
                 logger.debug(f"Registered function: {name}")
@@ -745,7 +747,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
         self, summary_prompt: str, messages: List[dict]
     ) -> Optional[str]:
         """Generate a conversation summary from messages."""
-        return await self.adapter.generate_summary(self.llm, summary_prompt, messages)
+        return await self.adapter.generate_summary(self.llms[0], summary_prompt, messages)
 
     async def _update_llm_context(
         self,
