@@ -188,7 +188,7 @@ def create_initial_node() -> NodeConfig:
         ],
         "task_messages": [
             {
-                "role": "system",
+                "role": "user",
                 "content": "Start by asking for the customer's age.",
             }
         ],
@@ -210,7 +210,7 @@ def create_marital_status_node() -> NodeConfig:
         "name": "marital_status",
         "task_messages": [
             {
-                "role": "system",
+                "role": "user",
                 "content": (
                     "Ask about the customer's marital status (single or married). "
                     "Wait for their response before calling collect_marital_status. "
@@ -238,7 +238,7 @@ def create_quote_calculation_node(age: int, marital_status: str) -> NodeConfig:
         "name": "quote_calculation",
         "task_messages": [
             {
-                "role": "system",
+                "role": "user",
                 "content": (
                     f"Calculate a quote for {age} year old {marital_status} customer. "
                     "Call calculate_quote with their information. "
@@ -269,7 +269,7 @@ def create_quote_results_node(
         "name": "quote_results",
         "task_messages": [
             {
-                "role": "system",
+                "role": "user",
                 "content": (
                     f"Quote details:\n"
                     f"Monthly Premium: ${quote['monthly_premium']:.2f}\n"
@@ -311,7 +311,7 @@ def create_end_node() -> NodeConfig:
         "name": "end",
         "task_messages": [
             {
-                "role": "system",
+                "role": "user",
                 "content": (
                     "Thank the customer for their time and end the conversation. "
                     "Mention that a representative will contact them about the quote."
