@@ -173,10 +173,19 @@ class LLMAdapter:
         """
         raise NotImplementedError("Subclasses must implement this method")
 
+
 class MultiLLMAdapter(LLMAdapter):
+    """Format adapter when multiple LLMs are in use.
+
+    Disallows provider-specific function definitions and requires functions to
+    be in the standard FlowsFunctionSchema format.
+    """
+
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
-        raise RuntimeError("Provider-specific function definitions are not supported in multi-LLM flows.")
-    
+        raise RuntimeError(
+            "Provider-specific function definitions are not supported in multi-LLM flows."
+        )
+
     def format_summary_message(self, summary: str) -> dict:
         """Format summary as a system message for multi-LLM flows.
 
@@ -186,18 +195,26 @@ class MultiLLMAdapter(LLMAdapter):
         Returns:
             A system message containing the summary.
         """
-        # The standard format in multi-LLM flows is the LLMContextMessage 
+        # The standard format in multi-LLM flows is the LLMContextMessage
         # format, which is based on OpenAI
         return {"role": "system", "content": f"Here's a summary of the conversation:\n{summary}"}
-    
+
     def generate_summary(self, llm, summary_prompt, messages):
+        """Generate a conversation summary."""
         # TODO: figure this out. We might need a refactor wherein the LLM
         # service itself can be invoked directly without reaching into its internals
-        raise NotImplementedError(
-            "MultiLLMAdapter does not yet support summary generation.")
-    
+        raise NotImplementedError("MultiLLMAdapter does not yet support summary generation.")
+
     def convert_to_function_schema(self, function_def):
-        raise RuntimeError("Provider-specific function definitions are not supported in multi-LLM flows.")
+        """Convert function definition to FlowsFunctionSchema.
+
+        This should never be invoked in multi-LLM flows, as they should only
+        use the standard FlowsFunctionSchema format.
+        """
+        raise RuntimeError(
+            "Provider-specific function definitions are not supported in multi-LLM flows."
+        )
+
 
 class OpenAIAdapter(LLMAdapter):
     """Format adapter for OpenAI.
@@ -752,9 +769,9 @@ def create_adapter(llms) -> LLMAdapter:
     Checks both direct class types and inheritance hierarchies to determine
     the appropriate adapter for any LLM service.
 
-    If only a single LLM service is provided (the typical case), create a 
-    provider-specific adapter, allowing the user to specify functions in a 
-    provider-specific format if they want to. Otherwise, create a generic 
+    If only a single LLM service is provided (the typical case), create a
+    provider-specific adapter, allowing the user to specify functions in a
+    provider-specific format if they want to. Otherwise, create a generic
     adapter that expects functions in the standard FlowsFunctionSchema format.
 
     Args:

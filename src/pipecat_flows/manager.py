@@ -103,7 +103,7 @@ class FlowManager:
 
         Args:
             task: PipelineTask instance for queueing frames.
-            llms: List of LLM service instances (e.g., OpenAI, Anthropic, Google). 
+            llms: List of LLM service instances (e.g., OpenAI, Anthropic, Google).
                 Typically there will only be one.
             context_aggregator: Context aggregator for updating user context.
             tts: Text-to-speech service for voice actions.
