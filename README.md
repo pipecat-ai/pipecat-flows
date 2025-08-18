@@ -23,18 +23,27 @@ The framework consists of:
 
 ## Installation
 
-Setup virtual environment
+1. Install uv
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
 
-Install
+   > **Need help?** Refer to the [uv install documentation](https://docs.astral.sh/uv/getting-started/installation/).
 
-```bash
-pip install pipecat-ai-flows
-```
+2. Install the module
+
+   ```bash
+   # For new projects
+   uv init my-pipecat-flows-app
+   cd my-pipecat-flows-app
+   uv add pipecat-ai-flows
+
+   # Or for existing projects
+   uv add pipecat-ai-flows
+   ```
+
+> **Using pip?** You can still use `pip install pipecat-ai-flows` to get set up.
 
 ## Basic Example
 
@@ -451,37 +460,30 @@ Each LLM provider (OpenAI, Anthropic, Google) has slightly different function ca
 
 To run these examples:
 
-1. **Setup Virtual Environment** (recommended):
-
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-2. **Installation**:
+1. **Installation**:
 
    Install the package in development mode:
 
    ```bash
-   pip install -e .
+   uv sync
    ```
 
    Install Pipecat with required options for examples:
 
    ```bash
-   pip install "pipecat-ai[daily,openai,deepgram,cartesia,silero,examples]"
+   uv pip install "pipecat-ai[daily,openai,deepgram,cartesia,silero,examples]"
    ```
 
    If you're running Google or Anthropic examples, you will need to update the installed options. For example:
 
    ```bash
    # Install Google Gemini
-   pip install "pipecat-ai[daily,google,deepgram,cartesia,silero,examples]"
+   uv pip install "pipecat-ai[daily,google,deepgram,cartesia,silero,examples]"
    # Install Anthropic
-   pip install "pipecat-ai[daily,anthropic,deepgram,cartesia,silero,examples]"
+   uv pip install "pipecat-ai[daily,anthropic,deepgram,cartesia,silero,examples]"
    ```
 
-3. **Configuration**:
+2. **Configuration**:
 
    Copy `env.example` to `.env` in the examples directory:
 
@@ -500,39 +502,33 @@ To run these examples:
 
    Looking for a Daily API key and room URL? Sign up on the [Daily Dashboard](https://dashboard.daily.co).
 
-4. **Running**:
+3. **Running**:
    ```bash
-   python examples/static/food_ordering.py -u YOUR_DAILY_ROOM_URL
+   uv run python examples/static/food_ordering.py -u YOUR_DAILY_ROOM_URL
    ```
 
-## Hacking on the framework
+## Contributing to the framework
 
-1. Set up a virtual environment before following these instructions. From the root of the repo:
+1. Clone the repository and navigate to it:
 
-   ```shell
-   python3 -m venv venv
-   source venv/bin/activate
+   ```bash
+   git clone https://github.com/pipecat-ai/pipecat-flows.git
+   cd pipecat-flows
    ```
 
-2. Install the development dependencies:
+2. Install development dependencies:
 
-   ```shell
-   pip install -r dev-requirements.txt
+   ```bash
+   uv sync --group dev
    ```
 
 3. Install the git pre-commit hooks (these help ensure your code follows project rules):
 
-   ```shell
-   pre-commit install
+   ```bash
+   uv run pre-commit install
    ```
 
-4. Install the `pipecat-ai-flows` package locally in editable mode:
-
-   ```shell
-   pip install -e .
-   ```
-
-   > The `-e` or `--editable` option allows you to modify the code without reinstalling.
+   > The package is automatically installed in editable mode when you run `uv sync`.
 
 ## Tests
 
@@ -540,18 +536,10 @@ The package includes a comprehensive test suite covering the core functionality.
 
 ### Setup Test Environment
 
-1. **Create Virtual Environment**:
-
+1. **Install Dependencies**:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-2. **Install Test Dependencies**:
-   ```bash
-   pip install -r dev-requirements.txt
-   pip install "pipecat-ai[google,openai,anthropic]"
-   pip install -e .
+   uv sync --group dev
+   uv add "pipecat-ai[google,aws,openai,anthropic]"
    ```
 
 ### Running Tests
@@ -559,25 +547,25 @@ The package includes a comprehensive test suite covering the core functionality.
 Run all tests:
 
 ```bash
-pytest tests/
+uv run pytest tests/
 ```
 
 Run specific test file:
 
 ```bash
-pytest tests/test_state.py
+uv run pytest tests/test_state.py
 ```
 
 Run specific test:
 
 ```bash
-pytest tests/test_state.py -k test_initialization
+uv run pytest tests/test_state.py -k test_initialization
 ```
 
 Run with coverage report:
 
 ```bash
-pytest tests/ --cov=pipecat_flows
+uv run pytest tests/ --cov=pipecat_flows
 ```
 
 ## Pipecat Flows Editor
