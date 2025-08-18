@@ -432,80 +432,32 @@ When using `RESET_WITH_SUMMARY`, the system automatically falls back to `RESET` 
 
 ## Examples
 
-The repository includes several complete example implementations in the `examples/` directory.
+The repository includes several complete example implementations demonstrating various features of Pipecat Flows.
 
-### Static
+### Available Examples
 
-In the `examples/static` directory, you'll find these examples:
+- **Static Flows**: Pre-defined conversation paths including food ordering, movie exploration, patient intake, and travel planning
+- **Dynamic Flows**: Runtime-generated flows including insurance quotes, restaurant reservations, and warm transfers
 
-- `food_ordering.py` - A restaurant order flow demonstrating node and edge functions
-- `movie_explorer_openai.py` - Movie information bot demonstrating real API integration with TMDB
-- `movie_explorer_anthropic.py` - The same movie information demo adapted for Anthropic's format
-- `movie_explorer_gemini.py` - The same movie explorer demo adapted for Google Gemini's format
-- `patient_intake_openai.py` - A medical intake system showing complex state management
-- `patient_intake_anthropic.py` - The same medical intake demo adapted for Anthropic's format
-- `patient_intake_gemini.py` - The same medical intake demo adapted for Gemini's format
-- `travel_planner.py` - A vacation planning assistant with parallel paths
+Each example is available in multiple LLM provider formats (OpenAI, Anthropic, Google Gemini, AWS Bedrock) to demonstrate cross-platform compatibility.
 
-### Dynamic
+### Getting Started with Examples
 
-In the `examples/dynamic` directory, you'll find these examples:
+For detailed setup instructions, configuration, and running examples, see the **[Examples README](examples/README.md)**.
 
-- `insurance_openai.py` - An insurance quote system using OpenAI's format
-- `insurance_anthropic.py` - The same insurance system adapted for Anthropic's format
-- `insurance_gemini.py` - The insurance system implemented with Google's format
-- `restaurant_reservation.py` - A reservation system with availability checking
+Quick start:
 
-Each LLM provider (OpenAI, Anthropic, Google) has slightly different function calling formats, but Pipecat Flows handles these differences internally while maintaining a consistent API for developers.
+```bash
+# Install dependencies
+uv sync
+uv pip install "pipecat-ai[daily,openai,deepgram,cartesia,silero,examples]"
 
-To run these examples:
+# Configure environment
+cp env.example .env  # Add your API keys
 
-1. **Installation**:
-
-   Install the package in development mode:
-
-   ```bash
-   uv sync
-   ```
-
-   Install Pipecat with required options for examples:
-
-   ```bash
-   uv pip install "pipecat-ai[daily,openai,deepgram,cartesia,silero,examples]"
-   ```
-
-   If you're running Google or Anthropic examples, you will need to update the installed options. For example:
-
-   ```bash
-   # Install Google Gemini
-   uv pip install "pipecat-ai[daily,google,deepgram,cartesia,silero,examples]"
-   # Install Anthropic
-   uv pip install "pipecat-ai[daily,anthropic,deepgram,cartesia,silero,examples]"
-   ```
-
-2. **Configuration**:
-
-   Copy `env.example` to `.env` in the examples directory:
-
-   ```bash
-   cp env.example .env
-   ```
-
-   Add your API keys and configuration:
-
-   - DEEPGRAM_API_KEY
-   - CARTESIA_API_KEY
-   - OPENAI_API_KEY
-   - ANTHROPIC_API_KEY
-   - GOOGLE_API_KEY
-   - DAILY_API_KEY
-
-   Looking for a Daily API key and room URL? Sign up on the [Daily Dashboard](https://dashboard.daily.co).
-
-3. **Running**:
-   ```bash
-   uv run python examples/static/food_ordering.py -u YOUR_DAILY_ROOM_URL
-   ```
+# Run an example
+uv run python examples/static/food_ordering.py -u YOUR_DAILY_ROOM_URL
+```
 
 ## Contributing to the framework
 
