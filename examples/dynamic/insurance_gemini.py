@@ -47,6 +47,8 @@ from pipecat.transports.services.daily import DailyParams, DailyTransport
 from pipecat_flows import FlowArgs, FlowManager, FlowResult, FlowsFunctionSchema, NodeConfig
 
 sys.path.append(str(Path(__file__).parent.parent))
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from runner import configure
 
 load_dotenv(override=True)
@@ -343,8 +345,8 @@ async def main():
         tts = DeepgramTTSService(api_key=os.getenv("DEEPGRAM_API_KEY"), voice="aura-helios-en")
         llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"), model="gemini-2.0-flash-exp")
 
-        context = OpenAILLMContext()
-        context_aggregator = llm.create_context_aggregator(context)
+        context = LLMContext()
+        context_aggregator = LLMContextAggregatorPair(context)
 
         # Create pipeline
         pipeline = Pipeline(
@@ -364,7 +366,7 @@ async def main():
         # Initialize flow manager with transition callback
         flow_manager = FlowManager(
             task=task,
-            llm=llm,
+            llms=[llm],
             context_aggregator=context_aggregator,
         )
 
