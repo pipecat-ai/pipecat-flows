@@ -21,33 +21,18 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: 'latest'
+
       - name: Set up Python
-        id: setup_python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Cache virtual environment
-        uses: actions/cache@v3
-        with:
-          key: venv-${{ runner.os }}-${{ steps.setup_python.outputs.python-version}}-${{ hashFiles('dev-requirements.txt') }}
-          path: .venv
-
-      - name: Setup virtual environment
-        run: |
-          python -m venv .venv
+        run: uv python install 3.10
 
       - name: Install dependencies
         run: |
-          source .venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install -r dev-requirements.txt
-          pip uninstall -y google-generativeai google-genai google-ai-generativelanguage
-          pip install "google-genai==0.7.0"
-          pip install "pipecat-ai[google,openai,anthropic]"
-          pip install -e .
+          uv sync --group dev
+          uv pip install "pipecat-ai[google,aws,openai,anthropic]"
 
       - name: Test with pytest
-        run: |
-          source .venv/bin/activate
-          pytest tests/ --cov=pipecat_flows
+        run: uv run pytest tests/ --cov=pipecat_flows
