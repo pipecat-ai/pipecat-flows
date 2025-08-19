@@ -108,10 +108,15 @@ class FlowManager:
             tts: Text-to-speech service for voice actions.
 
                 .. deprecated:: 0.0.18
-                    The tts parameter is deprecated and will be removed in a future version.
+                    The tts parameter is deprecated and will be removed in 1.0.0.
 
             flow_config: Static flow configuration. If provided, operates in static
                 mode with predefined nodes.
+
+                .. deprecated:: 0.0.19
+                    Static flows are deprecated and will be removed in 1.0.0.
+                    Use dynamic flows instead.
+
             context_strategy: Context strategy configuration for managing conversation
                 context during transitions.
             transport: Transport instance for communication.
@@ -121,7 +126,7 @@ class FlowManager:
         """
         if tts is not None:
             warnings.warn(
-                "The 'tts' parameter is deprecated and will be removed in a future version.",
+                "The 'tts' parameter is deprecated and will be removed in 1.0.0.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -140,6 +145,11 @@ class FlowManager:
 
         # Set up static or dynamic mode
         if flow_config:
+            warnings.warn(
+                "Static flows are deprecated as of 0.0.19 and will be removed in 1.0.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             self.nodes = flow_config["nodes"]
             self.initial_node = flow_config["initial_node"]
             logger.debug("Initialized in static mode")
@@ -563,7 +573,7 @@ class FlowManager:
         """Set up a new conversation node and transition to it.
 
         .. deprecated:: 0.0.18
-            This method is deprecated and will be removed in a future version.
+            This method is deprecated and will be removed in 1.0.0.
             Use set_node_from_config() instead, or prefer "consolidated" functions
             that return a tuple (result, next_node).
 
@@ -580,7 +590,7 @@ class FlowManager:
             with warnings.catch_warnings():
                 warnings.simplefilter("always")
                 warnings.warn(
-                    """`set_node()` is deprecated and will be removed in a future version. Instead, do the following for dynamic flows: 
+                    """`set_node()` is deprecated and will be removed in 1.0.0. Instead, do the following for dynamic flows: 
 - Prefer "consolidated" or "direct" functions that return a tuple (result, next_node) over deprecated `transition_callback`s
 - Pass your initial node to `FlowManager.initialize()`
 - If you really need to set a node explicitly, use `set_node_from_config()`
@@ -921,7 +931,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 with warnings.catch_warnings():
                     warnings.simplefilter("always")
                     warnings.warn(
-                        '`transition_to` and `transition_callback` are deprecated and will be removed in a future version. Use a "consolidated" `handler` that returns a tuple (result, next_node) instead.',
+                        '`transition_to` and `transition_callback` are deprecated and will be removed in 1.0.0. Use a "consolidated" `handler` that returns a tuple (result, next_node) instead.',
                         DeprecationWarning,
                         stacklevel=2,
                     )
