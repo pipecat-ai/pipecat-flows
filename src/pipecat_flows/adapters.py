@@ -186,7 +186,7 @@ class UniversalLLMAdapter(LLMAdapter):
 
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         raise RuntimeError(
-            "Provider-specific function definitions are not supported in flows using universal LLMContext."
+            "Provider-specific function definitions are not supported in flows using universal LLMContext. Use FlowsFunctionSchemas or direct functions instead."
         )
 
     def format_functions(
@@ -237,7 +237,7 @@ class UniversalLLMAdapter(LLMAdapter):
         they should only use the standard FlowsFunctionSchema format.
         """
         raise RuntimeError(
-            "Provider-specific function definitions are not supported in flows using universal LLMContext."
+            "Provider-specific function definitions are not supported in flows using universal LLMContext. Use FlowsFunctionSchemas or direct functions instead."
         )
 
 
