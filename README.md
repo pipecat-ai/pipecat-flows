@@ -582,6 +582,11 @@ pytest tests/ --cov=pipecat_flows
 
 ## Pipecat Flows Editor
 
+> **The Flows Editor is deprecated and will be removed along with Static Flows.**
+
+> We have future plans to introduce a new editor capability that supports dynamic flows, but we don't have a timeline yet.
+> We're open to collaborating with any developers or teams who have an interesting in building out this type of UI! Reach out to us on [Discord](https://discord.gg/pipecat) if you're interested.
+
 A visual editor for creating and managing Pipecat conversation flows.
 
 ![Food ordering flow example](https://raw.githubusercontent.com/pipecat-ai/pipecat-flows/main/images/food-ordering-flow.png)
