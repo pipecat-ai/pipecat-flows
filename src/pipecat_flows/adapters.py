@@ -24,7 +24,8 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
-from pipecat.processors.aggregators.llm_context import LLMContextMessage
+from pipecat.processors.aggregators.llm_context import NOT_GIVEN, NotGiven
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 
 from pipecat_flows.types import FlowsDirectFunctionWrapper, FlowsFunctionSchema
 
@@ -76,7 +77,9 @@ class LLMAdapter:
         self,
         functions: List[Union[Dict[str, Any], FunctionSchema, FlowsFunctionSchema]],
         original_configs: Optional[List] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> (
+        List[Dict[str, Any]] | ToolsSchema | NotGiven
+    ):  # NotGiven only used by subclass UniversalLLMAdapter
         """Format functions for provider-specific use.
 
         Args:
@@ -174,8 +177,8 @@ class LLMAdapter:
         raise NotImplementedError("Subclasses must implement this method")
 
 
-class MultiLLMAdapter(LLMAdapter):
-    """Format adapter when multiple LLMs are in use.
+class UniversalLLMAdapter(LLMAdapter):
+    """Format adapter when universal LLMContext is in use.
 
     Disallows provider-specific function definitions and requires functions to
     be in the standard FlowsFunctionSchema format.
@@ -183,11 +186,32 @@ class MultiLLMAdapter(LLMAdapter):
 
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         raise RuntimeError(
-            "Provider-specific function definitions are not supported in multi-LLM flows."
+            "Provider-specific function definitions are not supported in flows using universal LLMContext."
         )
 
+    def format_functions(
+        self,
+        functions: List[Union[Dict[str, Any], FunctionSchema, FlowsFunctionSchema]],
+        original_configs: Optional[List] = None,
+    ) -> ToolsSchema | NotGiven:
+        """Format functions for flows using universal LLMContext.
+
+        Args:
+            functions: List of function definitions (dicts or schema objects).
+            original_configs: Optional original node configs, used by some adapters.
+
+        Returns:
+            Functions formatted for use by universal LLMContext.
+        """
+        formatted_functions = super().format_functions(functions, original_configs=original_configs)
+        # Ensure we only return ToolsSchema or NOT_GIVEN, as expected by
+        # Pipecat's universal LLMContext.
+        if not formatted_functions:
+            return NOT_GIVEN
+        return formatted_functions
+
     def format_summary_message(self, summary: str) -> dict:
-        """Format summary as a system message for multi-LLM flows.
+        """Format summary as a system message for flows using universal LLMContext.
 
         Args:
             summary: The generated summary text.
@@ -195,24 +219,24 @@ class MultiLLMAdapter(LLMAdapter):
         Returns:
             A system message containing the summary.
         """
-        # The standard format in multi-LLM flows is the LLMContextMessage
-        # format, which is based on OpenAI
+        # The standard format in flows using universal LLMContext is the
+        # LLMContextMessage format, which is based on OpenAI
         return {"role": "system", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     def generate_summary(self, llm, summary_prompt, messages):
         """Generate a conversation summary."""
         # TODO: figure this out. We might need a refactor wherein the LLM
         # service itself can be invoked directly without reaching into its internals
-        raise NotImplementedError("MultiLLMAdapter does not yet support summary generation.")
+        raise NotImplementedError("UniversalLLMAdapter does not yet support summary generation.")
 
     def convert_to_function_schema(self, function_def):
         """Convert function definition to FlowsFunctionSchema.
 
-        This should never be invoked in multi-LLM flows, as they should only
-        use the standard FlowsFunctionSchema format.
+        This should never be invoked in flows using universal LLMContext, as
+        they should only use the standard FlowsFunctionSchema format.
         """
         raise RuntimeError(
-            "Provider-specific function definitions are not supported in multi-LLM flows."
+            "Provider-specific function definitions are not supported in flows using universal LLMContext."
         )
 
 
@@ -763,19 +787,15 @@ class AWSBedrockAdapter(LLMAdapter):
         )
 
 
-def create_adapter(llms) -> LLMAdapter:
-    """Create appropriate adapter based on LLM service type or inheritance.
+def create_adapter(llms, context_aggregator) -> LLMAdapter:
+    """Create appropriate adapter based on context type and LLM service type or inheritance.
 
     Checks both direct class types and inheritance hierarchies to determine
     the appropriate adapter for any LLM service.
 
-    If only a single LLM service is provided (the typical case), create a
-    provider-specific adapter, allowing the user to specify functions in a
-    provider-specific format if they want to. Otherwise, create a generic
-    adapter that expects functions in the standard FlowsFunctionSchema format.
-
     Args:
         llms: List of LLM service instances.
+        context_aggregator: Context aggregator pair.
 
     Returns:
         Provider-specific adapter instance.
@@ -783,9 +803,10 @@ def create_adapter(llms) -> LLMAdapter:
     Raises:
         ValueError: If LLM type is not supported or required dependency not installed.
     """
-    if len(llms) > 1:
-        logger.debug("Creating generic adapter for multiple LLMs")
-        return MultiLLMAdapter()
+    if isinstance(context_aggregator, LLMContextAggregatorPair):
+        # Universal LLMContext is in use, so we need the universal adapter
+        logger.debug("Creating universal adapter")
+        return UniversalLLMAdapter()
 
     llm = llms[0]
     llm_type = type(llm).__name__

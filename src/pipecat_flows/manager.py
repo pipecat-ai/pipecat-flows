@@ -130,7 +130,7 @@ class FlowManager:
         self.task = task
         self.llms = llms
         self.action_manager = ActionManager(task, flow_manager=self)
-        self.adapter = create_adapter(llms)
+        self.adapter = create_adapter(llms, context_aggregator)
         self.initialized = False
         self._context_aggregator = context_aggregator
         self._pending_transition: Optional[Dict[str, Any]] = None
