@@ -223,10 +223,11 @@ class UniversalLLMAdapter(LLMAdapter):
         # LLMContextMessage format, which is based on OpenAI
         return {"role": "system", "content": f"Here's a summary of the conversation:\n{summary}"}
 
-    def generate_summary(self, llm, summary_prompt, messages):
+    async def generate_summary(self, llm, summary_prompt, messages):
         """Generate a conversation summary."""
         # TODO: figure this out. We might need a refactor wherein the LLM
-        # service itself can be invoked directly without reaching into its internals
+        # service itself can be invoked directly without reaching into its internals.
+        # This is not a job for the adapter, but rather for the LLM service.
         raise NotImplementedError("UniversalLLMAdapter does not yet support summary generation.")
 
     def convert_to_function_schema(self, function_def):
