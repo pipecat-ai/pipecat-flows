@@ -133,6 +133,10 @@ class LLMAdapter:
     def format_summary_message(self, summary: str) -> dict:
         """Format a summary as a message appropriate for this LLM provider.
 
+        Note: summary messages are always expected in OpenAI format, because
+        summarization triggers an LLMMessagesUpdateFrame, which expects
+        OpenAI-style messages.
+
         Args:
             summary: The generated summary text.
 
@@ -298,6 +302,10 @@ class AnthropicAdapter(LLMAdapter):
     def format_summary_message(self, summary: str) -> dict:
         """Format summary as a user message for Anthropic.
 
+        Note: summary messages are always expected in OpenAI format, because
+        summarization triggers an LLMMessagesUpdateFrame, which expects
+        OpenAI-style messages.
+
         Args:
             summary: The generated summary text.
 
@@ -447,6 +455,10 @@ class GeminiAdapter(LLMAdapter):
     def format_summary_message(self, summary: str) -> dict:
         """Format summary as a user message for Gemini.
 
+        Note: summary messages are always expected in OpenAI format, because
+        summarization triggers an LLMMessagesUpdateFrame, which expects
+        OpenAI-style messages.
+
         Args:
             summary: The generated summary text.
 
@@ -517,16 +529,17 @@ class AWSBedrockAdapter(LLMAdapter):
     def format_summary_message(self, summary: str) -> dict:
         """Format summary as a user message for Bedrock models.
 
+        Note: summary messages are always expected in OpenAI format, because
+        summarization triggers an LLMMessagesUpdateFrame, which expects
+        OpenAI-style messages.
+
         Args:
             summary: The generated summary text.
 
         Returns:
             Bedrock-formatted user message containing the summary.
         """
-        return {
-            "role": "user",
-            "content": [{"text": f"Here's a summary of the conversation:\n{summary}"}],
-        }
+        return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert Bedrock function definition to FlowsFunctionSchema.
