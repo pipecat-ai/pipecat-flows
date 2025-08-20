@@ -144,24 +144,6 @@ class LLMAdapter:
         """
         raise NotImplementedError("Subclasses must implement this method")
 
-    async def generate_summary(
-        self, llm: Any, summary_prompt: str, messages: List[dict]
-    ) -> Optional[str]:
-        """Generate a summary using the LLM provider's API directly.
-
-        Args:
-            llm: LLM service instance containing client/credentials.
-            summary_prompt: Prompt text to guide summary generation.
-            messages: List of messages to summarize.
-
-        Returns:
-            Generated summary text, or None if generation fails.
-
-        Raises:
-            NotImplementedError: Must be implemented by subclasses.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
-
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert a provider-specific function definition to FlowsFunctionSchema.
 
@@ -223,13 +205,6 @@ class UniversalLLMAdapter(LLMAdapter):
         # LLMContextMessage format, which is based on OpenAI
         return {"role": "system", "content": f"Here's a summary of the conversation:\n{summary}"}
 
-    async def generate_summary(self, llm, summary_prompt, messages):
-        """Generate a conversation summary."""
-        # TODO: figure this out. We might need a refactor wherein the LLM
-        # service itself can be invoked directly without reaching into its internals.
-        # This is not a job for the adapter, but rather for the LLM service.
-        raise NotImplementedError("UniversalLLMAdapter does not yet support summary generation.")
-
     def convert_to_function_schema(self, function_def):
         """Convert function definition to FlowsFunctionSchema.
 
@@ -269,44 +244,6 @@ class OpenAIAdapter(LLMAdapter):
             OpenAI-formatted system message containing the summary.
         """
         return {"role": "system", "content": f"Here's a summary of the conversation:\n{summary}"}
-
-    async def generate_summary(
-        self, llm: Any, summary_prompt: str, messages: List[dict]
-    ) -> Optional[str]:
-        """Generate summary using OpenAI's API directly.
-
-        Args:
-            llm: OpenAI LLM service instance.
-            summary_prompt: Prompt text to guide summary generation.
-            messages: List of messages to summarize.
-
-        Returns:
-            Generated summary text, or None if generation fails.
-        """
-        try:
-            prompt_messages = [
-                {
-                    "role": "system",
-                    "content": summary_prompt,
-                },
-                {
-                    "role": "user",
-                    "content": f"Conversation history: {messages}",
-                },
-            ]
-
-            # LLM completion
-            response = await llm._client.chat.completions.create(
-                model=llm.model_name,
-                messages=prompt_messages,
-                stream=False,
-            )
-
-            return response.choices[0].message.content
-
-        except Exception as e:
-            logger.error(f"OpenAI summary generation failed: {e}", exc_info=True)
-            return None
 
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert OpenAI function definition to FlowsFunctionSchema.
@@ -368,42 +305,6 @@ class AnthropicAdapter(LLMAdapter):
             Anthropic-formatted user message containing the summary.
         """
         return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
-
-    async def generate_summary(
-        self, llm: Any, summary_prompt: str, messages: List[dict]
-    ) -> Optional[str]:
-        """Generate summary using Anthropic's API directly.
-
-        Args:
-            llm: Anthropic LLM service instance.
-            summary_prompt: Prompt text to guide summary generation.
-            messages: List of messages to summarize.
-
-        Returns:
-            Generated summary text, or None if generation fails.
-        """
-        try:
-            prompt_messages = [
-                {
-                    "role": "user",
-                    "content": f"Conversation history: {messages}",
-                },
-            ]
-
-            # LLM completion
-            response = await llm._client.messages.create(
-                model=llm.model_name,
-                messages=prompt_messages,
-                system=summary_prompt,
-                max_tokens=8192,
-                stream=False,
-            )
-
-            return response.content[0].text
-
-        except Exception as e:
-            logger.error(f"Anthropic summary generation failed: {e}", exc_info=True)
-            return None
 
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert Anthropic function definition to FlowsFunctionSchema.
@@ -554,49 +455,6 @@ class GeminiAdapter(LLMAdapter):
         """
         return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
 
-    async def generate_summary(
-        self, llm: Any, summary_prompt: str, messages: List[dict]
-    ) -> Optional[str]:
-        """Generate summary using Google's API directly.
-
-        Args:
-            llm: Google LLM service instance.
-            summary_prompt: Prompt text to guide summary generation.
-            messages: List of messages to summarize.
-
-        Returns:
-            Generated summary text, or None if generation fails.
-        """
-        try:
-            from google.genai.types import Content, GenerateContentConfig, Part
-
-            # Format conversation history as user message
-            contents = [
-                Content(role="user", parts=[Part(text=f"Conversation history: {messages}")])
-            ]
-
-            # Use summary_prompt as system instruction
-            generation_config = GenerateContentConfig(system_instruction=summary_prompt)
-
-            # Use the new google-genai client's async method
-            response = await llm._client.aio.models.generate_content(
-                model=llm._model_name,
-                contents=contents,
-                config=generation_config,
-            )
-
-            # Extract text from response
-            if response.candidates and response.candidates[0].content:
-                for part in response.candidates[0].content.parts:
-                    if part.text:
-                        return part.text
-
-            return None
-
-        except Exception as e:
-            logger.error(f"Google summary generation failed: {e}", exc_info=True)
-            return None
-
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert Gemini function definition to FlowsFunctionSchema.
 
@@ -669,64 +527,6 @@ class AWSBedrockAdapter(LLMAdapter):
             "role": "user",
             "content": [{"text": f"Here's a summary of the conversation:\n{summary}"}],
         }
-
-    async def generate_summary(
-        self, llm: Any, summary_prompt: str, messages: List[dict]
-    ) -> Optional[str]:
-        """Generate summary using AWS Bedrock API directly.
-
-        Args:
-            llm: Bedrock LLM service instance.
-            summary_prompt: Prompt text to guide summary generation.
-            messages: List of messages to summarize.
-
-        Returns:
-            Generated summary text, or None if generation fails.
-        """
-        try:
-            # Determine if we're using Claude or Nova based on model ID
-            model_id = llm.model_name
-
-            # Prepare request parameters
-            request_params = {
-                "modelId": model_id,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [{"text": f"Conversation history: {messages}"}],
-                    },
-                ],
-                "inferenceConfig": {
-                    "maxTokens": 8192,
-                    "temperature": 0.7,
-                    "topP": 0.9,
-                },
-            }
-
-            request_params["system"] = [{"text": summary_prompt}]
-
-            # Call Bedrock without streaming
-            response = llm._client.converse(**request_params)
-
-            # Extract the response text
-            if (
-                "output" in response
-                and "message" in response["output"]
-                and "content" in response["output"]["message"]
-            ):
-                content = response["output"]["message"]["content"]
-                if isinstance(content, list):
-                    for item in content:
-                        if item.get("text"):
-                            return item["text"]
-                elif isinstance(content, str):
-                    return content
-
-            return None
-
-        except Exception as e:
-            logger.error(f"Bedrock summary generation failed: {e}", exc_info=True)
-            return None
 
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert Bedrock function definition to FlowsFunctionSchema.

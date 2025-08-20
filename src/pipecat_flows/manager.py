@@ -39,6 +39,8 @@ from pipecat.frames.frames import (
     LLMSetToolsFrame,
 )
 from pipecat.pipeline.task import PipelineTask
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.base_transport import BaseTransport
 
@@ -873,10 +875,12 @@ In all of these cases, you can provide a `name` in your new node's config for de
         self._action_manager.schedule_deferred_post_actions(post_actions=post_actions)
 
     async def _create_conversation_summary(
-        self, summary_prompt: str, messages: List[dict]
+        self, summary_prompt: str, context: OpenAILLMContext | LLMContext
     ) -> Optional[str]:
-        """Generate a conversation summary from messages."""
-        return await self.adapter.generate_summary(self._llms[0], summary_prompt, messages)
+        """Generate a conversation summary from a given context."""
+        # TODO: once we take an LLMSwitcher instead of a list of LLMs,
+        # we can defer to the switcher to choose the active LLM for summary generation
+        return await self._llms[0].generate_summary(summary_prompt, context)
 
     async def _update_llm_context(
         self,
@@ -909,7 +913,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     summary = await asyncio.wait_for(
                         self._create_conversation_summary(
                             summary_prompt,
-                            self._context_aggregator.user()._context.messages,
+                            self._context_aggregator.user()._context,
                         ),
                         timeout=5.0,
                     )
