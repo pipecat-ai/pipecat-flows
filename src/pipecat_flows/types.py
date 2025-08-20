@@ -257,11 +257,13 @@ class FlowsFunctionSchema:
 
             .. deprecated:: 0.0.18
                 Use a "consolidated" handler that returns a tuple (result, next_node) instead.
+                This field is deprecated and will be removed in 1.0.0.
 
         transition_callback: Callback function for dynamic transitions.
 
             .. deprecated:: 0.0.18
                 Use a "consolidated" handler that returns a tuple (result, next_node) instead.
+                This field is deprecated and will be removed in 1.0.0.
     """
 
     name: str
@@ -418,6 +420,10 @@ class FlowConfig(TypedDict):
 
     Note:
         FlowConfig applies to static flows only.
+
+        .. deprecated:: 0.0.19
+            Static flows are deprecated and will be removed in 1.0.0.
+            Use dynamic flows instead.
 
     Parameters:
         initial_node: Name of the starting node.
