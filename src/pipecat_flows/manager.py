@@ -374,7 +374,12 @@ class FlowManager:
         if not self._context_aggregator:
             raise FlowError("No context aggregator available")
 
-        return self._context_aggregator.user()._context.messages
+        context = self._context_aggregator.user()._context
+
+        if isinstance(context, LLMContext):
+            return context.get_messages()
+        else:
+            return context.messages
 
     def register_action(self, action_type: str, handler: Callable) -> None:
         """Register a handler for a specific action type.
@@ -904,7 +909,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
             if (
                 update_config.strategy == ContextStrategy.RESET_WITH_SUMMARY
                 and self._context_aggregator
-                and self._context_aggregator.user()._context.messages
+                and self._context_aggregator.user()._context
             ):
                 # We know summary_prompt exists because of __post_init__ validation in ContextStrategyConfig
                 summary_prompt = cast(str, update_config.summary_prompt)
