@@ -31,6 +31,8 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from runner import configure
 
+from pipecat_flows.types import ContextStrategy, ContextStrategyConfig
+
 load_dotenv(override=True)
 
 logger.remove(0)
@@ -58,24 +60,37 @@ async def get_current_weather(flow_manager: FlowManager) -> tuple[FlowResult, No
     return FlowResult(status="success", response=weather_info), None
 
 
-def create_initial_node() -> NodeConfig:
-    return {
-        "name": "initial",
-        "role_messages": [
+async def summarize_conversation(flow_manager: FlowManager) -> tuple[None, NodeConfig]:
+    """Summarize the conversation so far."""
+    return None, create_main_node(summarize=True)
+
+
+def create_main_node(summarize: bool = False) -> NodeConfig:
+    return NodeConfig(
+        name="main",
+        role_messages=[
             {
                 "role": "system",
                 "content": "You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
             }
         ],
-        "task_messages": [
+        context_strategy=ContextStrategyConfig(
+            strategy=ContextStrategy.RESET_WITH_SUMMARY,
+            summary_prompt="Summarize the conversation so far in a concise way.",
+        )
+        if summarize
+        else ContextStrategyConfig(strategy=ContextStrategy.APPEND),
+        task_messages=[
             {
-                # TODO: should be able to specify "system" for OpenAI and "user" for Google
+                # TODO: this isn't handled correctly by the Google LLM yet
                 "role": "system",
-                "content": "Say a brief hello.",
+                "content": "Say the conversation summary, which was already retrieved (do not invoke the summarize_conversation function again)."
+                if summarize
+                else "Say a brief hello.",
             }
         ],
-        "functions": [switch_llm, get_current_weather],
-    }
+        functions=[switch_llm, get_current_weather, summarize_conversation],
+    )
 
 
 # Main setup
@@ -137,7 +152,7 @@ async def main():
         @transport.event_handler("on_client_connected")
         async def on_client_connected(transport, participant):
             logger.debug("Initializing flow manager")
-            await flow_manager.initialize(create_initial_node())
+            await flow_manager.initialize(create_main_node())
 
         runner = PipelineRunner()
         await runner.run(task)
