@@ -458,7 +458,7 @@ async def main():
         # Initialize flow manager with LLM
         flow_manager = FlowManager(
             task=task,
-            llms=[llm],
+            llm=llm,
             context_aggregator=context_aggregator,
             flow_config=flow_config,
         )

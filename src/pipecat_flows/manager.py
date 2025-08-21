@@ -38,6 +38,7 @@ from pipecat.frames.frames import (
     LLMMessagesUpdateFrame,
     LLMSetToolsFrame,
 )
+from pipecat.pipeline.llm_switcher import LLMSwitcher
 from pipecat.pipeline.task import PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
@@ -94,7 +95,7 @@ class FlowManager:
         self,
         *,
         task: PipelineTask,
-        llms: List[LLMService],
+        llm: LLMService | LLMSwitcher,
         context_aggregator: Any,
         tts: Optional[Any] = None,
         flow_config: Optional[FlowConfig] = None,
@@ -105,8 +106,7 @@ class FlowManager:
 
         Args:
             task: PipelineTask instance for queueing frames.
-            llms: List of LLM service instances (e.g., OpenAI, Anthropic, Google).
-                Typically there will only be one.
+            llm: LLM service or LLMSwitcher.
             context_aggregator: Context aggregator for updating user context.
             tts: Text-to-speech service for voice actions.
 
@@ -135,9 +135,9 @@ class FlowManager:
             )
 
         self._task = task
-        self._llms = llms
+        self._llm = llm
         self._action_manager = ActionManager(task, flow_manager=self)
-        self._adapter = create_adapter(llms, context_aggregator)
+        self._adapter = create_adapter(llm, context_aggregator)
         self._initialized = False
         self._context_aggregator = context_aggregator
         self._pending_transition: Optional[Dict[str, Any]] = None
@@ -670,12 +670,11 @@ class FlowManager:
                     name, handler, transition_to, transition_callback
                 )
 
-                # Register function with LLM
-                for llm in self._llms:
-                    llm.register_function(
-                        name,
-                        transition_func,
-                    )
+                # Register function with LLM (or LLMSwitcher)
+                self._llm.register_function(
+                    name,
+                    transition_func,
+                )
 
                 new_functions.add(name)
                 logger.debug(f"Registered function: {name}")
@@ -883,9 +882,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
         self, summary_prompt: str, context: OpenAILLMContext | LLMContext
     ) -> Optional[str]:
         """Generate a conversation summary from a given context."""
-        # TODO: once we take an LLMSwitcher instead of a list of LLMs,
-        # we can defer to the switcher to choose the active LLM for summary generation
-        return await self._llms[0].generate_summary(summary_prompt, context)
+        return await self._llm.generate_summary(summary_prompt, context)
 
     async def _update_llm_context(
         self,

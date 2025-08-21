@@ -601,14 +601,14 @@ class AWSBedrockAdapter(LLMAdapter):
         )
 
 
-def create_adapter(llms, context_aggregator) -> LLMAdapter:
+def create_adapter(llm, context_aggregator) -> LLMAdapter:
     """Create appropriate adapter based on context type and LLM service type or inheritance.
 
     Checks both direct class types and inheritance hierarchies to determine
     the appropriate adapter for any LLM service.
 
     Args:
-        llms: List of LLM service instances.
+        llm: LLM service instance or LLMSwitcher.
         context_aggregator: Context aggregator pair.
 
     Returns:
@@ -622,7 +622,6 @@ def create_adapter(llms, context_aggregator) -> LLMAdapter:
         logger.debug("Creating universal adapter")
         return UniversalLLMAdapter()
 
-    llm = llms[0]
     llm_type = type(llm).__name__
     llm_class = type(llm)
 
