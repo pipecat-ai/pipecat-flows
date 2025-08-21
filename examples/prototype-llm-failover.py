@@ -13,14 +13,12 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.pipeline.parallel_pipeline import ParallelPipeline
+from pipecat.pipeline.llm_switcher import LLMSwitcher, LLMSwitcherStrategyManual
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.processors.filters.function_filter import FunctionFilter
-from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.google.llm import GoogleLLMService
@@ -38,9 +36,6 @@ load_dotenv(override=True)
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
 
-current_llm = "OpenAI"
-# current_llm = "Google"
-
 
 async def switch_llm(flow_manager: FlowManager, llm: str) -> tuple[FlowResult, None]:
     """Switch the current LLM service.
@@ -48,17 +43,11 @@ async def switch_llm(flow_manager: FlowManager, llm: str) -> tuple[FlowResult, N
     Args:
         llm: The name of the LLM service to switch to (must be "OpenAI" or "Google").
     """
-    global current_llm
-    current_llm = llm
+    if llm == "OpenAI":
+        llm_switcher.strategy.set_active(llm_openai)
+    elif llm == "Google":
+        llm_switcher.strategy.set_active(llm_google)
     return FlowResult(status="success"), None
-
-
-async def openai_filter(frame) -> bool:
-    return current_llm == "OpenAI"
-
-
-async def google_filter(frame) -> bool:
-    return current_llm == "Google"
 
 
 async def get_current_weather(flow_manager: FlowManager) -> tuple[FlowResult, None]:
@@ -112,33 +101,24 @@ async def main():
             voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
         )
 
-        # Shared context and aggregators for both LLMs
+        # Shared context and aggregators for LLM services
         context = LLMContext()
-        context_aggregator = LLMContextAggregatorPair.create(context)
+        context_aggregator = LLMContextAggregatorPair(context)
 
-        # Primary LLM service
+        # LLM services
+        global llm_openai, llm_google, llm_switcher
         llm_openai = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-
-        # Secondary LLM service for failover
         llm_google = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
+        llm_switcher = LLMSwitcher(
+            llms=[llm_openai, llm_google], strategy_type=LLMSwitcherStrategyManual
+        )
 
         pipeline = Pipeline(
             [
                 transport.input(),
                 stt,
                 context_aggregator.user(),
-                ParallelPipeline(
-                    [
-                        FunctionFilter(openai_filter, direction=FrameDirection.DOWNSTREAM),
-                        llm_openai,
-                        FunctionFilter(openai_filter, direction=FrameDirection.UPSTREAM),
-                    ],
-                    [
-                        FunctionFilter(google_filter, direction=FrameDirection.DOWNSTREAM),
-                        llm_google,
-                        FunctionFilter(google_filter, direction=FrameDirection.UPSTREAM),
-                    ],
-                ),
+                llm_switcher,
                 tts,
                 transport.output(),
                 context_aggregator.assistant(),
@@ -150,7 +130,7 @@ async def main():
         # Initialize flow manager
         flow_manager = FlowManager(
             task=task,
-            llms=[llm_openai, llm_google],
+            llm=llm_switcher,
             context_aggregator=context_aggregator,
         )
 
