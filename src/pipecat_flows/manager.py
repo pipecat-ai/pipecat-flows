@@ -775,12 +775,6 @@ In all of these cases, you can provide a `name` in your new node's config for de
             if pre_actions := node_config.get("pre_actions"):
                 await self._execute_actions(pre_actions=pre_actions)
 
-            # Combine role and task messages
-            messages = []
-            if role_messages := node_config.get("role_messages"):
-                messages.extend(role_messages)
-            messages.extend(node_config["task_messages"])
-
             # Register functions and prepare tools
             tools: List[FlowsFunctionSchema | FlowsDirectFunctionWrapper] = []
             new_functions: Set[str] = set()
@@ -848,7 +842,10 @@ In all of these cases, you can provide a `name` in your new node's config for de
 
             # Update LLM context
             await self._update_llm_context(
-                messages, formatted_tools, strategy=node_config.get("context_strategy")
+                role_messages=node_config.get("role_messages"),
+                task_messages=node_config["task_messages"],
+                functions=formatted_tools,
+                strategy=node_config.get("context_strategy"),
             )
             logger.debug("Updated LLM context")
 
@@ -886,14 +883,16 @@ In all of these cases, you can provide a `name` in your new node's config for de
 
     async def _update_llm_context(
         self,
-        messages: List[dict],
+        role_messages: Optional[List[dict]],
+        task_messages: List[dict],
         functions: List[dict],
         strategy: Optional[ContextStrategyConfig] = None,
     ) -> None:
         """Update LLM context with new messages and functions.
 
         Args:
-            messages: New messages to add to context.
+            role_messages: Optional role messages to add to context.
+            task_messages: Task messages to add to context.
             functions: New functions to make available.
             strategy: Optional context update configuration.
 
@@ -901,6 +900,15 @@ In all of these cases, you can provide a `name` in your new node's config for de
             FlowError: If context update fails.
         """
         try:
+            messages = []
+
+            # Add role messages if provided.
+            # Note that these come before any possible summary message; some
+            # LLMs only support a single system instruction, and the first role
+            # message should take priority as that system instruction.
+            if role_messages:
+                messages.extend(role_messages)
+
             update_config = strategy or self._context_strategy
 
             if (
@@ -922,8 +930,8 @@ In all of these cases, you can provide a `name` in your new node's config for de
 
                     if summary:
                         summary_message = self._adapter.format_summary_message(summary)
-                        messages.insert(0, summary_message)
-                        logger.debug("Added conversation summary to context")
+                        messages.append(summary_message)
+                        logger.debug(f"Added conversation summary to context: {summary_message}")
                     else:
                         # Fall back to RESET strategy if summary fails
                         logger.warning("Failed to generate summary, falling back to RESET strategy")
@@ -932,6 +940,9 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 except asyncio.TimeoutError:
                     logger.warning("Summary generation timed out, falling back to RESET strategy")
                     update_config.strategy = ContextStrategy.RESET
+
+            # Add task messages
+            messages.extend(task_messages)
 
             # For first node or RESET/RESET_WITH_SUMMARY strategy, use update frame
             frame_type = (
