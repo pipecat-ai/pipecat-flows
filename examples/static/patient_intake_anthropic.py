@@ -206,7 +206,7 @@ flow_config: FlowConfig = {
                 {
                     "name": "verify_birthday",
                     "handler": verify_birthday,
-                    "description": "Verify the user has provided their correct birthday. Once confirmed, the next step is to recording the user's prescriptions.",
+                    "description": "Verify the user has provided their correct birthday. Once confirmed, the next step is to record the user's prescriptions.",
                     "input_schema": {
                         "type": "object",
                         "properties": {

@@ -34,8 +34,9 @@ from pipecat_flows import (
 )
 
 sys.path.append(str(Path(__file__).parent.parent))
-from pipecat_flows.types import FlowsFunctionSchema
 from runner import configure
+
+from pipecat_flows.types import FlowsFunctionSchema
 
 load_dotenv(override=True)
 
@@ -207,7 +208,7 @@ flow_config: FlowConfig = {
                 FlowsFunctionSchema(
                     name="verify_birthday",
                     handler=verify_birthday,
-                    description="Verify the user has provided their correct birthday. Once confirmed, the next step is to recording the user's prescriptions.",
+                    description="Verify the user has provided their correct birthday. Once confirmed, the next step is to record the user's prescriptions.",
                     properties={
                         "birthday": {
                             "type": "string",

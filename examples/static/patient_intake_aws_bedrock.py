@@ -154,7 +154,7 @@ flow_config: FlowConfig = {
             "functions": [
                 FlowsFunctionSchema(
                     name="verify_birthday",
-                    description="Verify the user has provided their correct birthday. Once confirmed, the next step is to recording the user's prescriptions.",
+                    description="Verify the user has provided their correct birthday. Once confirmed, the next step is to record the user's prescriptions.",
                     properties={
                         "birthday": {
                             "type": "string",
