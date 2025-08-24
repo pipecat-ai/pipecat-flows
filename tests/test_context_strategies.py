@@ -200,7 +200,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
             llm=OpenAILLMService(api_key=""),
             context_aggregator=self.mock_context_aggregator,
         )
-        openai_message = flow_manager.adapter.format_summary_message(summary)
+        openai_message = flow_manager._adapter.format_summary_message(summary)
         self.assertEqual(openai_message["role"], "system")
 
         # Test Anthropic format
@@ -209,7 +209,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
             llm=AnthropicLLMService(api_key=""),
             context_aggregator=self.mock_context_aggregator,
         )
-        anthropic_message = flow_manager.adapter.format_summary_message(summary)
+        anthropic_message = flow_manager._adapter.format_summary_message(summary)
         self.assertEqual(anthropic_message["role"], "user")
 
         # Test Gemini format
@@ -218,7 +218,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
             llm=GoogleLLMService(api_key=" "),  # dummy key (GoogleLLMService rejects empty string)
             context_aggregator=self.mock_context_aggregator,
         )
-        gemini_message = flow_manager.adapter.format_summary_message(summary)
+        gemini_message = flow_manager._adapter.format_summary_message(summary)
         self.assertEqual(gemini_message["role"], "user")
 
     async def test_node_level_strategy_override(self):

@@ -51,7 +51,7 @@ class LLMAdapter:
 
     def __init__(self):
         """Initialize the adapter."""
-        self.provider_adapter: Optional[BaseLLMAdapter] = None
+        self._provider_adapter: Optional[BaseLLMAdapter] = None
 
     def get_function_name(self, function_def: Union[Dict[str, Any], FlowsFunctionSchema]) -> str:
         """Extract function name from provider-specific function definition or schema.
@@ -136,7 +136,7 @@ class LLMAdapter:
         tools_schema = ToolsSchema(standard_tools=standard_functions)
 
         # Use the provider adapter to format the functions
-        return self.provider_adapter.to_provider_tools_format(tools_schema)
+        return self._provider_adapter.to_provider_tools_format(tools_schema)
 
     def format_summary_message(self, summary: str) -> dict:
         """Format a summary as a message appropriate for this LLM provider.
@@ -195,7 +195,7 @@ class OpenAIAdapter(LLMAdapter):
     def __init__(self):
         """Initialize the OpenAI adapter."""
         super().__init__()
-        self.provider_adapter = OpenAILLMAdapter()
+        self._provider_adapter = OpenAILLMAdapter()
 
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from OpenAI function definition.
@@ -299,7 +299,7 @@ class AnthropicAdapter(LLMAdapter):
     def __init__(self):
         """Initialize the Anthropic adapter."""
         super().__init__()
-        self.provider_adapter = AnthropicLLMAdapter()
+        self._provider_adapter = AnthropicLLMAdapter()
 
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from Anthropic function definition.
@@ -400,7 +400,7 @@ class GeminiAdapter(LLMAdapter):
     def __init__(self):
         """Initialize the Gemini adapter."""
         super().__init__()
-        self.provider_adapter = GeminiLLMAdapter()
+        self._provider_adapter = GeminiLLMAdapter()
 
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from Gemini function definition.
@@ -605,7 +605,7 @@ class AWSBedrockAdapter(LLMAdapter):
     def __init__(self):
         """Initialize the Bedrock adapter."""
         super().__init__()
-        self.provider_adapter = AWSBedrockLLMAdapter()
+        self._provider_adapter = AWSBedrockLLMAdapter()
 
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from Bedrock function definition.
