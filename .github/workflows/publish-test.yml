@@ -9,17 +9,15 @@ on:
         type: string
 
 jobs:
-  build-and-publish:
+  build:
+    name: 'Build and upload wheels'
     runs-on: ubuntu-latest
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/p/pipecat-ai-flows
-    permissions:
-      id-token: write # IMPORTANT: this permission is needed for trusted publishing
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 100
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
@@ -31,19 +29,39 @@ jobs:
 
       - name: Verify version matches
         run: |
-          PROJECT_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          PROJECT_VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
           if [ "$PROJECT_VERSION" != "${{ github.event.inputs.version }}" ]; then
             echo "Error: Input version (${{ github.event.inputs.version }}) does not match pyproject.toml version ($PROJECT_VERSION)"
             exit 1
           fi
 
-      - name: Install dependencies
-        run: |
-          uv sync
-          uv pip install build twine
+      - name: Install development dependencies
+        run: uv sync --group dev
 
-      - name: Build package
-        run: python -m build
+      - name: Build project
+        run: uv build
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels
+          path: ./dist
+
+  publish-to-test-pypi:
+    name: 'Publish to Test PyPI'
+    runs-on: ubuntu-latest
+    needs: [build]
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/pipecat-ai-flows
+    permissions:
+      id-token: write
+    steps:
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels
+          path: ./dist
 
       - name: Publish to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
