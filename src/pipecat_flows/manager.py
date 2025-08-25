@@ -131,17 +131,17 @@ class FlowManager:
                 stacklevel=2,
             )
 
-        self.task = task
-        self.llm = llm
-        self.action_manager = ActionManager(task, flow_manager=self)
-        self.adapter = create_adapter(llm)
-        self.initialized = False
+        self._task = task
+        self._llm = llm
+        self._action_manager = ActionManager(task, flow_manager=self)
+        self._adapter = create_adapter(llm)
+        self._initialized = False
         self._context_aggregator = context_aggregator
         self._pending_transition: Optional[Dict[str, Any]] = None
         self._context_strategy = context_strategy or ContextStrategyConfig(
             strategy=ContextStrategy.APPEND
         )
-        self.transport = transport
+        self._transport = transport
 
         # Set up static or dynamic mode
         if flow_config:
@@ -150,17 +150,17 @@ class FlowManager:
                 DeprecationWarning,
                 stacklevel=2,
             )
-            self.nodes = flow_config["nodes"]
-            self.initial_node = flow_config["initial_node"]
+            self._nodes = flow_config["nodes"]
+            self._initial_node = flow_config["initial_node"]
             logger.debug("Initialized in static mode")
         else:
-            self.nodes = {}
-            self.initial_node = None
+            self._nodes = {}
+            self._initial_node = None
             logger.debug("Initialized in dynamic mode")
 
-        self.state: Dict[str, Any] = {}  # Shared state across nodes
-        self.current_functions: Set[str] = set()  # Track registered functions
-        self.current_node: Optional[str] = None
+        self._state: Dict[str, Any] = {}  # Shared state across nodes
+        self._current_functions: Set[str] = set()  # Track registered functions
+        self._current_node: Optional[str] = None
 
         self._showed_deprecation_warning_for_transition_fields = False
         self._showed_deprecation_warning_for_set_node = False
@@ -206,24 +206,24 @@ class FlowManager:
                 # Dynamic flow: Initialize with the initial node configuration
                 flow_manager.initialize(create_initial_node())
         """
-        if self.initialized:
+        if self._initialized:
             logger.warning(f"{self.__class__.__name__} already initialized")
             return
 
         try:
-            self.initialized = True
+            self._initialized = True
             logger.debug(f"Initialized {self.__class__.__name__}")
 
             # Set initial node
             node_name = None
             node = None
-            if self.initial_node:
-                # Static flow: self.initial_node is expected to be there
-                node_name = self.initial_node
-                node = self.nodes[self.initial_node]
+            if self._initial_node:
+                # Static flow: self._initial_node is expected to be there
+                node_name = self._initial_node
+                node = self._nodes[self._initial_node]
                 if not node:
                     raise ValueError(
-                        f"Initial node '{self.initial_node}' not found in static flow configuration"
+                        f"Initial node '{self._initial_node}' not found in static flow configuration"
                     )
             else:
                 # Dynamic flow: initial_node argument may have been provided (otherwise initial node
@@ -236,7 +236,7 @@ class FlowManager:
                 await self._set_node(node_name, node)
 
         except Exception as e:
-            self.initialized = False
+            self._initialized = False
             raise FlowInitializationError(f"Failed to initialize flow: {str(e)}") from e
 
     def get_current_context(self) -> List[dict]:
@@ -269,7 +269,7 @@ class FlowManager:
 
             flow_manager.register_action("notify", custom_notification)
         """
-        self.action_manager._register_action(action_type, handler)
+        self._action_manager._register_action(action_type, handler)
 
     def _register_action_from_config(self, action: ActionConfig) -> None:
         """Register an action handler from action configuration.
@@ -284,7 +284,7 @@ class FlowManager:
         handler = action.get("handler")
 
         # Register action if not already registered
-        if action_type and action_type not in self.action_manager.action_handlers:
+        if action_type and action_type not in self._action_manager._action_handlers:
             # Register handler if provided
             if handler and callable(handler):
                 self.register_action(action_type, handler)
@@ -460,7 +460,7 @@ class FlowManager:
             if next_node:  # Function-returned next node (consolidated function)
                 if isinstance(next_node, str):  # Static flow
                     node_name = next_node
-                    node = self.nodes[next_node]
+                    node = self._nodes[next_node]
                 else:  # Dynamic flow
                     node_name = get_or_generate_node_name(next_node)
                     node = next_node
@@ -468,7 +468,7 @@ class FlowManager:
                 await self._set_node(node_name, node)
             elif transition_to:  # Static flow (deprecated)
                 logger.debug(f"Static transition to: {transition_to}")
-                await self._set_node(transition_to, self.nodes[transition_to])
+                await self._set_node(transition_to, self._nodes[transition_to])
             elif transition_callback:  # Dynamic flow (deprecated)
                 logger.debug(f"Dynamic transition for: {function_name}")
                 # Check callback signature
@@ -531,7 +531,7 @@ class FlowManager:
         Raises:
             FlowError: If function registration fails
         """
-        if name not in self.current_functions:
+        if name not in self._current_functions:
             try:
                 # Handle special token format (e.g. "__function__:function_name")
                 if isinstance(handler, str) and handler.startswith("__function__:"):
@@ -544,7 +544,7 @@ class FlowManager:
                 )
 
                 # Register function with LLM
-                self.llm.register_function(
+                self._llm.register_function(
                     name,
                     transition_func,
                 )
@@ -620,7 +620,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
             FlowTransitionError: If manager not initialized.
             FlowError: If node setup fails.
         """
-        if not self.initialized:
+        if not self._initialized:
             raise FlowTransitionError(f"{self.__class__.__name__} must be initialized first")
 
         try:
@@ -634,7 +634,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
             logger.debug(f"Setting node: {node_id}")
 
             # Clear any deferred post-actions from previous node
-            self.action_manager.clear_deferred_post_actions()
+            self._action_manager.clear_deferred_post_actions()
 
             # Register action handlers from config
             for action_list in [
@@ -695,7 +695,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 ):
                     for declaration in func_config["function_declarations"]:
                         # Convert each declaration to FlowsFunctionSchema and process it
-                        schema = self.adapter.convert_to_function_schema(
+                        schema = self._adapter.convert_to_function_schema(
                             {"function_declarations": [declaration]}
                         )
                         await register_function_schema(schema)
@@ -704,7 +704,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     schema = (
                         func_config
                         if isinstance(func_config, FlowsFunctionSchema)
-                        else self.adapter.convert_to_function_schema(func_config)
+                        else self._adapter.convert_to_function_schema(func_config)
                     )
                     await register_function_schema(schema)
 
@@ -715,7 +715,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 standard_functions.append(tool.to_function_schema())
 
             # Use provider adapter to format tools, passing original configs for Gemini adapter
-            formatted_tools = self.adapter.format_functions(
+            formatted_tools = self._adapter.format_functions(
                 standard_functions, original_configs=functions_list
             )
 
@@ -726,13 +726,13 @@ In all of these cases, you can provide a `name` in your new node's config for de
             logger.debug("Updated LLM context")
 
             # Update state
-            self.current_node = node_id
-            self.current_functions = new_functions
+            self._current_node = node_id
+            self._current_functions = new_functions
 
             # Trigger completion with new context
             respond_immediately = node_config.get("respond_immediately", True)
             if self._context_aggregator and respond_immediately:
-                await self.task.queue_frames([self._context_aggregator.user().get_context_frame()])
+                await self._task.queue_frames([self._context_aggregator.user().get_context_frame()])
 
             # Execute post-actions if any
             if post_actions := node_config.get("post_actions"):
@@ -749,13 +749,13 @@ In all of these cases, you can provide a `name` in your new node's config for de
             raise FlowError(f"Failed to set node {node_id}: {str(e)}") from e
 
     def _schedule_deferred_post_actions(self, post_actions: List[ActionConfig]) -> None:
-        self.action_manager.schedule_deferred_post_actions(post_actions=post_actions)
+        self._action_manager.schedule_deferred_post_actions(post_actions=post_actions)
 
     async def _create_conversation_summary(
         self, summary_prompt: str, messages: List[dict]
     ) -> Optional[str]:
         """Generate a conversation summary from messages."""
-        return await self.adapter.generate_summary(self.llm, summary_prompt, messages)
+        return await self._adapter.generate_summary(self._llm, summary_prompt, messages)
 
     async def _update_llm_context(
         self,
@@ -794,7 +794,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     )
 
                     if summary:
-                        summary_message = self.adapter.format_summary_message(summary)
+                        summary_message = self._adapter.format_summary_message(summary)
                         messages.insert(0, summary_message)
                         logger.debug("Added conversation summary to context")
                     else:
@@ -809,13 +809,13 @@ In all of these cases, you can provide a `name` in your new node's config for de
             # For first node or RESET/RESET_WITH_SUMMARY strategy, use update frame
             frame_type = (
                 LLMMessagesUpdateFrame
-                if self.current_node is None
+                if self._current_node is None
                 or update_config.strategy
                 in [ContextStrategy.RESET, ContextStrategy.RESET_WITH_SUMMARY]
                 else LLMMessagesAppendFrame
             )
 
-            await self.task.queue_frames(
+            await self._task.queue_frames(
                 [frame_type(messages=messages), LLMSetToolsFrame(tools=functions)]
             )
 
@@ -839,9 +839,9 @@ In all of these cases, you can provide a `name` in your new node's config for de
             post_actions: Actions to execute after context update.
         """
         if pre_actions:
-            await self.action_manager.execute_actions(pre_actions)
+            await self._action_manager.execute_actions(pre_actions)
         if post_actions:
-            await self.action_manager.execute_actions(post_actions)
+            await self._action_manager.execute_actions(post_actions)
 
     def _validate_node_config(self, node_id: str, config: NodeConfig) -> None:
         """Validate the configuration of a conversation node.
@@ -877,12 +877,12 @@ In all of these cases, you can provide a `name` in your new node's config for de
 
             # Extract function name using adapter (handles all formats)
             try:
-                name = self.adapter.get_function_name(func)
+                name = self._adapter.get_function_name(func)
             except Exception as e:
                 raise ValueError(f"Function in node '{node_id}' has invalid format: {str(e)}")
 
             # Skip validation for edge functions (matching node names)
-            if name in self.nodes:
+            if name in self._nodes:
                 continue
 
             # Check for handler, transition_to, and transition_callback depending on format

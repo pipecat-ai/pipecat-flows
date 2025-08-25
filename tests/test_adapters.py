@@ -44,7 +44,7 @@ class MockOpenAILLMAdapter:
 @pytest.fixture
 def openai_adapter():
     adapter = OpenAIAdapter()
-    adapter.provider_adapter = MockOpenAILLMAdapter()
+    adapter._provider_adapter = MockOpenAILLMAdapter()
     return adapter
 
 
@@ -163,7 +163,7 @@ class MockAnthropicLLMAdapter:
 @pytest.fixture
 def anthropic_adapter():
     adapter = AnthropicAdapter()
-    adapter.provider_adapter = MockAnthropicLLMAdapter()
+    adapter._provider_adapter = MockAnthropicLLMAdapter()
     return adapter
 
 
@@ -283,7 +283,7 @@ class MockGeminiLLMAdapter:
 @pytest.fixture
 def gemini_adapter():
     adapter = GeminiAdapter()
-    adapter.provider_adapter = MockGeminiLLMAdapter()
+    adapter._provider_adapter = MockGeminiLLMAdapter()
     return adapter
 
 
@@ -410,7 +410,7 @@ class MockAWSBedrockLLMAdapter:
 @pytest.fixture
 def bedrock_adapter():
     adapter = AWSBedrockAdapter()
-    adapter.provider_adapter = MockAWSBedrockLLMAdapter()
+    adapter._provider_adapter = MockAWSBedrockLLMAdapter()
     return adapter
 
 

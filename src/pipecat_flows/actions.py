@@ -90,8 +90,8 @@ class ActionManager:
             task: PipelineTask instance used to queue frames.
             flow_manager: FlowManager instance that this ActionManager is part of.
         """
-        self.action_handlers: Dict[str, Callable] = {}
-        self.task = task
+        self._action_handlers: Dict[str, Callable] = {}
+        self._task = task
         self._flow_manager = flow_manager
         self._ongoing_actions_count = 0
         self._ongoing_actions_finished_event = asyncio.Event()
@@ -135,7 +135,7 @@ class ActionManager:
         """
         if not callable(handler):
             raise ValueError("Action handler must be callable")
-        self.action_handlers[action_type] = handler
+        self._action_handlers[action_type] = handler
         logger.debug(f"Registered handler for action type: {action_type}")
 
     async def execute_actions(self, actions: Optional[List[ActionConfig]]) -> None:
@@ -159,7 +159,7 @@ class ActionManager:
             if not action_type:
                 raise ActionError("Action missing required 'type' field")
 
-            handler = self.action_handlers.get(action_type)
+            handler = self._action_handlers.get(action_type)
             if not handler:
                 raise ActionError(f"No handler registered for action type: {action_type}")
 
@@ -307,10 +307,10 @@ class ActionManager:
             self._increment_ongoing_actions_count()
 
             # Queue the action frame
-            await self.task.queue_frame(TTSSpeakFrame(text=text))
+            await self._task.queue_frame(TTSSpeakFrame(text=text))
 
             # Queue a frame marking the end of the action
-            await self.task.queue_frame(ActionFinishedFrame())
+            await self._task.queue_frame(ActionFinishedFrame())
         except Exception as e:
             self._decrement_ongoing_actions_count()
             logger.error(f"TTS error: {e}")
@@ -330,8 +330,8 @@ class ActionManager:
 
         # Queue the action frames
         if action.get("text"):  # Optional goodbye message
-            await self.task.queue_frame(TTSSpeakFrame(text=action["text"]))
-        await self.task.queue_frame(EndFrame())
+            await self._task.queue_frame(TTSSpeakFrame(text=action["text"]))
+        await self._task.queue_frame(EndFrame())
 
         # NOTE: there's no point queueing an ActionFinishedFrame here, since the previously-queued
         # EndFrame ensures that it'll never get delivered to our observer
@@ -357,7 +357,7 @@ class ActionManager:
 
         # Queue the action frame (we're queueing rather than running it here to ensure it happens
         # at the appropriate time in the pipeline, like when the bot's turn is over, for example).
-        await self.task.queue_frame(FunctionActionFrame(action=action, function=handler))
+        await self._task.queue_frame(FunctionActionFrame(action=action, function=handler))
 
         # NOTE: we do NOT queue an ActionFinishedFrame here; instead, we will decrement the ongoing
         # actions count when the function has finished executing (the function may take some time)

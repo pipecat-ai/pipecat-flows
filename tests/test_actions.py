@@ -70,8 +70,8 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
     async def test_initialization(self):
         """Test ActionManager initialization and default handlers."""
         # Verify built-in action handlers are registered
-        self.assertIn("tts_say", self.action_manager.action_handlers)
-        self.assertIn("end_conversation", self.action_manager.action_handlers)
+        self.assertIn("tts_say", self.action_manager._action_handlers)
+        self.assertIn("end_conversation", self.action_manager._action_handlers)
 
     async def test_tts_action(self):
         """Test basic TTS action execution."""
