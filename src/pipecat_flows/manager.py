@@ -881,7 +881,6 @@ In all of these cases, you can provide a `name` in your new node's config for de
         """Generate a conversation summary from a given context."""
         return await self.adapter.generate_summary(self._llm, summary_prompt, context)
 
-
     async def _update_llm_context(
         self,
         role_messages: Optional[List[dict]],
