@@ -38,7 +38,10 @@ from pipecat.frames.frames import (
     LLMMessagesUpdateFrame,
     LLMSetToolsFrame,
 )
+from pipecat.pipeline.llm_switcher import LLMSwitcher
 from pipecat.pipeline.task import PipelineTask
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.base_transport import BaseTransport
 
@@ -92,7 +95,7 @@ class FlowManager:
         self,
         *,
         task: PipelineTask,
-        llm: LLMService,
+        llm: LLMService | LLMSwitcher,
         context_aggregator: Any,
         tts: Optional[Any] = None,
         flow_config: Optional[FlowConfig] = None,
@@ -103,7 +106,7 @@ class FlowManager:
 
         Args:
             task: PipelineTask instance for queueing frames.
-            llm: LLM service instance (e.g., OpenAI, Anthropic, Google).
+            llm: LLM service or LLMSwitcher.
             context_aggregator: Context aggregator for updating user context.
             tts: Text-to-speech service for voice actions.
 
@@ -134,7 +137,7 @@ class FlowManager:
         self.task = task
         self.llm = llm
         self.action_manager = ActionManager(task, flow_manager=self)
-        self.adapter = create_adapter(llm)
+        self.adapter = create_adapter(llm, context_aggregator)
         self.initialized = False
         self._context_aggregator = context_aggregator
         self._pending_transition: Optional[Dict[str, Any]] = None
@@ -252,7 +255,12 @@ class FlowManager:
         if not self._context_aggregator:
             raise FlowError("No context aggregator available")
 
-        return self._context_aggregator.user()._context.messages
+        context = self._context_aggregator.user()._context
+
+        if isinstance(context, LLMContext):
+            return context.get_messages()
+        else:
+            return context.messages
 
     def register_action(self, action_type: str, handler: Callable) -> None:
         """Register a handler for a specific action type.
@@ -543,7 +551,7 @@ class FlowManager:
                     name, handler, transition_to, transition_callback
                 )
 
-                # Register function with LLM
+                # Register function with LLM (or LLMSwitcher)
                 self.llm.register_function(
                     name,
                     transition_func,
@@ -648,12 +656,6 @@ In all of these cases, you can provide a `name` in your new node's config for de
             if pre_actions := node_config.get("pre_actions"):
                 await self._execute_actions(pre_actions=pre_actions)
 
-            # Combine role and task messages
-            messages = []
-            if role_messages := node_config.get("role_messages"):
-                messages.extend(role_messages)
-            messages.extend(node_config["task_messages"])
-
             # Register functions and prepare tools
             tools: List[FlowsFunctionSchema | FlowsDirectFunctionWrapper] = []
             new_functions: Set[str] = set()
@@ -721,7 +723,10 @@ In all of these cases, you can provide a `name` in your new node's config for de
 
             # Update LLM context
             await self._update_llm_context(
-                messages, formatted_tools, strategy=node_config.get("context_strategy")
+                role_messages=node_config.get("role_messages"),
+                task_messages=node_config["task_messages"],
+                functions=formatted_tools,
+                strategy=node_config.get("context_strategy"),
             )
             logger.debug("Updated LLM context")
 
@@ -752,21 +757,23 @@ In all of these cases, you can provide a `name` in your new node's config for de
         self.action_manager.schedule_deferred_post_actions(post_actions=post_actions)
 
     async def _create_conversation_summary(
-        self, summary_prompt: str, messages: List[dict]
+        self, summary_prompt: str, context: OpenAILLMContext | LLMContext
     ) -> Optional[str]:
-        """Generate a conversation summary from messages."""
-        return await self.adapter.generate_summary(self.llm, summary_prompt, messages)
+        """Generate a conversation summary from a given context."""
+        return await self.adapter.generate_summary(self.llm, summary_prompt, context)
 
     async def _update_llm_context(
         self,
-        messages: List[dict],
+        role_messages: Optional[List[dict]],
+        task_messages: List[dict],
         functions: List[dict],
         strategy: Optional[ContextStrategyConfig] = None,
     ) -> None:
         """Update LLM context with new messages and functions.
 
         Args:
-            messages: New messages to add to context.
+            role_messages: Optional role messages to add to context.
+            task_messages: Task messages to add to context.
             functions: New functions to make available.
             strategy: Optional context update configuration.
 
@@ -774,12 +781,21 @@ In all of these cases, you can provide a `name` in your new node's config for de
             FlowError: If context update fails.
         """
         try:
+            messages = []
+
+            # Add role messages if provided.
+            # Note that these come before any possible summary message; some
+            # LLMs only support a single system instruction, and the first role
+            # message should take priority as that system instruction.
+            if role_messages:
+                messages.extend(role_messages)
+
             update_config = strategy or self._context_strategy
 
             if (
                 update_config.strategy == ContextStrategy.RESET_WITH_SUMMARY
                 and self._context_aggregator
-                and self._context_aggregator.user()._context.messages
+                and self._context_aggregator.user()._context
             ):
                 # We know summary_prompt exists because of __post_init__ validation in ContextStrategyConfig
                 summary_prompt = cast(str, update_config.summary_prompt)
@@ -788,15 +804,15 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     summary = await asyncio.wait_for(
                         self._create_conversation_summary(
                             summary_prompt,
-                            self._context_aggregator.user()._context.messages,
+                            self._context_aggregator.user()._context,
                         ),
                         timeout=5.0,
                     )
 
                     if summary:
                         summary_message = self.adapter.format_summary_message(summary)
-                        messages.insert(0, summary_message)
-                        logger.debug("Added conversation summary to context")
+                        messages.append(summary_message)
+                        logger.debug(f"Added conversation summary to context: {summary_message}")
                     else:
                         # Fall back to RESET strategy if summary fails
                         logger.warning("Failed to generate summary, falling back to RESET strategy")
@@ -805,6 +821,9 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 except asyncio.TimeoutError:
                     logger.warning("Summary generation timed out, falling back to RESET strategy")
                     update_config.strategy = ContextStrategy.RESET
+
+            # Add task messages
+            messages.extend(task_messages)
 
             # For first node or RESET/RESET_WITH_SUMMARY strategy, use update frame
             frame_type = (
