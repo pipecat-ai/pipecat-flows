@@ -24,9 +24,8 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
-from pipecat.processors.aggregators.llm_context import NOT_GIVEN, NotGiven
+from pipecat.processors.aggregators.llm_context import NOT_GIVEN, LLMContext, NotGiven
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 
 from pipecat_flows.types import FlowsDirectFunctionWrapper, FlowsFunctionSchema
@@ -243,15 +242,15 @@ class UniversalLLMAdapter(LLMAdapter):
             Generated summary text, or None if generation fails.
         """
         prompt_messages = [
-                {
-                    "role": "system",
-                    "content": summary_prompt,
-                },
-                {
-                    "role": "user",
-                    "content": f"Conversation history: {context.get_messages()}",
-                },
-            ]
+            {
+                "role": "system",
+                "content": summary_prompt,
+            },
+            {
+                "role": "user",
+                "content": f"Conversation history: {context.get_messages()}",
+            },
+        ]
 
         summary_context = LLMContext(messages=prompt_messages)
 
@@ -700,7 +699,7 @@ class AWSBedrockAdapter(LLMAdapter):
             Bedrock-formatted user message containing the summary.
         """
         return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
-    
+
     async def generate_summary(
         self, llm: Any, summary_prompt: str, context: OpenAILLMContext | LLMContext
     ) -> Optional[str]:
