@@ -16,7 +16,10 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.llm_switcher import LLMSwitcher
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.service_switcher import ServiceSwitcherStrategyManual
+from pipecat.pipeline.service_switcher import (
+    ManuallySwitchServiceFrame,
+    ServiceSwitcherStrategyManual,
+)
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
@@ -47,9 +50,9 @@ async def switch_llm(flow_manager: FlowManager, llm: str) -> tuple[FlowResult, N
         llm: The name of the LLM service to switch to (must be "OpenAI" or "Google").
     """
     if llm == "OpenAI":
-        llm_switcher.strategy.set_active(llm_openai)
+        await task.queue_frames([ManuallySwitchServiceFrame(service=llm_openai)])
     elif llm == "Google":
-        llm_switcher.strategy.set_active(llm_google)
+        await task.queue_frames([ManuallySwitchServiceFrame(service=llm_google)])
     return FlowResult(status="success"), None
 
 
@@ -121,7 +124,7 @@ async def main():
         context_aggregator = LLMContextAggregatorPair(context)
 
         # LLM services
-        global llm_openai, llm_google, llm_switcher
+        global llm_openai, llm_google
         llm_openai = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
         llm_google = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
         llm_switcher = LLMSwitcher(
@@ -140,6 +143,7 @@ async def main():
             ]
         )
 
+        global task
         task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
 
         # Initialize flow manager
