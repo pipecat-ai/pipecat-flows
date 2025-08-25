@@ -26,6 +26,8 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.processors.aggregators.llm_context import NOT_GIVEN, NotGiven
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 
 from pipecat_flows.types import FlowsDirectFunctionWrapper, FlowsFunctionSchema
 
@@ -148,6 +150,24 @@ class LLMAdapter:
         """
         raise NotImplementedError("Subclasses must implement this method")
 
+    async def generate_summary(
+        self, llm: Any, summary_prompt: str, context: OpenAILLMContext | LLMContext
+    ) -> Optional[str]:
+        """Generate a summary by running a direct one-shot, out-of-band inference with the LLM.
+
+        Args:
+            llm: LLM service instance containing client/credentials.
+            summary_prompt: Prompt text to guide summary generation.
+            context: Context object containing conversation history for the summary.
+
+        Returns:
+            Generated summary text, or None if generation fails.
+
+        Raises:
+            NotImplementedError: Must be implemented by subclasses.
+        """
+        raise NotImplementedError("Subclasses must implement this method")
+
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert a provider-specific function definition to FlowsFunctionSchema.
 
@@ -209,6 +229,34 @@ class UniversalLLMAdapter(LLMAdapter):
         # LLMContextMessage format, which is based on OpenAI
         return {"role": "system", "content": f"Here's a summary of the conversation:\n{summary}"}
 
+    async def generate_summary(
+        self, llm: Any, summary_prompt: str, context: LLMContext
+    ) -> Optional[str]:
+        """Generate a summary by running a direct one-shot, out-of-band inference with the LLM.
+
+        Args:
+            llm: LLM service instance containing client/credentials.
+            summary_prompt: Prompt text to guide summary generation.
+            context: Context object containing conversation history for the summary.
+
+        Returns:
+            Generated summary text, or None if generation fails.
+        """
+        prompt_messages = [
+                {
+                    "role": "system",
+                    "content": summary_prompt,
+                },
+                {
+                    "role": "user",
+                    "content": f"Conversation history: {context.get_messages()}",
+                },
+            ]
+
+        summary_context = LLMContext(messages=prompt_messages)
+
+        return await llm.run_inference(summary_context)
+
     def convert_to_function_schema(self, function_def):
         """Convert function definition to FlowsFunctionSchema.
 
@@ -248,6 +296,44 @@ class OpenAIAdapter(LLMAdapter):
             OpenAI-formatted system message containing the summary.
         """
         return {"role": "system", "content": f"Here's a summary of the conversation:\n{summary}"}
+
+    async def generate_summary(
+        self, llm: Any, summary_prompt: str, context: OpenAILLMContext | LLMContext
+    ) -> Optional[str]:
+        """Generate a summary by running a direct one-shot, out-of-band inference with OpenAI.
+
+        Args:
+            llm: LLM service instance containing client/credentials.
+            summary_prompt: Prompt text to guide summary generation.
+            context: Context object containing conversation history for the summary.
+
+        Returns:
+            Generated summary text, or None if generation fails.
+        """
+        try:
+            if isinstance(context, OpenAILLMContext):
+                messages = context.messages
+            elif isinstance(context, LLMContext):
+                messages = context.get_messages()
+
+            prompt_messages = [
+                {
+                    "role": "system",
+                    "content": summary_prompt,
+                },
+                {
+                    "role": "user",
+                    "content": f"Conversation history: {messages}",
+                },
+            ]
+
+            summary_context = LLMContext(messages=prompt_messages)
+
+            return await llm.run_inference(summary_context)
+
+        except Exception as e:
+            logger.error(f"OpenAI summary generation failed: {e}", exc_info=True)
+            return None
 
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert OpenAI function definition to FlowsFunctionSchema.
@@ -313,6 +399,42 @@ class AnthropicAdapter(LLMAdapter):
             Anthropic-formatted user message containing the summary.
         """
         return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
+
+    async def generate_summary(
+        self, llm: Any, summary_prompt: str, context: OpenAILLMContext | LLMContext
+    ) -> Optional[str]:
+        """Generate a summary by running a direct one-shot, out-of-band inference with Anthropic.
+
+        Args:
+            llm: LLM service instance containing client/credentials.
+            summary_prompt: Prompt text to guide summary generation.
+            context: Context object containing conversation history for the summary.
+
+        Returns:
+            Generated summary text, or None if generation fails.
+        """
+        try:
+            if isinstance(context, OpenAILLMContext):
+                messages = context.messages
+            elif isinstance(context, LLMContext):
+                messages = context.get_messages()
+
+            prompt_messages = [
+                {
+                    "role": "user",
+                    "content": f"Conversation history: {messages}",
+                },
+            ]
+
+            # TODO: update to use LLMContext once Anthropic supports it in Pipecat
+            # Once all services support LLMContext, we won't even need LLM-specific generate_summary methods
+            summary_context = OpenAILLMContext(messages=prompt_messages)
+
+            return await llm.run_inference(summary_context, summary_prompt)
+
+        except Exception as e:
+            logger.error(f"Anthropic summary generation failed: {e}", exc_info=True)
+            return None
 
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert Anthropic function definition to FlowsFunctionSchema.
@@ -467,6 +589,44 @@ class GeminiAdapter(LLMAdapter):
         """
         return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
 
+    async def generate_summary(
+        self, llm: Any, summary_prompt: str, context: OpenAILLMContext | LLMContext
+    ) -> Optional[str]:
+        """Generate a summary by running a direct one-shot, out-of-band inference with Google.
+
+        Args:
+            llm: LLM service instance containing client/credentials.
+            summary_prompt: Prompt text to guide summary generation.
+            context: Context object containing conversation history for the summary.
+
+        Returns:
+            Generated summary text, or None if generation fails.
+        """
+        try:
+            if isinstance(context, OpenAILLMContext):
+                messages = context.messages
+            elif isinstance(context, LLMContext):
+                messages = context.get_messages()
+
+            prompt_messages = [
+                {
+                    "role": "system",
+                    "content": summary_prompt,
+                },
+                {
+                    "role": "user",
+                    "content": f"Conversation history: {messages}",
+                },
+            ]
+
+            summary_context = LLMContext(messages=prompt_messages)
+
+            return await llm.run_inference(summary_context)
+
+        except Exception as e:
+            logger.error(f"Google summary generation failed: {e}", exc_info=True)
+            return None
+
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert Gemini function definition to FlowsFunctionSchema.
 
@@ -540,6 +700,42 @@ class AWSBedrockAdapter(LLMAdapter):
             Bedrock-formatted user message containing the summary.
         """
         return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
+    
+    async def generate_summary(
+        self, llm: Any, summary_prompt: str, context: OpenAILLMContext | LLMContext
+    ) -> Optional[str]:
+        """Generate a summary by running a direct one-shot, out-of-band inference with AWS Bedrock.
+
+        Args:
+            llm: LLM service instance containing client/credentials.
+            summary_prompt: Prompt text to guide summary generation.
+            context: Context object containing conversation history for the summary.
+
+        Returns:
+            Generated summary text, or None if generation fails.
+        """
+        try:
+            if isinstance(context, OpenAILLMContext):
+                messages = context.messages
+            elif isinstance(context, LLMContext):
+                messages = context.get_messages()
+
+            prompt_messages = [
+                {
+                    "role": "user",
+                    "content": f"Conversation history: {messages}",
+                },
+            ]
+
+            # TODO: update to use LLMContext once Anthropic supports it in Pipecat
+            # Once all services support LLMContext, we won't even need LLM-specific generate_summary methods
+            summary_context = OpenAILLMContext(messages=prompt_messages)
+
+            return await llm.run_inference(summary_context, summary_prompt)
+
+        except Exception as e:
+            logger.error(f"Bedrock summary generation failed: {e}", exc_info=True)
+            return None
 
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert Bedrock function definition to FlowsFunctionSchema.

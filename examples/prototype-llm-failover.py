@@ -82,7 +82,6 @@ def create_main_node(summarize: bool = False) -> NodeConfig:
         else ContextStrategyConfig(strategy=ContextStrategy.APPEND),
         task_messages=[
             {
-                # TODO: this isn't handled correctly by the Google LLM yet
                 "role": "system",
                 "content": "Say the conversation summary, which was already retrieved (do not invoke the summarize_conversation function again)."
                 if summarize
