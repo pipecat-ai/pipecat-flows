@@ -41,6 +41,7 @@ dev = [
     "ruff~=0.12.1",
     "setuptools~=78.1.1",
     "python-dotenv>=1.0.1,<2.0.0",
+    "pipecat-ai[webrtc,daily,silero,deepgram,openai,cartesia,runner,anthropic,google,aws]>=0.0.79",
 ]
 
 docs = [
