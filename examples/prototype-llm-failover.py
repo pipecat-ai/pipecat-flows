@@ -13,9 +13,10 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.pipeline.llm_switcher import LLMSwitcher, LLMSwitcherStrategyManual
+from pipecat.pipeline.llm_switcher import LLMSwitcher
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
+from pipecat.pipeline.service_switcher import ServiceSwitcherStrategyManual
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
@@ -124,7 +125,7 @@ async def main():
         llm_openai = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
         llm_google = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
         llm_switcher = LLMSwitcher(
-            llms=[llm_openai, llm_google], strategy_type=LLMSwitcherStrategyManual
+            llms=[llm_openai, llm_google], strategy_type=ServiceSwitcherStrategyManual
         )
 
         pipeline = Pipeline(
