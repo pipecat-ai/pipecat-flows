@@ -5,6 +5,71 @@ All notable changes to **Pipecat Flows** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Add support for the new Pipecat `LLMSwitcher`, which can be used as a drop-in
+  replacement for `LLMService`s in scenarios where you want to switch LLMs at
+  runtime.
+
+  There are a couple of pre-requisites to using `LLMSwitcher`:
+
+  - You must be using the new universal `LLMContext` and
+    `LLMContextAggregatorPair` (as of Pipecat 0.0.82, supported only by
+    Pipecat's OpenAI and Google LLM implementations, but with more on the way).
+  - You must be using "direct" functions or `FlowsFunctionSchema` functions (as
+    opposed to provider-specific formats).
+
+  Using `LLMSwitcher` looks like this:
+
+  ```python
+  # Create shared context and aggregators for your LLM services
+  context = LLMContext()
+  context_aggregator = LLMContextAggregatorPair(context)
+
+  # Instantiate your LLM services
+  llm_openai = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+  llm_google = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
+
+  # Instantiate a switcher
+  # (ServiceSwitcherStrategyManual defaults to OpenAI, as it's first in the list)
+  llm_switcher = LLMSwitcher(
+      llms=[llm_openai, llm_google], strategy_type=ServiceSwitcherStrategyManual
+  )
+
+  # Create your pipeline as usual (passing the switcher instead of an LLM)
+  pipeline = Pipeline(
+    [
+        transport.input(),
+        stt,
+        context_aggregator.user(),
+        llm_switcher,
+        tts,
+        transport.output(),
+        context_aggregator.assistant(),
+    ]
+  )
+  task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
+
+  # Initialize your flow manager as usual (passing the switcher instead of an LLM)
+  flow_manager = FlowManager(
+      task=task,
+      llm=llm_switcher,
+      context_aggregator=context_aggregator,
+  )
+
+  # ...
+  # Start your flow as usual
+  @transport.event_handler("on_client_connected")
+  async def on_client_connected(transport, participant):
+      await flow_manager.initialize(create_main_node())
+
+  # ...
+  # Whenever is appropriate, switch LLMs!
+  await task.queue_frames([ManuallySwitchServiceFrame(service=llm_google)])
+  ```
+
 ## [0.0.20] - 2025-08-27
 
 ### Changed
