@@ -41,25 +41,49 @@ logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
 
 
-async def switch_llm(flow_manager: FlowManager, llm: str) -> tuple[FlowResult, None]:
+class SwitchLLMResult(FlowResult):
+    """Result of switching the LLM service."""
+
+    message: str
+
+
+async def switch_llm(flow_manager: FlowManager, llm: str) -> tuple[SwitchLLMResult, None]:
     """Switch the current LLM service.
 
     Args:
-        llm: The name of the LLM service to switch to (must be "OpenAI" or "Google").
+        llm: The name of the LLM service to switch to. Must be either "OpenAI" or "Google".
     """
+    new_llm = llm_openai if llm == "OpenAI" else llm_google
+    if llm_switcher.active_llm == new_llm:
+        return SwitchLLMResult(status="success", message=f"Already using {llm} LLM service."), None
     if llm == "OpenAI":
         await task.queue_frames([ManuallySwitchServiceFrame(service=llm_openai)])
     elif llm == "Google":
         await task.queue_frames([ManuallySwitchServiceFrame(service=llm_google)])
-    return FlowResult(status="success"), None
+    return SwitchLLMResult(status="success", message=f"Switched to {llm} LLM service."), None
 
 
-async def get_current_weather(flow_manager: FlowManager) -> tuple[FlowResult, None]:
-    """Get the current weather information."""
+class WeatherResult(FlowResult):
+    """Result of getting the current weather."""
+
+    conditions: str
+    temperature: int
+
+
+async def get_current_weather(
+    flow_manager: FlowManager, location: str, format: str
+) -> tuple[WeatherResult, None]:
+    """Get the current weather.
+
+    Args:
+        location: The city and state, e.g. "San Francisco, CA".
+        format: The temperature unit to use. Must be either "celsius" or "fahrenheit". Infer this from the user's location.
+    """
     # This is a placeholder for the actual implementation
     # In a real scenario, you would call an API to get the weather data
-    weather_info = "The current weather is sunny with a temperature of 75 degrees Fahrenheit."
-    return FlowResult(status="success", response=weather_info), None
+    return WeatherResult(
+        status="success", conditions="sunny", temperature=75 if format == "fahrenheit" else 24
+    ), None
 
 
 async def summarize_conversation(flow_manager: FlowManager) -> tuple[None, NodeConfig]:
@@ -122,7 +146,7 @@ async def main():
         context_aggregator = LLMContextAggregatorPair(context)
 
         # LLM services
-        global llm_openai, llm_google
+        global llm_openai, llm_google, llm_switcher
         llm_openai = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
         llm_google = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
         llm_switcher = LLMSwitcher(
