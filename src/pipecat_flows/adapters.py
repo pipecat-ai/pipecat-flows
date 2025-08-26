@@ -78,10 +78,17 @@ class LLMAdapter:
         self,
         functions: List[Union[Dict[str, Any], FunctionSchema, FlowsFunctionSchema]],
         original_configs: Optional[List] = None,
-    ) -> (
-        List[Dict[str, Any]] | ToolsSchema | NotGiven
-    ):  # NotGiven only used by subclass UniversalLLMAdapter
+    ) -> List[Dict[str, Any]] | ToolsSchema | NotGiven:
         """Format functions for provider-specific use.
+
+        The formatted functions/tools will be used in an LLMSetToolsFrame.
+
+        The NotGiven return type is only used by the subclass
+        UniversalLLMAdapter, as the universal LLMContext expects NOT_GIVEN when
+        there are no tools.
+
+        All other LLM-specific contexts expect either a list of dicts or a
+        ToolsSchema, with an empty list meaning "no tools".
 
         Args:
             functions: List of function definitions (dicts or schema objects).
@@ -90,7 +97,7 @@ class LLMAdapter:
         Returns:
             List of functions formatted for the provider.
         """
-        # Return empty list if no functions
+        # Return empty list to mean "no tools"
         if not functions:
             return []
 
@@ -124,7 +131,8 @@ class LLMAdapter:
                     )
                 )
 
-        # Return empty list if no valid functions were processed
+        # Return empty list to mean "no tools" if no valid functions were
+        # processed
         if not standard_functions:
             return []
 
