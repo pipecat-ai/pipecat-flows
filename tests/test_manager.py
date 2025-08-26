@@ -830,7 +830,9 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(FlowError):
             await flow_manager._update_llm_context(
-                messages=[{"role": "system", "content": "Test"}], functions=[]
+                role_messages=[],
+                task_messages=[{"role": "system", "content": "Test"}],
+                functions=[],
             )
 
     async def test_function_declarations_processing(self):

@@ -318,10 +318,10 @@ class OpenAIAdapter(LLMAdapter):
             Generated summary text, or None if generation fails.
         """
         try:
-            if isinstance(context, OpenAILLMContext):
-                messages = context.messages
-            elif isinstance(context, LLMContext):
+            if isinstance(context, LLMContext):
                 messages = context.get_messages()
+            else:
+                messages = context.messages
 
             prompt_messages = [
                 {
@@ -421,10 +421,10 @@ class AnthropicAdapter(LLMAdapter):
             Generated summary text, or None if generation fails.
         """
         try:
-            if isinstance(context, OpenAILLMContext):
-                messages = context.messages
-            elif isinstance(context, LLMContext):
+            if isinstance(context, LLMContext):
                 messages = context.get_messages()
+            else:
+                messages = context.messages
 
             prompt_messages = [
                 {
@@ -610,10 +610,10 @@ class GeminiAdapter(LLMAdapter):
             Generated summary text, or None if generation fails.
         """
         try:
-            if isinstance(context, OpenAILLMContext):
-                messages = context.messages
-            elif isinstance(context, LLMContext):
+            if isinstance(context, LLMContext):
                 messages = context.get_messages()
+            else:
+                messages = context.messages
 
             prompt_messages = [
                 {
@@ -722,10 +722,10 @@ class AWSBedrockAdapter(LLMAdapter):
             Generated summary text, or None if generation fails.
         """
         try:
-            if isinstance(context, OpenAILLMContext):
-                messages = context.messages
-            elif isinstance(context, LLMContext):
+            if isinstance(context, LLMContext):
                 messages = context.get_messages()
+            else:
+                messages = context.messages
 
             prompt_messages = [
                 {
