@@ -165,8 +165,8 @@ async def mute_customer(action: dict, flow_manager: FlowManager):
 
 
 async def start_hold_music(action: dict, flow_manager: FlowManager):
-    hold_music_args = flow_manager.state["hold_music_args"]
-    flow_manager.state["hold_music_process"] = await asyncio.create_subprocess_exec(
+    hold_music_args = flow_manager._state["hold_music_args"]
+    flow_manager._state["hold_music_process"] = await asyncio.create_subprocess_exec(
         sys.executable,
         str(hold_music_args["script_path"]),
         "-m",
@@ -198,7 +198,7 @@ async def make_customer_hear_only_hold_music(action: dict, flow_manager: FlowMan
 
 async def print_human_agent_join_url(action: dict, flow_manager: FlowManager):
     """Print the URL for joining as a human agent."""
-    logger.info(f"\n\nJOIN AS AGENT:\n{flow_manager.state['human_agent_join_url']}\n")
+    logger.info(f"\n\nJOIN AS AGENT:\n{flow_manager._state['human_agent_join_url']}\n")
 
 
 async def unmute_customer_and_make_humans_hear_each_other(action: dict, flow_manager: FlowManager):
@@ -666,12 +666,12 @@ async def main():
         logger.info(
             f"\n\nJOIN AS CUSTOMER:\n{room_url}{'?' if '?' not in room_url else '&'}t={customer_token}\n"
         )
-        flow_manager.state["human_agent_join_url"] = (
+        flow_manager._state["human_agent_join_url"] = (
             f"{room_url}{'?' if '?' not in room_url else '&'}t={human_agent_token}"
         )
 
         # Prepare hold music args
-        flow_manager.state["hold_music_args"] = {
+        flow_manager._state["hold_music_args"] = {
             "script_path": Path(__file__).parent.parent / "assets" / "hold_music" / "hold_music.py",
             "wav_file_path": Path(__file__).parent.parent
             / "assets"
@@ -685,7 +685,7 @@ async def main():
 
         # Clean up hold music process at exit, if needed
         def cleanup_hold_music_process():
-            hold_music_process = flow_manager.state.get("hold_music_process")
+            hold_music_process = flow_manager._state.get("hold_music_process")
             if hold_music_process:
                 try:
                     hold_music_process.terminate()
