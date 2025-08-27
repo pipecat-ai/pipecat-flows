@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pipecat-ai-flows"
-version = "0.0.19"
+version = "0.0.20"
 description = "Conversation Flow management for Pipecat AI applications"
 license = { text = "BSD 2-Clause License" }
 readme = "README.md"
