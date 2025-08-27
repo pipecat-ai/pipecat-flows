@@ -40,7 +40,7 @@ import atexit
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 import aiohttp
 from dotenv import load_dotenv
@@ -149,7 +149,7 @@ async def mute_customer(action: dict, flow_manager: FlowManager):
 
     Do it by revoking their canSnd permission, which both mutes them and ensures that they can't unmute.
     """
-    transport: DailyTransport = flow_manager.transport
+    transport = cast(DailyTransport, flow_manager._transport)
     customer_participant_id = get_customer_participant_id(transport=transport)
 
     if customer_participant_id:
@@ -183,7 +183,7 @@ async def make_customer_hear_only_hold_music(action: dict, flow_manager: FlowMan
 
     We don't want them hearing the bot and the human agent talking.
     """
-    transport: DailyTransport = flow_manager.transport
+    transport = cast(DailyTransport, flow_manager._transport)
     customer_participant_id = get_customer_participant_id(transport=transport)
 
     if customer_participant_id:
@@ -203,7 +203,7 @@ async def print_human_agent_join_url(action: dict, flow_manager: FlowManager):
 
 async def unmute_customer_and_make_humans_hear_each_other(action: dict, flow_manager: FlowManager):
     """Unmute the customer and make it so the customer and human agent can hear each other."""
-    transport: DailyTransport = flow_manager.transport
+    transport = cast(DailyTransport, flow_manager._transport)
     customer_participant_id = get_customer_participant_id(transport=transport)
     agent_participant_id = get_human_agent_participant_id(transport=transport)
 
@@ -632,7 +632,7 @@ async def main():
             - Otherwise...nothing, for the purposes of this demo. We're assuming the human agent won't join while the conversation flow is any other node.
             """
             user_id = participant.get("info", {}).get("userId")
-            if user_id == "agent" and flow_manager.current_node == "transferring_to_human_agent":
+            if user_id == "agent" and flow_manager._current_node == "transferring_to_human_agent":
                 await start_human_agent_interaction(flow_manager=flow_manager)
 
         @transport.event_handler("on_participant_left")
