@@ -5,6 +5,19 @@ All notable changes to **Pipecat Flows** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.20] - 2025-08-27
+
+### Changed
+
+- Added an `@property` for the following `FlowManager` attributes in order to
+  officially make them part of the public API: `state`, `task`, `transport`,
+  and `current_node`.
+
+### Fixed
+
+- Corrected an issue where the Flow Manager state was marked as private. To
+  make this clear, added a `@property` to access the state.
+
 ## [0.0.19] - 2025-08-25
 
 ### Deprecated

@@ -158,12 +158,131 @@ class FlowManager:
             self._initial_node = None
             logger.debug("Initialized in dynamic mode")
 
-        self._state: Dict[str, Any] = {}  # Shared state across nodes
+        self._state: Dict[str, Any] = {}  # Internal state storage
         self._current_functions: Set[str] = set()  # Track registered functions
         self._current_node: Optional[str] = None
 
         self._showed_deprecation_warning_for_transition_fields = False
         self._showed_deprecation_warning_for_set_node = False
+
+    @property
+    def state(self) -> Dict[str, Any]:
+        """Access the shared state dictionary across nodes.
+
+        This property provides access to a persistent dictionary that maintains
+        data across node transitions. It can be used to store and retrieve
+        conversation state, user preferences, or any other data that needs
+        to persist throughout the flow.
+
+        Returns:
+            Dict[str, Any]: The shared state dictionary that can be used for
+                reading and writing state data.
+
+        Examples:
+            Setting state::
+
+                flow_manager.state["user_name"] = "Alice"
+                flow_manager.state["age"] = 25
+
+            Getting state::
+
+                name = flow_manager.state.get("user_name", "Unknown")
+                age = flow_manager.state["age"]
+
+            Checking for state::
+
+                if "user_preferences" in flow_manager.state:
+                    preferences = flow_manager.state["user_preferences"]
+        """
+        return self._state
+
+    @property
+    def transport(self) -> Optional[BaseTransport]:
+        """Access the transport instance used for communication.
+
+        This property provides access to the transport instance that handles
+        communication with the client (e.g., DailyTransport for Daily rooms).
+        The transport can be used to interact with participants, manage
+        audio/video settings, or access platform-specific features.
+
+        Returns:
+            Optional[BaseTransport]: The transport instance if provided during
+                initialization, None otherwise.
+
+        Examples:
+            Accessing transport in action handlers::
+
+                async def mute_participant(action: dict, flow_manager: FlowManager):
+                    transport = flow_manager.transport
+                    if transport and hasattr(transport, 'update_participant'):
+                        await transport.update_participant(participant_id, {"canSnd": False})
+
+            Working with Daily transport features::
+
+                async def get_room_info(action: dict, flow_manager: FlowManager):
+                    transport = flow_manager.transport
+                    if isinstance(transport, DailyTransport):
+                        participants = transport.participants()
+                        return {"participant_count": len(participants)}
+        """
+        return self._transport
+
+    @property
+    def current_node(self) -> Optional[str]:
+        """Access the identifier of the currently active conversation node.
+
+        This property provides access to the current node name/identifier in the
+        conversation flow. It can be used to make decisions based on the current
+        state of the conversation, implement conditional logic, or for debugging
+        and logging purposes.
+
+        Returns:
+            Optional[str]: The identifier of the current node if a node is active,
+                None if no node has been set or before initialization.
+
+        Examples:
+            Conditional logic based on current node::
+
+                async def participant_joined(action: dict, flow_manager: FlowManager):
+                    current = flow_manager.current_node
+                    if current == "transferring_to_human_agent":
+                        await start_human_agent_interaction(flow_manager)
+                    elif current == "collecting_payment":
+                        await setup_secure_session(flow_manager)
+
+            Logging and debugging::
+
+                async def log_conversation_state(action: dict, flow_manager: FlowManager):
+                    node = flow_manager.current_node
+                    logger.info(f"Current conversation node: {node}")
+                    return {"current_node": node}
+        """
+        return self._current_node
+
+    @property
+    def task(self) -> PipelineTask:
+        """Access the pipeline task instance for frame queueing.
+
+        This property provides access to the PipelineTask instance used by the
+        FlowManager. The task can be used to queue custom frames directly into
+        the pipeline, enabling advanced flow control and custom frame injection.
+
+        Returns:
+            PipelineTask: The pipeline task instance used for frame processing
+                and queueing operations.
+
+        Examples:
+            Queueing frames in handlers::
+
+                async def send_custom_notification(action: dict, flow_manager: FlowManager):
+                    from pipecat.frames.frames import TTSUpdateSettingsFrame
+
+                    # Queue a TTS settings update frame
+                    await task.queue_frame(
+                        TTSUpdateSettingsFrame(settings={"voice": "your-new-voice-id"})
+                    )
+        """
+        return self._task
 
     def _validate_transition_callback(self, name: str, callback: Any) -> None:
         """Validate a transition callback.
