@@ -123,9 +123,9 @@ class StartOrderResult(FlowResult):
 
 
 # Function handlers
-async def check_store_location_and_hours_of_operation() -> tuple[
-    StoreLocationAndHoursOfOperationResult, NodeConfig
-]:
+async def check_store_location_and_hours_of_operation(
+    args: FlowArgs, flow_manager: FlowManager
+) -> tuple[StoreLocationAndHoursOfOperationResult, NodeConfig]:
     """Check store location and hours of operation."""
     result = StoreLocationAndHoursOfOperationResult(
         status="success",
@@ -136,7 +136,9 @@ async def check_store_location_and_hours_of_operation() -> tuple[
     return result, next_node
 
 
-async def start_order() -> tuple[StartOrderResult, NodeConfig]:
+async def start_order(
+    args: FlowArgs, flow_manager: FlowManager
+) -> tuple[StartOrderResult, NodeConfig]:
     """Start a new order."""
     result = StartOrderResult(status="error")
     next_node = next_node_after_customer_task(result)
@@ -207,7 +209,7 @@ async def unmute_customer_and_make_humans_hear_each_other(action: dict, flow_man
     customer_participant_id = get_customer_participant_id(transport=transport)
     agent_participant_id = get_human_agent_participant_id(transport=transport)
 
-    if customer_participant_id:
+    if customer_participant_id and agent_participant_id:
         await transport.update_remote_participants(
             remote_participants={
                 customer_participant_id: {
@@ -446,7 +448,7 @@ def create_end_human_agent_conversation_node() -> NodeConfig:
 
 
 # Helpers
-def get_customer_participant_id(transport: DailyTransport) -> str:
+def get_customer_participant_id(transport: DailyTransport) -> str | None:
     return next(
         (
             p["id"]
@@ -457,7 +459,7 @@ def get_customer_participant_id(transport: DailyTransport) -> str:
     )
 
 
-def get_human_agent_participant_id(transport: DailyTransport) -> str:
+def get_human_agent_participant_id(transport: DailyTransport) -> str | None:
     return next(
         (
             p["id"]
@@ -551,7 +553,7 @@ async def get_token(
     permissions: dict,
     daily_rest_helper: DailyRESTHelper,
     room_url: str,
-    user_name: str = None,
+    user_name: str | None = None,
 ) -> str:
     return await daily_rest_helper.get_token(
         room_url=room_url,
@@ -580,9 +582,9 @@ async def main():
                 vad_analyzer=SileroVADAnalyzer(),
             ),
         )
-        stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+        stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
         tts = CartesiaHttpTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
+            api_key=os.getenv("CARTESIA_API_KEY", ""),
             voice_id="d46abd1d-2d02-43e8-819f-51fb652c1c61",  # Newsman
         )
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
@@ -651,7 +653,7 @@ async def main():
                 await task.cancel()
 
         # Print URL for joining as customer, and store URL for joining as human agent, to be printed later
-        key = os.getenv("DAILY_API_KEY")
+        key = os.getenv("DAILY_API_KEY", "")
         daily_rest_helper = DailyRESTHelper(
             daily_api_key=key,
             daily_api_url=os.getenv("DAILY_API_URL", "https://api.daily.co/v1"),
