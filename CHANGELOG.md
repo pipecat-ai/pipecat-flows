@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.0.20] - 2025-08-27
 
+### Changed
+
+- Added an `@property` for the following `FlowManager` attributes in order to
+  officially make them part of the public API: `state`, `task`, `transport`,
+  and `current_node`.
+
 ### Fixed
 
 - Corrected an issue where the Flow Manager state was marked as private. To
