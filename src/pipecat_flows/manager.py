@@ -767,8 +767,18 @@ In all of these cases, you can provide a `name` in your new node's config for de
             if pre_actions := node_config.get("pre_actions"):
                 await self._execute_actions(pre_actions=pre_actions)
 
-            # Combine role and task messages
             messages = []
+            # Add an empty assistant message if the last message has a role "tool".
+            # This is a workaround for Mistral, which requires an assistant message following a tool message.
+            if (
+                len(self._context_aggregator.user()._context.messages) > 0
+                and self._context_aggregator.user()._context.messages[-1].get("role") == "tool"
+            ):
+                messages.append(
+                    {"role": "assistant", "content": " "}
+                )  # Keep the space in the content; an empty string does not work.
+
+            # Combine role and task messages
             if role_messages := node_config.get("role_messages"):
                 messages.extend(role_messages)
             messages.extend(node_config["task_messages"])
