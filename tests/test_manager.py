@@ -433,14 +433,14 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Set state data
         test_value = "test_value"
-        flow_manager._state["test_key"] = test_value
+        flow_manager.state["test_key"] = test_value
 
         # Reset mock to clear initialization calls
         self.mock_task.queue_frames.reset_mock()
 
         # Verify state persists across node transitions
         await flow_manager.set_node_from_config(self.sample_node)
-        self.assertEqual(flow_manager._state["test_key"], test_value)
+        self.assertEqual(flow_manager.state["test_key"], test_value)
 
     async def test_multiple_function_registration(self):
         """Test registration of multiple functions."""

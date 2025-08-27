@@ -158,12 +158,43 @@ class FlowManager:
             self._initial_node = None
             logger.debug("Initialized in dynamic mode")
 
-        self._state: Dict[str, Any] = {}  # Shared state across nodes
+        self._state: Dict[str, Any] = {}  # Internal state storage
         self._current_functions: Set[str] = set()  # Track registered functions
         self._current_node: Optional[str] = None
 
         self._showed_deprecation_warning_for_transition_fields = False
         self._showed_deprecation_warning_for_set_node = False
+
+    @property
+    def state(self) -> Dict[str, Any]:
+        """Access the shared state dictionary across nodes.
+
+        This property provides access to a persistent dictionary that maintains
+        data across node transitions. It can be used to store and retrieve
+        conversation state, user preferences, or any other data that needs
+        to persist throughout the flow.
+
+        Returns:
+            Dict[str, Any]: The shared state dictionary that can be used for
+                reading and writing state data.
+
+        Examples:
+            Setting state::
+
+                flow_manager.state["user_name"] = "Alice"
+                flow_manager.state["age"] = 25
+
+            Getting state::
+
+                name = flow_manager.state.get("user_name", "Unknown")
+                age = flow_manager.state["age"]
+
+            Checking for state::
+
+                if "user_preferences" in flow_manager.state:
+                    preferences = flow_manager.state["user_preferences"]
+        """
+        return self._state
 
     def _validate_transition_callback(self, name: str, callback: Any) -> None:
         """Validate a transition callback.
