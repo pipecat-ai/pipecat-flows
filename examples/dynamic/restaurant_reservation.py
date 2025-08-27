@@ -13,6 +13,8 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.extensions.voicemail.voicemail_detector import VoicemailDetector
+from pipecat.frames.frames import TTSSpeakFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -258,13 +260,28 @@ async def main(wait_for_user: bool):
         context = OpenAILLMContext()
         context_aggregator = llm.create_context_aggregator(context)
 
+        classification_llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+
+        # Create an instance of the voice detector
+        # Optional `system_prompt` arg to overwrite the prompt
+        # Optional `voicemail_response_delay` to modify the wait time for the callback firing
+        detector = VoicemailDetector(
+            llm=classification_llm,
+        )
+
+        @detector.event_handler("on_voicemail_detected")
+        async def handle_voicemail(processor) -> None:
+            await processor.push_frame(TTSSpeakFrame("Please leave a message."))
+
         pipeline = Pipeline(
             [
                 transport.input(),
                 stt,
+                detector.detector(),  # Classification
                 context_aggregator.user(),
                 llm,
                 tts,
+                detector.gate(),
                 transport.output(),
                 context_aggregator.assistant(),
             ]
