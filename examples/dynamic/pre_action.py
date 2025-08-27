@@ -33,10 +33,27 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.frames.frames import (
+    BotStoppedSpeakingFrame,
+    InputAudioRawFrame,
+    InterimTranscriptionFrame,
+    StartInterruptionFrame,
+    StopInterruptionFrame,
+    TranscriptionFrame,
+    TTSSpeakFrame,
+    UserStartedSpeakingFrame,
+    UserStoppedSpeakingFrame,
+    VADUserStartedSpeakingFrame,
+    VADUserStoppedSpeakingFrame,
+)
+from pipecat.observers.loggers.debug_log_observer import DebugLogObserver
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.filters.frame_filter import FrameFilter
+from pipecat.processors.filters.stt_mute_filter import STTMuteConfig, STTMuteFilter, STTMuteStrategy
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.cartesia.tts import CartesiaHttpTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
@@ -52,6 +69,48 @@ load_dotenv(override=True)
 
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
+
+
+# Custom processor to track TTSSpeakFrame and BotStoppedSpeakingFrame
+class CustomMuteFilter(FrameProcessor):
+    """Processor to control custom muting based on TTSSpeakFrame and BotStoppedSpeakingFrame."""
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._is_muted = False
+
+    async def process_frame(self, frame, direction: FrameDirection) -> None:
+        await super().process_frame(frame, direction)
+        """Process frames to control muting state."""
+        if isinstance(frame, TTSSpeakFrame):
+            logger.debug(f"CustomMuteFilter: TTSSpeakFrame detected, enabling muting")
+            self._is_muted = True
+        elif isinstance(frame, BotStoppedSpeakingFrame):
+            logger.debug(f"CustomMuteFilter: BotStoppedSpeakingFrame detected, disabling muting")
+            self._is_muted = False
+
+        if isinstance(
+            frame,
+            (
+                StartInterruptionFrame,
+                StopInterruptionFrame,
+                VADUserStartedSpeakingFrame,
+                VADUserStoppedSpeakingFrame,
+                UserStartedSpeakingFrame,
+                UserStoppedSpeakingFrame,
+                InputAudioRawFrame,
+                InterimTranscriptionFrame,
+                TranscriptionFrame,
+            ),
+        ):
+            # Only pass VAD-related frames when not muted
+            if not self._is_muted:
+                await self.push_frame(frame, direction)
+            else:
+                logger.trace(f"{frame.__class__.__name__} suppressed - CustomSTT currently muted")
+        else:
+            # Pass all other frames through
+            await self.push_frame(frame, direction)
 
 
 # Function handlers
@@ -109,7 +168,12 @@ def create_greeting_node() -> NodeConfig:
     """Create the greeting node with a pre-action that says 'Ok!' before responding."""
     return NodeConfig(
         name="greeting_node",
-        pre_actions=[ActionConfig(type="tts_say", text="Ok! Give me just one moment!")],
+        pre_actions=[
+            ActionConfig(
+                type="tts_say",
+                text="Ok! Give me just one moment! This is a longer than usual pre-action, to demonstrate that things are being muted!",
+            )
+        ],
         task_messages=[
             {
                 "role": "system",
@@ -169,11 +233,22 @@ async def main():
         context = OpenAILLMContext()
         context_aggregator = llm.create_context_aggregator(context)
 
+        # Create STT mute filter with both FUNCTION_CALL and CUSTOM strategies
+        stt_mute_filter = STTMuteFilter(
+            config=STTMuteConfig(
+                strategies={STTMuteStrategy.FUNCTION_CALL},
+            )
+        )
+
+        custom_mute_filter = CustomMuteFilter()
+
         # Create pipeline
         pipeline = Pipeline(
             [
                 transport.input(),
                 stt,
+                stt_mute_filter,  # Add STTMuteFilter between STT and context aggregator
+                custom_mute_filter,
                 context_aggregator.user(),
                 llm,
                 tts,
@@ -181,7 +256,12 @@ async def main():
                 context_aggregator.assistant(),
             ]
         )
-        task = PipelineTask(pipeline=pipeline, params=PipelineParams(allow_interruptions=True))
+        task = PipelineTask(
+            pipeline=pipeline,
+            params=PipelineParams(
+                allow_interruptions=True, observers=[DebugLogObserver(frame_types=(TTSSpeakFrame,))]
+            ),
+        )
 
         # Initialize flow manager
         flow_manager = FlowManager(
