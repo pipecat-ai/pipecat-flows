@@ -126,7 +126,7 @@ async def main():
         transport = DailyTransport(
             room_url,
             None,
-            "LLM Failover Bot",
+            "LLM Switcher Bot",
             DailyParams(
                 audio_in_enabled=True,
                 audio_out_enabled=True,
