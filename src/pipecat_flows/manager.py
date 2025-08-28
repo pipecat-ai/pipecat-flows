@@ -36,6 +36,7 @@ from pipecat.frames.frames import (
     FunctionCallResultProperties,
     LLMMessagesAppendFrame,
     LLMMessagesUpdateFrame,
+    LLMRunFrame,
     LLMSetToolsFrame,
 )
 from pipecat.pipeline.llm_switcher import LLMSwitcher
@@ -856,7 +857,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
             # Trigger completion with new context
             respond_immediately = node_config.get("respond_immediately", True)
             if self._context_aggregator and respond_immediately:
-                await self._task.queue_frames([self._context_aggregator.user().get_context_frame()])
+                await self._task.queue_frames([LLMRunFrame()])
 
             # Execute post-actions if any
             if post_actions := node_config.get("post_actions"):
