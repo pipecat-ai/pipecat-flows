@@ -64,9 +64,6 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.mock_context_aggregator = MagicMock()
         self.mock_context_aggregator.user = MagicMock()
         self.mock_context_aggregator.user.return_value = MagicMock()
-        self.mock_context_aggregator.user.return_value.get_context_frame = MagicMock(
-            return_value=MagicMock()
-        )
 
         self.mock_context_aggregator.assistant = MagicMock(
             return_value=self.mock_assistant_aggregator

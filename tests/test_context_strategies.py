@@ -60,9 +60,6 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         self.mock_context_aggregator.user = MagicMock()
         self.mock_context_aggregator.user.return_value = MagicMock()
         self.mock_context_aggregator.user.return_value._context = self.mock_context
-        self.mock_context_aggregator.user.return_value.get_context_frame = MagicMock(
-            return_value=MagicMock()
-        )
 
         # Sample node configuration
         self.sample_node: NodeConfig = {
