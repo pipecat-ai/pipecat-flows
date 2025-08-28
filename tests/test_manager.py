@@ -150,7 +150,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(mock_function.called)  # Shouldn't be called until function is used
         self.assertEqual(flow_manager._current_node, "test")
 
-    async def test_static_flow_transitions(self):
+    @patch("pipecat_flows.manager.LLMRunFrame")
+    async def test_static_flow_transitions(self, mock_llm_run_frame):
         """Test transitions in static flows."""
         flow_manager = FlowManager(
             task=self.mock_task,
@@ -185,11 +186,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         append_frames = [f for f in first_frames if isinstance(f, LLMMessagesAppendFrame)]
         self.assertTrue(len(append_frames) > 0, "Should have at least one AppendFrame")
 
-        # Verify that LLM completion was triggered
-        self.assertTrue(
-            self.mock_context_aggregator.user().get_context_frame.called,
-            "Should have triggered LLM completion",
-        )
+        # Verify that LLM completion was triggered by checking LLMRunFrame instantiation
+        mock_llm_run_frame.assert_called()
 
     async def test_transition_callback_signatures(self):
         """Test both two and three argument transition callback signatures.
@@ -1238,7 +1236,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Edge functions should set run_llm=False
         self.assertTrue(edge_properties_2 is not None and edge_properties_2.run_llm is False)
 
-    async def test_completion_timing(self):
+    @patch("pipecat_flows.manager.LLMRunFrame")
+    async def test_completion_timing(self, mock_llm_run_frame):
         """Test that completions occur at the right time."""
         flow_manager = FlowManager(
             task=self.mock_task,
@@ -1249,7 +1248,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Test initial node setup
         self.mock_task.queue_frames.reset_mock()
-        self.mock_context_aggregator.user().get_context_frame.reset_mock()
+        mock_llm_run_frame.reset_mock()
 
         await flow_manager.set_node_from_config(
             {
@@ -1262,8 +1261,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # First call is for updating context
         self.assertTrue(self.mock_task.queue_frames.called)
 
-        # Verify completion was triggered
-        self.assertTrue(self.mock_context_aggregator.user().get_context_frame.called)
+        # Verify that LLM completion was triggered by checking LLMRunFrame instantiation
+        mock_llm_run_frame.assert_called_once()
 
         # Add next node to flow manager's nodes
         next_node: NodeConfig = {
@@ -1274,13 +1273,13 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Test node transition by directly setting next node
         self.mock_task.queue_frames.reset_mock()
-        self.mock_context_aggregator.user().get_context_frame.reset_mock()
+        mock_llm_run_frame.reset_mock()
 
         await flow_manager.set_node_from_config(next_node)
 
         # Should see context update and completion trigger again
         self.assertTrue(self.mock_task.queue_frames.called)
-        self.assertTrue(self.mock_context_aggregator.user().get_context_frame.called)
+        mock_llm_run_frame.assert_called_once()
 
     async def test_transition_configuration_exclusivity(self):
         """Test that transition_to and transition_callback cannot be used together.
