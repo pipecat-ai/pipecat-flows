@@ -36,7 +36,8 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
@@ -44,6 +45,7 @@ from pipecat.transports.services.daily import DailyParams, DailyTransport
 from pipecat.utils.text.markdown_text_filter import MarkdownTextFilter
 
 from pipecat_flows import FlowArgs, FlowConfig, FlowManager, FlowResult
+from pipecat_flows.types import FlowsFunctionSchema
 
 sys.path.append(str(Path(__file__).parent.parent))
 from runner import configure
@@ -352,24 +354,20 @@ flow_config: FlowConfig = {
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "get_current_movies_then_explore",
-                        "handler": get_movies_then_explore,
-                        "description": "Fetch movies currently playing in theaters",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "get_upcoming_movies_then_explore",
-                        "handler": get_upcoming_movies_then_explore,
-                        "description": "Fetch movies coming soon to theaters",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
+                FlowsFunctionSchema(
+                    name="get_current_movies_then_explore",
+                    handler=get_movies_then_explore,
+                    description="Fetch movies currently playing in theaters",
+                    properties={},
+                    required=[],
+                ),
+                FlowsFunctionSchema(
+                    name="get_upcoming_movies_then_explore",
+                    handler=get_upcoming_movies_then_explore,
+                    description="Fetch movies coming soon to theaters",
+                    properties={},
+                    required=[],
+                ),
             ],
         },
         "explore_movie": {
@@ -387,63 +385,41 @@ After showing details or recommendations, ask if they'd like to explore another 
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "get_movie_details",
-                        "handler": get_movie_details,
-                        "description": "Get details about a specific movie including cast",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "movie_id": {"type": "integer", "description": "TMDB movie ID"}
-                            },
-                            "required": ["movie_id"],
-                        },
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "get_similar_movies",
-                        "handler": get_similar_movies,
-                        "description": "Get similar movies as recommendations",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "movie_id": {"type": "integer", "description": "TMDB movie ID"}
-                            },
-                            "required": ["movie_id"],
-                        },
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "get_current_movies",
-                        "handler": get_movies,
-                        "description": "Show current movies in theaters",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "get_upcoming_movies",
-                        "handler": get_upcoming_movies,
-                        "description": "Show movies coming soon",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "end_conversation",
-                        "handler": end_conversation,
-                        "description": "End the conversation",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
+                FlowsFunctionSchema(
+                    name="get_movie_details",
+                    handler=get_movie_details,
+                    description="Get details about a specific movie including cast",
+                    properties={"movie_id": {"type": "integer", "description": "TMDB movie ID"}},
+                    required=["movie_id"],
+                ),
+                FlowsFunctionSchema(
+                    name="get_similar_movies",
+                    handler=get_similar_movies,
+                    description="Get similar movies as recommendations",
+                    properties={"movie_id": {"type": "integer", "description": "TMDB movie ID"}},
+                    required=["movie_id"],
+                ),
+                FlowsFunctionSchema(
+                    name="get_current_movies",
+                    handler=get_movies,
+                    description="Show current movies in theaters",
+                    properties={},
+                    required=[],
+                ),
+                FlowsFunctionSchema(
+                    name="get_upcoming_movies",
+                    handler=get_upcoming_movies,
+                    description="Show movies coming soon",
+                    properties={},
+                    required=[],
+                ),
+                FlowsFunctionSchema(
+                    name="end_conversation",
+                    handler=end_conversation,
+                    description="End the conversation",
+                    properties={},
+                    required=[],
+                ),
             ],
         },
         "end": {
@@ -483,8 +459,8 @@ async def main():
         )
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
 
-        context = OpenAILLMContext()
-        context_aggregator = llm.create_context_aggregator(context)
+        context = LLMContext()
+        context_aggregator = LLMContextAggregatorPair(context)
 
         pipeline = Pipeline(
             [

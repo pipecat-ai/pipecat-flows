@@ -16,13 +16,15 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 
 from pipecat_flows import FlowArgs, FlowConfig, FlowManager, FlowResult
+from pipecat_flows.types import FlowsFunctionSchema
 
 sys.path.append(str(Path(__file__).parent.parent))
 from runner import configure
@@ -158,24 +160,20 @@ flow_config: FlowConfig = {
                 },
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "choose_pizza",
-                        "handler": choose_pizza,
-                        "description": "User wants to order pizza. Let's get that order started.",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "choose_sushi",
-                        "handler": choose_sushi,
-                        "description": "User wants to order sushi. Let's get that order started.",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
+                FlowsFunctionSchema(
+                    name="choose_pizza",
+                    handler=choose_pizza,
+                    description="User wants to order pizza. Let's get that order started.",
+                    properties={},
+                    required=[],
+                ),
+                FlowsFunctionSchema(
+                    name="choose_sushi",
+                    handler=choose_sushi,
+                    description="User wants to order sushi. Let's get that order started.",
+                    properties={},
+                    required=[],
+                ),
             ],
         },
         "choose_pizza": {
@@ -194,30 +192,24 @@ Remember to be friendly and casual.""",
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "select_pizza_order",
-                        "handler": select_pizza_order,
-                        "description": "Record the pizza order details",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "size": {
-                                    "type": "string",
-                                    "enum": ["small", "medium", "large"],
-                                    "description": "Size of the pizza",
-                                },
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["pepperoni", "cheese", "supreme", "vegetarian"],
-                                    "description": "Type of pizza",
-                                },
-                            },
-                            "required": ["size", "type"],
+                FlowsFunctionSchema(
+                    name="select_pizza_order",
+                    handler=select_pizza_order,
+                    description="Record the pizza order details",
+                    properties={
+                        "size": {
+                            "type": "string",
+                            "enum": ["small", "medium", "large"],
+                            "description": "Size of the pizza",
+                        },
+                        "type": {
+                            "type": "string",
+                            "enum": ["pepperoni", "cheese", "supreme", "vegetarian"],
+                            "description": "Type of pizza",
                         },
                     },
-                },
+                    required=["size", "type"],
+                ),
             ],
         },
         "choose_sushi": {
@@ -234,31 +226,25 @@ Remember to be friendly and casual.""",
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "select_sushi_order",
-                        "handler": select_sushi_order,
-                        "description": "Record the sushi order details",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "count": {
-                                    "type": "integer",
-                                    "minimum": 1,
-                                    "maximum": 10,
-                                    "description": "Number of rolls to order",
-                                },
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["california", "spicy tuna", "rainbow", "dragon"],
-                                    "description": "Type of sushi roll",
-                                },
-                            },
-                            "required": ["count", "type"],
+                FlowsFunctionSchema(
+                    name="select_sushi_order",
+                    handler=select_sushi_order,
+                    description="Record the sushi order details",
+                    properties={
+                        "count": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 10,
+                            "description": "Number of rolls to order",
+                        },
+                        "type": {
+                            "type": "string",
+                            "enum": ["california", "spicy tuna", "rainbow", "dragon"],
+                            "description": "Type of sushi roll",
                         },
                     },
-                },
+                    required=["count", "type"],
+                ),
             ],
         },
         "confirm": {
@@ -273,24 +259,20 @@ Be friendly and clear when reading back the order details.""",
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "complete_order",
-                        "handler": complete_order,
-                        "description": "User confirms the order is correct",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "revise_order",
-                        "handler": revise_order,
-                        "description": "User wants to make changes to their order",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
+                FlowsFunctionSchema(
+                    name="complete_order",
+                    handler=complete_order,
+                    description="User confirms the order is correct",
+                    properties={},
+                    required=[],
+                ),
+                FlowsFunctionSchema(
+                    name="revise_order",
+                    handler=revise_order,
+                    description="User wants to make changes to their order",
+                    properties={},
+                    required=[],
+                ),
             ],
         },
         "end": {
@@ -330,8 +312,8 @@ async def main():
         )
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
 
-        context = OpenAILLMContext()
-        context_aggregator = llm.create_context_aggregator(context)
+        context = LLMContext()
+        context_aggregator = LLMContextAggregatorPair(context)
 
         # Create pipeline
         pipeline = Pipeline(
