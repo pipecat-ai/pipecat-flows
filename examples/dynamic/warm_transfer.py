@@ -469,6 +469,35 @@ def get_human_agent_participant_id(transport: DailyTransport) -> str:
     )
 
 
+async def get_bot_token(daily_rest_helper: DailyRESTHelper, room_url: str) -> str:
+    """Gets a Daily token for the bot, configured with properties:
+    {
+        user_id: "bot",
+        user_name: "Bot",
+        owner: true,
+        permissions: {
+            canReceive: {
+                base: false,
+                byUserId: {
+                    customer: true,
+                    agent: true
+                }
+            }
+        }
+    }
+    We only need the bot to be able to hear the customer and the human agent;
+    it shouldn't hear the hold music.
+    """
+    return await get_token(
+        user_id="bot",
+        permissions={"canReceive": {"base": False, "byUserId": {"customer": True, "agent": True}}},
+        daily_rest_helper=daily_rest_helper,
+        room_url=room_url,
+        user_name="Bot",
+        owner=True,
+    )
+
+
 async def get_customer_token(daily_rest_helper: DailyRESTHelper, room_url: str) -> str:
     """Gets a Daily token for the customer, configured with properties:
     {
@@ -483,6 +512,7 @@ async def get_customer_token(daily_rest_helper: DailyRESTHelper, room_url: str) 
             }
         }
     }
+    At join time we only need the customer to be able to hear the bot.
     """
     return await get_token(
         user_id="customer",
@@ -497,6 +527,7 @@ async def get_customer_token(daily_rest_helper: DailyRESTHelper, room_url: str) 
         daily_rest_helper=daily_rest_helper,
         room_url=room_url,
         user_name="Customer",
+        owner=False,
     )
 
 
@@ -514,6 +545,7 @@ async def get_human_agent_token(daily_rest_helper: DailyRESTHelper, room_url: st
             }
         }
     }
+    At join time we only need the human agent to be able to hear the bot.
     """
     return await get_token(
         user_id="agent",
@@ -528,6 +560,7 @@ async def get_human_agent_token(daily_rest_helper: DailyRESTHelper, room_url: st
         daily_rest_helper=daily_rest_helper,
         room_url=room_url,
         user_name="Agent",
+        owner=False,
     )
 
 
@@ -544,6 +577,7 @@ async def get_hold_music_player_token(daily_rest_helper: DailyRESTHelper, room_u
         daily_rest_helper=daily_rest_helper,
         room_url=room_url,
         user_name="Hold music",
+        owner=False,
     )
 
 
@@ -552,11 +586,12 @@ async def get_token(
     permissions: dict,
     daily_rest_helper: DailyRESTHelper,
     room_url: str,
-    user_name: str = None,
+    user_name: str,
+    owner: bool,
 ) -> str:
     return await daily_rest_helper.get_token(
         room_url=room_url,
-        owner=False,
+        owner=owner,
         params=DailyMeetingTokenParams(
             properties=DailyMeetingTokenProperties(
                 user_id=user_id, user_name=user_name, permissions=permissions
@@ -568,12 +603,21 @@ async def get_token(
 async def main():
     """Main function to set up and run the bot."""
     async with aiohttp.ClientSession() as session:
-        (room_url, token) = await configure(session)
+        key = os.getenv("DAILY_API_KEY")
+        daily_rest_helper = DailyRESTHelper(
+            daily_api_key=key,
+            daily_api_url=os.getenv("DAILY_API_URL", "https://api.daily.co/v1"),
+            aiohttp_session=session,
+        )
+
+        # Get room URL and bot token
+        (room_url, _) = await configure(session)
+        bot_token = await get_bot_token(daily_rest_helper=daily_rest_helper, room_url=room_url)
 
         # Initialize services
         transport = DailyTransport(
             room_url=room_url,
-            token=token,
+            token=bot_token,
             bot_name="ABC Widget Company Bot",
             params=DailyParams(
                 audio_in_enabled=True,
@@ -652,12 +696,6 @@ async def main():
                 await task.cancel()
 
         # Print URL for joining as customer, and store URL for joining as human agent, to be printed later
-        key = os.getenv("DAILY_API_KEY")
-        daily_rest_helper = DailyRESTHelper(
-            daily_api_key=key,
-            daily_api_url=os.getenv("DAILY_API_URL", "https://api.daily.co/v1"),
-            aiohttp_session=session,
-        )
         customer_token = await get_customer_token(
             daily_rest_helper=daily_rest_helper, room_url=room_url
         )
