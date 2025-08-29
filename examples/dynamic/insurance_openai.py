@@ -47,7 +47,11 @@ from pipecat.transports.services.daily import DailyParams, DailyTransport
 from pipecat_flows import FlowArgs, FlowManager, FlowResult, NodeConfig
 
 sys.path.append(str(Path(__file__).parent.parent))
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from runner import configure
+
+from pipecat_flows import FlowsFunctionSchema
 
 load_dotenv(override=True)
 
@@ -192,19 +196,13 @@ def create_initial_node() -> NodeConfig:
             }
         ],
         "functions": [
-            {
-                "type": "function",
-                "function": {
-                    "name": "collect_age",
-                    "handler": collect_age,
-                    "description": "Record customer's age",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"age": {"type": "integer"}},
-                        "required": ["age"],
-                    },
-                },
-            }
+            FlowsFunctionSchema(
+                name="collect_age",
+                description="Record customer's age",
+                properties={"age": {"type": "integer"}},
+                required=["age"],
+                handler=collect_age,
+            )
         ],
     }
 
@@ -220,21 +218,13 @@ def create_marital_status_node() -> NodeConfig:
             }
         ],
         "functions": [
-            {
-                "type": "function",
-                "function": {
-                    "name": "collect_marital_status",
-                    "handler": collect_marital_status,
-                    "description": "Record marital status",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "marital_status": {"type": "string", "enum": ["single", "married"]}
-                        },
-                        "required": ["marital_status"],
-                    },
-                },
-            }
+            FlowsFunctionSchema(
+                name="collect_marital_status",
+                description="Record marital status after customer provides it",
+                properties={"marital_status": {"type": "string", "enum": ["single", "married"]}},
+                required=["marital_status"],
+                handler=collect_marital_status,
+            )
         ],
     }
 
@@ -254,25 +244,16 @@ def create_quote_calculation_node(age: int, marital_status: str) -> NodeConfig:
             }
         ],
         "functions": [
-            {
-                "type": "function",
-                "function": {
-                    "name": "calculate_quote",
-                    "handler": calculate_quote,
-                    "description": "Calculate initial insurance quote",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "age": {"type": "integer"},
-                            "marital_status": {
-                                "type": "string",
-                                "enum": ["single", "married"],
-                            },
-                        },
-                        "required": ["age", "marital_status"],
-                    },
+            FlowsFunctionSchema(
+                name="calculate_quote",
+                description="Calculate initial insurance quote",
+                properties={
+                    "age": {"type": "integer"},
+                    "marital_status": {"type": "string", "enum": ["single", "married"]},
                 },
-            }
+                required=["age", "marital_status"],
+                handler=calculate_quote,
+            )
         ],
     }
 
@@ -300,31 +281,23 @@ def create_quote_results_node(
             }
         ],
         "functions": [
-            {
-                "type": "function",
-                "function": {
-                    "name": "update_coverage",
-                    "handler": update_coverage,
-                    "description": "Recalculate quote with new coverage options",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "coverage_amount": {"type": "integer"},
-                            "deductible": {"type": "integer"},
-                        },
-                        "required": ["coverage_amount", "deductible"],
-                    },
+            FlowsFunctionSchema(
+                name="update_coverage",
+                description="Recalculate quote with new coverage options",
+                properties={
+                    "coverage_amount": {"type": "integer"},
+                    "deductible": {"type": "integer"},
                 },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "end_quote",
-                    "handler": end_quote,
-                    "description": "Complete the quote process",
-                    "parameters": {"type": "object", "properties": {}},
-                },
-            },
+                required=["coverage_amount", "deductible"],
+                handler=update_coverage,
+            ),
+            FlowsFunctionSchema(
+                name="end_quote",
+                description="Complete the quote process when customer is satisfied",
+                properties={},
+                required=[],
+                handler=end_quote,
+            ),
         ],
     }
 
@@ -367,8 +340,8 @@ async def main():
         tts = DeepgramTTSService(api_key=os.getenv("DEEPGRAM_API_KEY"), voice="aura-helios-en")
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
 
-        context = OpenAILLMContext()
-        context_aggregator = llm.create_context_aggregator(context)
+        context = LLMContext()
+        context_aggregator = LLMContextAggregatorPair(context)
 
         # Create pipeline
         pipeline = Pipeline(

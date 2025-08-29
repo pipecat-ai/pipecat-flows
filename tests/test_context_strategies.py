@@ -45,10 +45,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
 
         # Set up mock LLM with client
         self.mock_llm = OpenAILLMService(api_key="")
-        self.mock_llm._client = MagicMock()
-        self.mock_llm._client.chat = MagicMock()
-        self.mock_llm._client.chat.completions = MagicMock()
-        self.mock_llm._client.chat.completions.create = AsyncMock()
+        self.mock_llm.run_inference = AsyncMock()
 
         self.mock_tts = AsyncMock()
 
@@ -63,9 +60,6 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         self.mock_context_aggregator.user = MagicMock()
         self.mock_context_aggregator.user.return_value = MagicMock()
         self.mock_context_aggregator.user.return_value._context = self.mock_context
-        self.mock_context_aggregator.user.return_value.get_context_frame = MagicMock(
-            return_value=MagicMock()
-        )
 
         # Sample node configuration
         self.sample_node: NodeConfig = {
@@ -134,9 +128,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         """Test successful RESET_WITH_SUMMARY strategy."""
         # Mock successful summary generation
         mock_summary = "Conversation summary"
-        self.mock_llm._client.chat.completions.create.return_value.choices = [
-            MagicMock(message=MagicMock(content=mock_summary))
-        ]
+        self.mock_llm.run_inference.return_value = mock_summary
 
         flow_manager = FlowManager(
             task=self.mock_task,
@@ -175,9 +167,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         await flow_manager.initialize()
 
         # Mock timeout
-        self.mock_llm._client.chat.completions.create.side_effect = AsyncMock(
-            side_effect=TimeoutError
-        )
+        self.mock_llm.run_inference.side_effect = AsyncMock(side_effect=TimeoutError)
 
         # Set nodes and verify fallback to RESET
         await flow_manager._set_node("first", self.sample_node)
@@ -251,9 +241,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
     async def test_summary_generation_content(self):
         """Test that summary generation uses correct prompt and context."""
         mock_summary = "Generated summary"
-        self.mock_llm._client.chat.completions.create.return_value.choices = [
-            MagicMock(message=MagicMock(content=mock_summary))
-        ]
+        self.mock_llm.run_inference.return_value = mock_summary
 
         summary_prompt = "Create a detailed summary"
         flow_manager = FlowManager(
@@ -271,22 +259,23 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         await flow_manager._set_node("second", self.sample_node)
 
         # Verify summary generation call
-        create_call = self.mock_llm._client.chat.completions.create.call_args
-        create_kwargs = create_call[1]
+        run_inference_call = self.mock_llm.run_inference.call_args
+        run_inference_args = run_inference_call[0]
 
         # Verify prompt and context were included
-        messages = create_kwargs["messages"]
-        self.assertTrue(any(summary_prompt in str(m) for m in messages))
+        context = run_inference_args[0]
+        self.assertTrue(any(summary_prompt in str(m) for m in context.get_messages()))
         self.assertTrue(
-            any(str(self.mock_context.messages[0]["content"]) in str(m) for m in messages)
+            any(
+                str(self.mock_context.messages[0]["content"]) in str(m)
+                for m in context.get_messages()
+            )
         )
 
     async def test_context_structure_after_summary(self):
         """Test the structure of context after summary generation."""
         mock_summary = "Generated summary"
-        self.mock_llm._client.chat.completions.create.return_value.choices = [
-            MagicMock(message=MagicMock(content=mock_summary))
-        ]
+        self.mock_llm.run_inference.return_value = mock_summary
 
         flow_manager = FlowManager(
             task=self.mock_task,

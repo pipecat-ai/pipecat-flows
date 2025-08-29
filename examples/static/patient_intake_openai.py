@@ -17,7 +17,8 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
@@ -35,6 +36,8 @@ from pipecat_flows import (
 
 sys.path.append(str(Path(__file__).parent.parent))
 from runner import configure
+
+from pipecat_flows.types import FlowsFunctionSchema
 
 load_dotenv(override=True)
 
@@ -203,24 +206,18 @@ flow_config: FlowConfig = {
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "verify_birthday",
-                        "handler": verify_birthday,
-                        "description": "Verify the user has provided their correct birthday. Once confirmed, the next step is to recording the user's prescriptions.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "birthday": {
-                                    "type": "string",
-                                    "description": "The user's birthdate (convert to YYYY-MM-DD format)",
-                                }
-                            },
-                            "required": ["birthday"],
-                        },
+                FlowsFunctionSchema(
+                    name="verify_birthday",
+                    handler=verify_birthday,
+                    description="Verify the user has provided their correct birthday. Once confirmed, the next step is to record the user's prescriptions.",
+                    properties={
+                        "birthday": {
+                            "type": "string",
+                            "description": "The user's birthdate (convert to YYYY-MM-DD format)",
+                        }
                     },
-                },
+                    required=["birthday"],
+                ),
             ],
         },
         "get_prescriptions": {
@@ -232,37 +229,31 @@ flow_config: FlowConfig = {
             ],
             "context_strategy": ContextStrategyConfig(strategy=ContextStrategy.RESET),
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "record_prescriptions",
-                        "handler": record_prescriptions,
-                        "description": "Record the user's prescriptions. Once confirmed, the next step is to collect allergy information.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "prescriptions": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "medication": {
-                                                "type": "string",
-                                                "description": "The medication's name",
-                                            },
-                                            "dosage": {
-                                                "type": "string",
-                                                "description": "The prescription's dosage",
-                                            },
-                                        },
-                                        "required": ["medication", "dosage"],
+                FlowsFunctionSchema(
+                    name="record_prescriptions",
+                    handler=record_prescriptions,
+                    description="Record the user's prescriptions. Once confirmed, the next step is to collect allergy information.",
+                    properties={
+                        "prescriptions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "medication": {
+                                        "type": "string",
+                                        "description": "The medication's name",
                                     },
-                                }
+                                    "dosage": {
+                                        "type": "string",
+                                        "description": "The prescription's dosage",
+                                    },
+                                },
+                                "required": ["medication", "dosage"],
                             },
-                            "required": ["prescriptions"],
-                        },
+                        }
                     },
-                },
+                    required=["prescriptions"],
+                ),
             ],
         },
         "get_allergies": {
@@ -273,33 +264,27 @@ flow_config: FlowConfig = {
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "record_allergies",
-                        "handler": record_allergies,
-                        "description": "Record the user's allergies. Once confirmed, then next step is to collect medical conditions.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "allergies": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "name": {
-                                                "type": "string",
-                                                "description": "What the user is allergic to",
-                                            },
-                                        },
-                                        "required": ["name"],
+                FlowsFunctionSchema(
+                    name="record_allergies",
+                    handler=record_allergies,
+                    description="Record the user's allergies. Once confirmed, then next step is to collect medical conditions.",
+                    properties={
+                        "allergies": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "What the user is allergic to",
                                     },
-                                }
+                                },
+                                "required": ["name"],
                             },
-                            "required": ["allergies"],
-                        },
+                        }
                     },
-                },
+                    required=["allergies"],
+                ),
             ],
         },
         "get_conditions": {
@@ -310,33 +295,27 @@ flow_config: FlowConfig = {
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "record_conditions",
-                        "handler": record_conditions,
-                        "description": "Record the user's medical conditions. Once confirmed, the next step is to collect visit reasons.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "conditions": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "name": {
-                                                "type": "string",
-                                                "description": "The user's medical condition",
-                                            },
-                                        },
-                                        "required": ["name"],
+                FlowsFunctionSchema(
+                    name="record_conditions",
+                    handler=record_conditions,
+                    description="Record the user's medical conditions. Once confirmed, the next step is to collect visit reasons.",
+                    properties={
+                        "conditions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The user's medical condition",
                                     },
-                                }
+                                },
+                                "required": ["name"],
                             },
-                            "required": ["conditions"],
-                        },
+                        }
                     },
-                },
+                    required=["conditions"],
+                ),
             ],
         },
         "get_visit_reasons": {
@@ -347,33 +326,27 @@ flow_config: FlowConfig = {
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "record_visit_reasons",
-                        "handler": record_visit_reasons,
-                        "description": "Record the reasons for their visit. Once confirmed, the next step is to verify all information.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "visit_reasons": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "name": {
-                                                "type": "string",
-                                                "description": "The user's reason for visiting",
-                                            },
-                                        },
-                                        "required": ["name"],
+                FlowsFunctionSchema(
+                    name="record_visit_reasons",
+                    handler=record_visit_reasons,
+                    description="Record the reasons for their visit. Once confirmed, the next step is to verify all information.",
+                    properties={
+                        "visit_reasons": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The user's reason for visiting",
                                     },
-                                }
+                                },
+                                "required": ["name"],
                             },
-                            "required": ["visit_reasons"],
-                        },
+                        }
                     },
-                },
+                    required=["visit_reasons"],
+                ),
             ],
         },
         "verify": {
@@ -397,24 +370,20 @@ Be thorough in reviewing all details and wait for explicit confirmation.""",
                 ),
             ),
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "revise_information",
-                        "handler": revise_information,
-                        "description": "Return to prescriptions to revise information",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "confirm_information",
-                        "handler": confirm_information,
-                        "description": "Proceed with confirmed information",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
+                FlowsFunctionSchema(
+                    name="revise_information",
+                    handler=revise_information,
+                    description="Return to prescriptions to revise information",
+                    properties={},
+                    required=[],
+                ),
+                FlowsFunctionSchema(
+                    name="confirm_information",
+                    handler=confirm_information,
+                    description="Proceed with confirmed information",
+                    properties={},
+                    required=[],
+                ),
             ],
         },
         "confirm": {
@@ -425,15 +394,13 @@ Be thorough in reviewing all details and wait for explicit confirmation.""",
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "complete_intake",
-                        "handler": complete_intake,
-                        "description": "Complete the intake process",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
+                FlowsFunctionSchema(
+                    name="complete_intake",
+                    handler=complete_intake,
+                    description="Complete the intake process",
+                    properties={},
+                    required=[],
+                ),
             ],
         },
         "end": {
@@ -473,8 +440,8 @@ async def main():
         )
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
 
-        context = OpenAILLMContext()
-        context_aggregator = llm.create_context_aggregator(context)
+        context = LLMContext()
+        context_aggregator = LLMContextAggregatorPair(context)
 
         pipeline = Pipeline(
             [

@@ -22,13 +22,11 @@ import sys
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from loguru import logger
-from pipecat.adapters.base_llm_adapter import BaseLLMAdapter
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
-from pipecat.adapters.services.anthropic_adapter import AnthropicLLMAdapter
-from pipecat.adapters.services.bedrock_adapter import AWSBedrockLLMAdapter
-from pipecat.adapters.services.gemini_adapter import GeminiLLMAdapter
-from pipecat.adapters.services.open_ai_adapter import OpenAILLMAdapter
+from pipecat.processors.aggregators.llm_context import NOT_GIVEN, LLMContext, NotGiven
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 
 from pipecat_flows.types import FlowsDirectFunctionWrapper, FlowsFunctionSchema
 
@@ -48,10 +46,6 @@ class LLMAdapter:
     - Google Gemini: Uses function declarations format
     - AWS Bedrock: Uses Anthropic-compatible format
     """
-
-    def __init__(self):
-        """Initialize the adapter."""
-        self._provider_adapter: Optional[BaseLLMAdapter] = None
 
     def get_function_name(self, function_def: Union[Dict[str, Any], FlowsFunctionSchema]) -> str:
         """Extract function name from provider-specific function definition or schema.
@@ -84,8 +78,17 @@ class LLMAdapter:
         self,
         functions: List[Union[Dict[str, Any], FunctionSchema, FlowsFunctionSchema]],
         original_configs: Optional[List] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict[str, Any]] | ToolsSchema | NotGiven:
         """Format functions for provider-specific use.
+
+        The formatted functions/tools will be used in an LLMSetToolsFrame.
+
+        The NotGiven return type is only used by the subclass
+        UniversalLLMAdapter, as the universal LLMContext expects NOT_GIVEN when
+        there are no tools.
+
+        All other LLM-specific contexts expect either a list of dicts or a
+        ToolsSchema, with an empty list meaning "no tools".
 
         Args:
             functions: List of function definitions (dicts or schema objects).
@@ -94,7 +97,7 @@ class LLMAdapter:
         Returns:
             List of functions formatted for the provider.
         """
-        # Return empty list if no functions
+        # Return empty list to mean "no tools"
         if not functions:
             return []
 
@@ -128,18 +131,20 @@ class LLMAdapter:
                     )
                 )
 
-        # Return empty list if no valid functions were processed
+        # Return empty list to mean "no tools" if no valid functions were
+        # processed
         if not standard_functions:
             return []
 
         # Create ToolsSchema with all functions
-        tools_schema = ToolsSchema(standard_tools=standard_functions)
-
-        # Use the provider adapter to format the functions
-        return self._provider_adapter.to_provider_tools_format(tools_schema)
+        return ToolsSchema(standard_tools=standard_functions)
 
     def format_summary_message(self, summary: str) -> dict:
         """Format a summary as a message appropriate for this LLM provider.
+
+        Note: summary messages are always expected in OpenAI format, because
+        summarization triggers an LLMMessagesUpdateFrame, which expects
+        OpenAI-style messages.
 
         Args:
             summary: The generated summary text.
@@ -153,14 +158,14 @@ class LLMAdapter:
         raise NotImplementedError("Subclasses must implement this method")
 
     async def generate_summary(
-        self, llm: Any, summary_prompt: str, messages: List[dict]
+        self, llm: Any, summary_prompt: str, context: OpenAILLMContext | LLMContext
     ) -> Optional[str]:
-        """Generate a summary using the LLM provider's API directly.
+        """Generate a summary by running a direct one-shot, out-of-band inference with the LLM.
 
         Args:
             llm: LLM service instance containing client/credentials.
             summary_prompt: Prompt text to guide summary generation.
-            messages: List of messages to summarize.
+            context: Context object containing conversation history for the summary.
 
         Returns:
             Generated summary text, or None if generation fails.
@@ -185,17 +190,97 @@ class LLMAdapter:
         raise NotImplementedError("Subclasses must implement this method")
 
 
+class UniversalLLMAdapter(LLMAdapter):
+    """Format adapter when universal LLMContext is in use.
+
+    Disallows provider-specific function definitions and requires functions to
+    be in the standard FlowsFunctionSchema format.
+    """
+
+    def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
+        raise RuntimeError(
+            "Provider-specific function definitions are not supported in flows using universal LLMContext. Use FlowsFunctionSchemas or direct functions instead."
+        )
+
+    def format_functions(
+        self,
+        functions: List[Union[Dict[str, Any], FunctionSchema, FlowsFunctionSchema]],
+        original_configs: Optional[List] = None,
+    ) -> ToolsSchema | NotGiven:
+        """Format functions for flows using universal LLMContext.
+
+        Args:
+            functions: List of function definitions (dicts or schema objects).
+            original_configs: Optional original node configs, used by some adapters.
+
+        Returns:
+            Functions formatted for use by universal LLMContext.
+        """
+        formatted_functions = super().format_functions(functions, original_configs=original_configs)
+        # Ensure we only return ToolsSchema or NOT_GIVEN, as expected by
+        # Pipecat's universal LLMContext.
+        if not formatted_functions:
+            return NOT_GIVEN
+        return formatted_functions
+
+    def format_summary_message(self, summary: str) -> dict:
+        """Format summary as a system message for flows using universal LLMContext.
+
+        Args:
+            summary: The generated summary text.
+
+        Returns:
+            A system message containing the summary.
+        """
+        # The standard format in flows using universal LLMContext is the
+        # LLMContextMessage format, which is based on OpenAI
+        return {"role": "system", "content": f"Here's a summary of the conversation:\n{summary}"}
+
+    async def generate_summary(
+        self, llm: Any, summary_prompt: str, context: LLMContext
+    ) -> Optional[str]:
+        """Generate a summary by running a direct one-shot, out-of-band inference with the LLM.
+
+        Args:
+            llm: LLM service instance containing client/credentials.
+            summary_prompt: Prompt text to guide summary generation.
+            context: Context object containing conversation history for the summary.
+
+        Returns:
+            Generated summary text, or None if generation fails.
+        """
+        prompt_messages = [
+            {
+                "role": "system",
+                "content": summary_prompt,
+            },
+            {
+                "role": "user",
+                "content": f"Conversation history: {context.get_messages()}",
+            },
+        ]
+
+        summary_context = LLMContext(messages=prompt_messages)
+
+        return await llm.run_inference(summary_context)
+
+    def convert_to_function_schema(self, function_def):
+        """Convert function definition to FlowsFunctionSchema.
+
+        This should never be invoked in flows using universal LLMContext, as
+        they should only use the standard FlowsFunctionSchema format.
+        """
+        raise RuntimeError(
+            "Provider-specific function definitions are not supported in flows using universal LLMContext. Use FlowsFunctionSchemas or direct functions instead."
+        )
+
+
 class OpenAIAdapter(LLMAdapter):
     """Format adapter for OpenAI.
 
     Handles OpenAI's function calling format, which is used as the default format
     in the flow system.
     """
-
-    def __init__(self):
-        """Initialize the OpenAI adapter."""
-        super().__init__()
-        self._provider_adapter = OpenAILLMAdapter()
 
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from OpenAI function definition.
@@ -220,19 +305,24 @@ class OpenAIAdapter(LLMAdapter):
         return {"role": "system", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     async def generate_summary(
-        self, llm: Any, summary_prompt: str, messages: List[dict]
+        self, llm: Any, summary_prompt: str, context: OpenAILLMContext | LLMContext
     ) -> Optional[str]:
-        """Generate summary using OpenAI's API directly.
+        """Generate a summary by running a direct one-shot, out-of-band inference with OpenAI.
 
         Args:
-            llm: OpenAI LLM service instance.
+            llm: LLM service instance containing client/credentials.
             summary_prompt: Prompt text to guide summary generation.
-            messages: List of messages to summarize.
+            context: Context object containing conversation history for the summary.
 
         Returns:
             Generated summary text, or None if generation fails.
         """
         try:
+            if isinstance(context, LLMContext):
+                messages = context.get_messages()
+            else:
+                messages = context.messages
+
             prompt_messages = [
                 {
                     "role": "system",
@@ -244,14 +334,9 @@ class OpenAIAdapter(LLMAdapter):
                 },
             ]
 
-            # LLM completion
-            response = await llm._client.chat.completions.create(
-                model=llm.model_name,
-                messages=prompt_messages,
-                stream=False,
-            )
+            summary_context = LLMContext(messages=prompt_messages)
 
-            return response.choices[0].message.content
+            return await llm.run_inference(summary_context)
 
         except Exception as e:
             logger.error(f"OpenAI summary generation failed: {e}", exc_info=True)
@@ -296,11 +381,6 @@ class AnthropicAdapter(LLMAdapter):
     and Anthropic's as needed.
     """
 
-    def __init__(self):
-        """Initialize the Anthropic adapter."""
-        super().__init__()
-        self._provider_adapter = AnthropicLLMAdapter()
-
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from Anthropic function definition.
 
@@ -315,6 +395,10 @@ class AnthropicAdapter(LLMAdapter):
     def format_summary_message(self, summary: str) -> dict:
         """Format summary as a user message for Anthropic.
 
+        Note: summary messages are always expected in OpenAI format, because
+        summarization triggers an LLMMessagesUpdateFrame, which expects
+        OpenAI-style messages.
+
         Args:
             summary: The generated summary text.
 
@@ -324,19 +408,24 @@ class AnthropicAdapter(LLMAdapter):
         return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     async def generate_summary(
-        self, llm: Any, summary_prompt: str, messages: List[dict]
+        self, llm: Any, summary_prompt: str, context: OpenAILLMContext | LLMContext
     ) -> Optional[str]:
-        """Generate summary using Anthropic's API directly.
+        """Generate a summary by running a direct one-shot, out-of-band inference with Anthropic.
 
         Args:
-            llm: Anthropic LLM service instance.
+            llm: LLM service instance containing client/credentials.
             summary_prompt: Prompt text to guide summary generation.
-            messages: List of messages to summarize.
+            context: Context object containing conversation history for the summary.
 
         Returns:
             Generated summary text, or None if generation fails.
         """
         try:
+            if isinstance(context, LLMContext):
+                messages = context.get_messages()
+            else:
+                messages = context.messages
+
             prompt_messages = [
                 {
                     "role": "user",
@@ -344,16 +433,11 @@ class AnthropicAdapter(LLMAdapter):
                 },
             ]
 
-            # LLM completion
-            response = await llm._client.messages.create(
-                model=llm.model_name,
-                messages=prompt_messages,
-                system=summary_prompt,
-                max_tokens=8192,
-                stream=False,
-            )
+            # TODO: update to use LLMContext once Anthropic supports it in Pipecat
+            # Once all services support LLMContext, we won't even need LLM-specific generate_summary methods
+            summary_context = OpenAILLMContext(messages=prompt_messages)
 
-            return response.content[0].text
+            return await llm.run_inference(summary_context, summary_prompt)
 
         except Exception as e:
             logger.error(f"Anthropic summary generation failed: {e}", exc_info=True)
@@ -397,11 +481,6 @@ class GeminiAdapter(LLMAdapter):
     and Gemini's as needed.
     """
 
-    def __init__(self):
-        """Initialize the Gemini adapter."""
-        super().__init__()
-        self._provider_adapter = GeminiLLMAdapter()
-
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from Gemini function definition.
 
@@ -435,6 +514,7 @@ class GeminiAdapter(LLMAdapter):
         Returns:
             List of functions formatted for Gemini.
         """
+        # TODO: here we should always be formatting into FunctionSchemas, not provider-specific format
         gemini_functions = []
 
         # If original_configs is provided, extract functions from it
@@ -504,6 +584,10 @@ class GeminiAdapter(LLMAdapter):
     def format_summary_message(self, summary: str) -> dict:
         """Format summary as a user message for Gemini.
 
+        Note: summary messages are always expected in OpenAI format, because
+        summarization triggers an LLMMessagesUpdateFrame, which expects
+        OpenAI-style messages.
+
         Args:
             summary: The generated summary text.
 
@@ -513,43 +597,38 @@ class GeminiAdapter(LLMAdapter):
         return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     async def generate_summary(
-        self, llm: Any, summary_prompt: str, messages: List[dict]
+        self, llm: Any, summary_prompt: str, context: OpenAILLMContext | LLMContext
     ) -> Optional[str]:
-        """Generate summary using Google's API directly.
+        """Generate a summary by running a direct one-shot, out-of-band inference with Google.
 
         Args:
-            llm: Google LLM service instance.
+            llm: LLM service instance containing client/credentials.
             summary_prompt: Prompt text to guide summary generation.
-            messages: List of messages to summarize.
+            context: Context object containing conversation history for the summary.
 
         Returns:
             Generated summary text, or None if generation fails.
         """
         try:
-            from google.genai.types import Content, GenerateContentConfig, Part
+            if isinstance(context, LLMContext):
+                messages = context.get_messages()
+            else:
+                messages = context.messages
 
-            # Format conversation history as user message
-            contents = [
-                Content(role="user", parts=[Part(text=f"Conversation history: {messages}")])
+            prompt_messages = [
+                {
+                    "role": "system",
+                    "content": summary_prompt,
+                },
+                {
+                    "role": "user",
+                    "content": f"Conversation history: {messages}",
+                },
             ]
 
-            # Use summary_prompt as system instruction
-            generation_config = GenerateContentConfig(system_instruction=summary_prompt)
+            summary_context = LLMContext(messages=prompt_messages)
 
-            # Use the new google-genai client's async method
-            response = await llm._client.aio.models.generate_content(
-                model=llm._model_name,
-                contents=contents,
-                config=generation_config,
-            )
-
-            # Extract text from response
-            if response.candidates and response.candidates[0].content:
-                for part in response.candidates[0].content.parts:
-                    if part.text:
-                        return part.text
-
-            return None
+            return await llm.run_inference(summary_context)
 
         except Exception as e:
             logger.error(f"Google summary generation failed: {e}", exc_info=True)
@@ -602,11 +681,6 @@ class AWSBedrockAdapter(LLMAdapter):
     converting between OpenAI's format and Bedrock's as needed.
     """
 
-    def __init__(self):
-        """Initialize the Bedrock adapter."""
-        super().__init__()
-        self._provider_adapter = AWSBedrockLLMAdapter()
-
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         """Extract function name from Bedrock function definition.
 
@@ -622,70 +696,49 @@ class AWSBedrockAdapter(LLMAdapter):
     def format_summary_message(self, summary: str) -> dict:
         """Format summary as a user message for Bedrock models.
 
+        Note: summary messages are always expected in OpenAI format, because
+        summarization triggers an LLMMessagesUpdateFrame, which expects
+        OpenAI-style messages.
+
         Args:
             summary: The generated summary text.
 
         Returns:
             Bedrock-formatted user message containing the summary.
         """
-        return {
-            "role": "user",
-            "content": [{"text": f"Here's a summary of the conversation:\n{summary}"}],
-        }
+        return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     async def generate_summary(
-        self, llm: Any, summary_prompt: str, messages: List[dict]
+        self, llm: Any, summary_prompt: str, context: OpenAILLMContext | LLMContext
     ) -> Optional[str]:
-        """Generate summary using AWS Bedrock API directly.
+        """Generate a summary by running a direct one-shot, out-of-band inference with AWS Bedrock.
 
         Args:
-            llm: Bedrock LLM service instance.
+            llm: LLM service instance containing client/credentials.
             summary_prompt: Prompt text to guide summary generation.
-            messages: List of messages to summarize.
+            context: Context object containing conversation history for the summary.
 
         Returns:
             Generated summary text, or None if generation fails.
         """
         try:
-            # Determine if we're using Claude or Nova based on model ID
-            model_id = llm.model_name
+            if isinstance(context, LLMContext):
+                messages = context.get_messages()
+            else:
+                messages = context.messages
 
-            # Prepare request parameters
-            request_params = {
-                "modelId": model_id,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [{"text": f"Conversation history: {messages}"}],
-                    },
-                ],
-                "inferenceConfig": {
-                    "maxTokens": 8192,
-                    "temperature": 0.7,
-                    "topP": 0.9,
+            prompt_messages = [
+                {
+                    "role": "user",
+                    "content": f"Conversation history: {messages}",
                 },
-            }
+            ]
 
-            request_params["system"] = [{"text": summary_prompt}]
+            # TODO: update to use LLMContext once Anthropic supports it in Pipecat
+            # Once all services support LLMContext, we won't even need LLM-specific generate_summary methods
+            summary_context = OpenAILLMContext(messages=prompt_messages)
 
-            # Call Bedrock without streaming
-            response = llm._client.converse(**request_params)
-
-            # Extract the response text
-            if (
-                "output" in response
-                and "message" in response["output"]
-                and "content" in response["output"]["message"]
-            ):
-                content = response["output"]["message"]["content"]
-                if isinstance(content, list):
-                    for item in content:
-                        if item.get("text"):
-                            return item["text"]
-                elif isinstance(content, str):
-                    return content
-
-            return None
+            return await llm.run_inference(summary_context, summary_prompt)
 
         except Exception as e:
             logger.error(f"Bedrock summary generation failed: {e}", exc_info=True)
@@ -751,14 +804,15 @@ class AWSBedrockAdapter(LLMAdapter):
         )
 
 
-def create_adapter(llm) -> LLMAdapter:
-    """Create appropriate adapter based on LLM service type or inheritance.
+def create_adapter(llm, context_aggregator) -> LLMAdapter:
+    """Create appropriate adapter based on context type and LLM service type or inheritance.
 
     Checks both direct class types and inheritance hierarchies to determine
     the appropriate adapter for any LLM service.
 
     Args:
-        llm: LLM service instance.
+        llm: LLM service instance or LLMSwitcher.
+        context_aggregator: Context aggregator pair.
 
     Returns:
         Provider-specific adapter instance.
@@ -766,6 +820,11 @@ def create_adapter(llm) -> LLMAdapter:
     Raises:
         ValueError: If LLM type is not supported or required dependency not installed.
     """
+    if isinstance(context_aggregator, LLMContextAggregatorPair):
+        # Universal LLMContext is in use, so we need the universal adapter
+        logger.debug("Creating universal adapter")
+        return UniversalLLMAdapter()
+
     llm_type = type(llm).__name__
     llm_class = type(llm)
 

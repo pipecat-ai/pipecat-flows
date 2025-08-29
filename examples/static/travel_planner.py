@@ -17,7 +17,8 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
@@ -25,6 +26,7 @@ from pipecat.transports.services.daily import DailyParams, DailyTransport
 from pipecat.utils.text.markdown_text_filter import MarkdownTextFilter
 
 from pipecat_flows import FlowArgs, FlowConfig, FlowManager, FlowResult
+from pipecat_flows.types import FlowsFunctionSchema
 
 sys.path.append(str(Path(__file__).parent.parent))
 from runner import configure
@@ -159,24 +161,20 @@ flow_config: FlowConfig = {
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "choose_beach",
-                        "handler": choose_beach,
-                        "description": "User wants to plan a beach vacation",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "choose_mountain",
-                        "handler": choose_mountain,
-                        "description": "User wants to plan a mountain retreat",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
+                FlowsFunctionSchema(
+                    name="choose_beach",
+                    handler=choose_beach,
+                    description="User wants to plan a beach vacation",
+                    properties={},
+                    required=[],
+                ),
+                FlowsFunctionSchema(
+                    name="choose_mountain",
+                    handler=choose_mountain,
+                    description="User wants to plan a mountain retreat",
+                    properties={},
+                    required=[],
+                ),
             ],
         },
         "choose_beach": {
@@ -187,25 +185,19 @@ flow_config: FlowConfig = {
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "select_destination",
-                        "handler": select_destination,
-                        "description": "Record the selected beach destination",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "destination": {
-                                    "type": "string",
-                                    "enum": ["Maui", "Cancun", "Maldives"],
-                                    "description": "Selected beach destination",
-                                }
-                            },
-                            "required": ["destination"],
-                        },
+                FlowsFunctionSchema(
+                    name="select_destination",
+                    handler=select_destination,
+                    description="Record the selected beach destination",
+                    properties={
+                        "destination": {
+                            "type": "string",
+                            "enum": ["Maui", "Cancun", "Maldives"],
+                            "description": "Selected beach destination",
+                        }
                     },
-                },
+                    required=["destination"],
+                ),
             ],
         },
         "choose_mountain": {
@@ -216,25 +208,19 @@ flow_config: FlowConfig = {
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "select_destination",
-                        "handler": select_destination,
-                        "description": "Record the selected mountain destination",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "destination": {
-                                    "type": "string",
-                                    "enum": ["Swiss Alps", "Rocky Mountains", "Himalayas"],
-                                    "description": "Selected mountain destination",
-                                }
-                            },
-                            "required": ["destination"],
-                        },
+                FlowsFunctionSchema(
+                    name="select_destination",
+                    handler=select_destination,
+                    description="Record the selected mountain destination",
+                    properties={
+                        "destination": {
+                            "type": "string",
+                            "enum": ["Swiss Alps", "Rocky Mountains", "Himalayas"],
+                            "description": "Selected mountain destination",
+                        }
                     },
-                },
+                    required=["destination"],
+                ),
             ],
         },
         "get_dates": {
@@ -245,30 +231,24 @@ flow_config: FlowConfig = {
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "record_dates",
-                        "handler": record_dates,
-                        "description": "Record the selected travel dates",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "check_in": {
-                                    "type": "string",
-                                    "format": "date",
-                                    "description": "Check-in date (YYYY-MM-DD)",
-                                },
-                                "check_out": {
-                                    "type": "string",
-                                    "format": "date",
-                                    "description": "Check-out date (YYYY-MM-DD)",
-                                },
-                            },
-                            "required": ["check_in", "check_out"],
+                FlowsFunctionSchema(
+                    name="record_dates",
+                    handler=record_dates,
+                    description="Record the selected travel dates",
+                    properties={
+                        "check_in": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Check-in date (YYYY-MM-DD)",
+                        },
+                        "check_out": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Check-out date (YYYY-MM-DD)",
                         },
                     },
-                },
+                    required=["check_in", "check_out"],
+                ),
             ],
         },
         "get_activities": {
@@ -279,27 +259,21 @@ flow_config: FlowConfig = {
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "record_activities",
-                        "handler": record_activities,
-                        "description": "Record selected activities",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "activities": {
-                                    "type": "array",
-                                    "items": {"type": "string"},
-                                    "minItems": 1,
-                                    "maxItems": 3,
-                                    "description": "Selected activities",
-                                }
-                            },
-                            "required": ["activities"],
-                        },
+                FlowsFunctionSchema(
+                    name="record_activities",
+                    handler=record_activities,
+                    description="Record selected activities",
+                    properties={
+                        "activities": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "description": "Selected activities",
+                        }
                     },
-                },
+                    required=["activities"],
+                ),
             ],
         },
         "verify_itinerary": {
@@ -310,24 +284,20 @@ flow_config: FlowConfig = {
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "revise_plan",
-                        "handler": revise_plan,
-                        "description": "Return to date selection to revise the plan",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "confirm_booking",
-                        "handler": confirm_booking,
-                        "description": "Confirm the booking and proceed to end",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
+                FlowsFunctionSchema(
+                    name="revise_plan",
+                    handler=revise_plan,
+                    description="Return to date selection to revise the plan",
+                    properties={},
+                    required=[],
+                ),
+                FlowsFunctionSchema(
+                    name="confirm_booking",
+                    handler=confirm_booking,
+                    description="Confirm the booking and proceed to end",
+                    properties={},
+                    required=[],
+                ),
             ],
         },
         "confirm_booking": {
@@ -338,15 +308,13 @@ flow_config: FlowConfig = {
                 }
             ],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "end",
-                        "handler": end,
-                        "description": "End the conversation",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                }
+                FlowsFunctionSchema(
+                    name="end",
+                    handler=end,
+                    description="End the conversation",
+                    properties={},
+                    required=[],
+                ),
             ],
             "pre_actions": [
                 {"type": "tts_say", "text": "Fantastic! Your dream vacation is confirmed!"}
@@ -389,8 +357,8 @@ async def main():
         )
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
 
-        context = OpenAILLMContext()
-        context_aggregator = llm.create_context_aggregator(context)
+        context = LLMContext()
+        context_aggregator = LLMContextAggregatorPair(context)
 
         pipeline = Pipeline(
             [

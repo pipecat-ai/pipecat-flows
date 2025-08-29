@@ -20,6 +20,7 @@ Mocks:
 """
 
 import pytest
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
 
 from pipecat_flows.adapters import (
     AnthropicAdapter,
@@ -92,11 +93,11 @@ def test_openai_adapter_native_format(openai_adapter):
     assert schema.transition_to == "next_step"
     assert schema.transition_callback is None
 
-    # Format function for OpenAI
+    # Format function for OpenAI (ToolsSchema expected)
     formatted = openai_adapter.format_functions([openai_function])
-    assert len(formatted) == 1
-    assert formatted[0]["type"] == "function"
-    assert formatted[0]["function"]["name"] == "get_weather"
+    assert isinstance(formatted, ToolsSchema)
+    assert len(formatted.standard_tools) == 1
+    assert formatted.standard_tools[0].name == "get_weather"
 
 
 def test_openai_adapter_function_schema(openai_adapter):
@@ -125,20 +126,15 @@ def test_openai_adapter_function_schema(openai_adapter):
     function_name = openai_adapter.get_function_name(flows_schema)
     assert function_name == "get_weather"
 
-    # Format schema for OpenAI
+    # Format schema for OpenAI (ToolsSchema expected)
     formatted = openai_adapter.format_functions([flows_schema])
-    assert len(formatted) == 1
-    assert formatted[0]["type"] == "function"
-    assert formatted[0]["function"]["name"] == "get_weather"
-    assert formatted[0]["function"]["description"] == "Get the current weather in a location"
-    assert "location" in formatted[0]["function"]["parameters"]["properties"]
-    assert "unit" in formatted[0]["function"]["parameters"]["properties"]
-    assert formatted[0]["function"]["parameters"]["required"] == ["location"]
-
-    # Verify FlowsFunctionSchema is correctly converted to FunctionSchema
-    # by checking that handler and transition_to are not in the formatted output
-    assert "handler" not in formatted[0]["function"]
-    assert "transition_to" not in formatted[0]["function"]
+    assert isinstance(formatted, ToolsSchema)
+    assert len(formatted.standard_tools) == 1
+    assert formatted.standard_tools[0].name == "get_weather"
+    assert formatted.standard_tools[0].description == "Get the current weather in a location"
+    assert "location" in formatted.standard_tools[0].properties
+    assert "unit" in formatted.standard_tools[0].properties
+    assert formatted.standard_tools[0].required == ["location"]
 
 
 # Mock Anthropic's adapter to avoid actual network calls
@@ -208,16 +204,15 @@ def test_anthropic_adapter_native_format(anthropic_adapter):
     assert schema.transition_to is None
     assert schema.transition_callback is not None
 
-    # Format function for Anthropic
+    # Format function for Anthropic (ToolsSchema expected)
     formatted = anthropic_adapter.format_functions([anthropic_function])
-    assert len(formatted) == 1
-    assert formatted[0]["name"] == "get_weather"
-    assert formatted[0]["description"] == "Get the current weather in a location"
-    assert "location" in formatted[0]["input_schema"]["properties"]
-
-    # Verify flow-specific fields not in formatted output
-    assert "handler" not in formatted[0]
-    assert "transition_callback" not in formatted[0]
+    assert isinstance(formatted, ToolsSchema)
+    assert len(formatted.standard_tools) == 1
+    assert formatted.standard_tools[0].name == "get_weather"
+    assert formatted.standard_tools[0].description == "Get the current weather in a location"
+    assert "location" in formatted.standard_tools[0].properties
+    assert "unit" in formatted.standard_tools[0].properties
+    assert formatted.standard_tools[0].required == ["location"]
 
 
 def test_anthropic_adapter_function_schema(anthropic_adapter):
@@ -246,18 +241,15 @@ def test_anthropic_adapter_function_schema(anthropic_adapter):
     function_name = anthropic_adapter.get_function_name(flows_schema)
     assert function_name == "get_weather"
 
-    # Format schema for Anthropic
+    # Format schema for Anthropic (ToolsSchema expected)
     formatted = anthropic_adapter.format_functions([flows_schema])
-    assert len(formatted) == 1
-    assert formatted[0]["name"] == "get_weather"
-    assert formatted[0]["description"] == "Get the current weather in a location"
-    assert "location" in formatted[0]["input_schema"]["properties"]
-    assert "unit" in formatted[0]["input_schema"]["properties"]
-    assert formatted[0]["input_schema"]["required"] == ["location"]
-
-    # Verify flow-specific fields not in formatted output
-    assert "handler" not in formatted[0]
-    assert "transition_callback" not in formatted[0]
+    assert isinstance(formatted, ToolsSchema)
+    assert len(formatted.standard_tools) == 1
+    assert formatted.standard_tools[0].name == "get_weather"
+    assert formatted.standard_tools[0].description == "Get the current weather in a location"
+    assert "location" in formatted.standard_tools[0].properties
+    assert "unit" in formatted.standard_tools[0].properties
+    assert formatted.standard_tools[0].required == ["location"]
 
 
 # Mock Gemini's adapter to avoid actual network calls
@@ -457,17 +449,13 @@ def test_bedrock_adapter_native_format(bedrock_adapter):
     assert schema.transition_to == "next_step"
     assert schema.transition_callback is None
 
-    # Format function for Bedrock
+    # Format function for Bedrock (ToolsSchema expected)
     formatted = bedrock_adapter.format_functions([bedrock_function])
-    assert len(formatted) == 1
-    assert formatted[0]["name"] == "get_weather"
-    assert formatted[0]["description"] == "Get the current weather in a location"
-    assert "json" in formatted[0]["input_schema"]
-    assert "location" in formatted[0]["input_schema"]["json"]["properties"]
-
-    # Verify flow-specific fields not in formatted output
-    assert "handler" not in formatted[0]
-    assert "transition_to" not in formatted[0]
+    assert isinstance(formatted, ToolsSchema)
+    assert len(formatted.standard_tools) == 1
+    assert formatted.standard_tools[0].name == "get_weather"
+    assert formatted.standard_tools[0].description == "Get the current weather in a location"
+    assert "location" in formatted.standard_tools[0].properties
 
 
 def test_bedrock_adapter_function_schema(bedrock_adapter):
@@ -496,19 +484,15 @@ def test_bedrock_adapter_function_schema(bedrock_adapter):
     function_name = bedrock_adapter.get_function_name(flows_schema)
     assert function_name == "get_weather"
 
-    # Format schema for Bedrock
+    # Format schema for Bedrock (ToolsSchema expected)
     formatted = bedrock_adapter.format_functions([flows_schema])
-    assert len(formatted) == 1
-    assert formatted[0]["name"] == "get_weather"
-    assert formatted[0]["description"] == "Get the current weather in a location"
-    assert "json" in formatted[0]["input_schema"]
-    assert "location" in formatted[0]["input_schema"]["json"]["properties"]
-    assert "unit" in formatted[0]["input_schema"]["json"]["properties"]
-    assert formatted[0]["input_schema"]["json"]["required"] == ["location"]
-
-    # Verify flow-specific fields not in formatted output
-    assert "handler" not in formatted[0]
-    assert "transition_callback" not in formatted[0]
+    assert isinstance(formatted, ToolsSchema)
+    assert len(formatted.standard_tools) == 1
+    assert formatted.standard_tools[0].name == "get_weather"
+    assert formatted.standard_tools[0].description == "Get the current weather in a location"
+    assert "location" in formatted.standard_tools[0].properties
+    assert "unit" in formatted.standard_tools[0].properties
+    assert formatted.standard_tools[0].required == ["location"]
 
 
 def test_bedrock_adapter_toolspec_format(bedrock_adapter):
