@@ -771,13 +771,13 @@ wheels = [
 
 [[package]]
 name = "daily-python"
-version = "0.19.7"
+version = "0.19.8"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/64/b3/fa69e78338b294cfca5b96dabb3b95220cb990c82d14e79d9380514c6daa/daily_python-0.19.7-cp37-abi3-macosx_10_15_x86_64.whl", hash = "sha256:86b4115720a2e8219eb2ccdc5a6b9b30a3c4eb5eaa772d54bab8f70892714473", size = 13692618, upload-time = "2025-08-14T06:24:45.687Z" },
-    { url = "https://files.pythonhosted.org/packages/d1/1f/ccfb155285dd5d9607a6a44dca22226de28b2b3cfc9ee40681cb801d72e7/daily_python-0.19.7-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:0c4f8104b200a59f4af52b9bcbcab4d5133deef4319093fd338e6e48b79be51d", size = 12047173, upload-time = "2025-08-14T06:24:47.812Z" },
-    { url = "https://files.pythonhosted.org/packages/61/a2/af0243049c2782cdbb4e781a1ca2cd39bc7a062d9b088630e4bd6da0777b/daily_python-0.19.7-cp37-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:6c3127ae1f6ca666cc4f663020e273e2b0db1836d628cb073070bf759d46a871", size = 14110897, upload-time = "2025-08-14T06:24:49.693Z" },
-    { url = "https://files.pythonhosted.org/packages/12/22/f3d5063eaad06f2989474360f9c50588190ed89df5c886caa11972f7badb/daily_python-0.19.7-cp37-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:7dcb67eafe1b50a605e2384159520d5794233b7f5b27081e137fbbaca1a785e2", size = 14582931, upload-time = "2025-08-14T06:24:51.542Z" },
+    { url = "https://files.pythonhosted.org/packages/25/33/21029ca23df6bae54dfa4e8af550fdcc557f053dc924a554cfa0e32b2904/daily_python-0.19.8-cp37-abi3-macosx_10_15_x86_64.whl", hash = "sha256:cccd2eb8b223299408a9f1269a6f1a257d03aba749ef9fa97678010474c2b40b", size = 13692303, upload-time = "2025-08-27T21:24:36.567Z" },
+    { url = "https://files.pythonhosted.org/packages/14/5b/c795498ffe7cbdca72530b71b4102c4ef43c2f528a72f0deb2d4c3af1cac/daily_python-0.19.8-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:2c1010d44238d492cee3a6af231ff613899efb54943fe3a191f5b84d6af3330d", size = 12047872, upload-time = "2025-08-27T21:24:39.097Z" },
+    { url = "https://files.pythonhosted.org/packages/94/fd/145d65d6902873f3b44f3da7918d1bbbeeb6228e260e2aeb163311a33aa2/daily_python-0.19.8-cp37-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:d2b2fedf92e84b599f18d424ede423116eabffbe01ec6434f478d0b577d8bec3", size = 14111600, upload-time = "2025-08-27T21:24:40.962Z" },
+    { url = "https://files.pythonhosted.org/packages/5b/b6/a0123f00003cee45e488467649e2d69f09058f7815a4c590b4827992d3ef/daily_python-0.19.8-cp37-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:faec30ae64e233384d8bb96ad13de871843bb02f67bf3aa793a6bce9722734c5", size = 14582824, upload-time = "2025-08-27T21:24:43.148Z" },
 ]
 
 [[package]]
@@ -887,7 +887,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -1412,7 +1412,7 @@ name = "importlib-metadata"
 version = "8.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp", marker = "python_full_version < '3.13'" },
+    { name = "zipp", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641, upload-time = "2025-04-27T15:29:01.736Z" }
 wheels = [
@@ -2216,7 +2216,7 @@ wheels = [
 
 [[package]]
 name = "pipecat-ai"
-version = "0.0.81"
+version = "0.0.82"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2236,9 +2236,9 @@ dependencies = [
     { name = "soxr" },
     { name = "wait-for2", marker = "python_full_version < '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/dc/d8/0bc2854b07562b921ce83a063d0c2d564c62b67d8c1ea5ae941f0b6a8c08/pipecat_ai-0.0.81.tar.gz", hash = "sha256:8e3fe130933de9884c6fcfedddeadc853b08ca931a896cf2a279281595fa08d6", size = 2967156, upload-time = "2025-08-25T16:29:54.193Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5b/d7/afaf75b3ab4f5f977d501622678a5da1d483da4140cd8af0bcc314ab5ddf/pipecat_ai-0.0.82.tar.gz", hash = "sha256:b44a20ca292fd91ff1687beb68be62dbf94c3aef0ce21081b5c29a5a8864d044", size = 2990742, upload-time = "2025-08-28T20:07:11.787Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a0/b4/327bd98b5a37486b81abfdfcb3b815259cd3e4fc2e0b4a3d29860ccd543f/pipecat_ai-0.0.81-py3-none-any.whl", hash = "sha256:5f974b689b2ff2f471f91abe0c9fe624bc49573205d4aa72767fb6f4960d17d2", size = 2641374, upload-time = "2025-08-25T16:29:51.591Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/da/c7233c55f985f77a50d828e73e5e09f171a9632c3d01d0db7ded090fed03/pipecat_ai-0.0.82-py3-none-any.whl", hash = "sha256:2fc2bb8b5282939ec36d1fc80bc952b43128ba2de4191425d4261cf0a6f0c083", size = 2669642, upload-time = "2025-08-28T20:07:09.386Z" },
 ]
 
 [package.optional-dependencies]
@@ -2284,7 +2284,7 @@ webrtc = [
 
 [[package]]
 name = "pipecat-ai-flows"
-version = "0.0.19"
+version = "0.0.20"
 source = { editable = "." }
 dependencies = [
     { name = "docstring-parser" },
