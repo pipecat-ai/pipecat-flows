@@ -1,3 +1,9 @@
+#
+# Copyright (c) 2024-2025, Daily
+#
+# SPDX-License-Identifier: BSD 2-Clause License
+#
+
 import asyncio
 import unittest
 from typing import Optional, TypedDict, Union
@@ -5,11 +11,6 @@ from typing import Optional, TypedDict, Union
 from pipecat_flows.exceptions import InvalidFunctionError
 from pipecat_flows.manager import FlowManager
 from pipecat_flows.types import FlowsDirectFunctionWrapper
-
-# Copyright (c) 2025, Daily
-#
-# SPDX-License-Identifier: BSD 2-Clause License
-#
 
 """Tests for FlowsDirectFunction class."""
 
