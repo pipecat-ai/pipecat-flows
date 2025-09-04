@@ -1,8 +1,9 @@
 #
-# Copyright (c) 2025, Daily
+# Copyright (c) 2024-2025, Daily
 #
 # SPDX-License-Identifier: BSD 2-Clause License
 #
+
 """'Warm Handoff' Example using Pipecat Dynamic Flows with OpenAI.
 
 This example demonstrates how to create a bot that transfers a customer to a human agent when the bot is unable to fulfill the customers's request.
@@ -54,8 +55,8 @@ from pipecat.processors.aggregators.llm_response_universal import LLMContextAggr
 from pipecat.services.cartesia.tts import CartesiaHttpTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.transports.services.daily import DailyParams, DailyTransport
-from pipecat.transports.services.helpers.daily_rest import (
+from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.transports.daily.utils import (
     DailyMeetingTokenParams,
     DailyMeetingTokenProperties,
     DailyRESTHelper,
@@ -271,8 +272,8 @@ def create_initial_customer_interaction_node() -> NodeConfig:
         task_messages=[
             {
                 "role": "system",
-                "content": """Start off by greeting the customer. Then ask how you could help, offering two choices of what you could help with: you could provide store location and hours of operation, or begin placing an order. Be friendly and casual. 
-                
+                "content": """Start off by greeting the customer. Then ask how you could help, offering two choices of what you could help with: you could provide store location and hours of operation, or begin placing an order. Be friendly and casual.
+
                 To help the customer:
                 - Use the check_store_location_and_hours_of_operation function to check store location and hours of operation to provide to the customer
                 - Use the start_order function to begin placing an order on the customer's behalf
@@ -318,7 +319,7 @@ def create_continued_customer_interaction_node() -> NodeConfig:
             {
                 "role": "system",
                 "content": """Ask the customer there's anything else you could help them with today, or if they'd like to end the conversation. If they need more help, re-offer the two choices you offered before: you could provide store location and hours of operation, or begin placing an order.
-                
+
                 To help the customer:
                 - Use the check_store_location_and_hours_of_operation function to check store location and hours of operation to provide to the customer
                 - Use the start_order function to begin placing an order on the customer's behalf
@@ -387,7 +388,7 @@ def create_human_agent_interaction_node() -> NodeConfig:
             {
                 "role": "system",
                 "content": """You're now talking to an agent who has just joined the call. Assume that the customer you were helping up until this point can no longer hear you. Your job is to be as helpful as you can and bring the agent up to speed so that they can assist the customer. Start by greeting the agent politely and explaining what the customer was trying to do that you were unable to help with, and any relevant error details. Ask the agent if they have any questions or whether they're ready to connect to the customer.
-                
+
                 Once the agent tells you they're ready to connect to the customer, call the connect_human_agent_and_customer function.
                 """,
             }

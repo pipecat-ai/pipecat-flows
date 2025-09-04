@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, Daily
+# Copyright (c) 2024-2025, Daily
 #
 # SPDX-License-Identifier: BSD 2-Clause License
 
@@ -10,7 +10,6 @@ Requirements:
 - GOOGLE_API_KEY
 """
 
-import argparse
 import os
 
 from dotenv import load_dotenv
@@ -27,10 +26,8 @@ from pipecat.services.cartesia.stt import CartesiaSTTService
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.google.llm import GoogleLLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
-from pipecat.transports.network.fastapi_websocket import (
-    FastAPIWebsocketParams,
-)
-from pipecat.transports.services.daily import DailyParams
+from pipecat.transports.daily.transport import DailyParams
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.utils.text.markdown_text_filter import MarkdownTextFilter
 
 from pipecat_flows import (
