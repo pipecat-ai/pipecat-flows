@@ -21,6 +21,7 @@ from pipecat.pipeline.service_switcher import ServiceSwitcherStrategyManual
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.services.anthropic.llm import AnthropicLLMService
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.google.llm import GoogleLLMService
@@ -51,15 +52,20 @@ async def switch_llm(flow_manager: FlowManager, llm: str) -> tuple[SwitchLLMResu
     """Switch the current LLM service.
 
     Args:
-        llm: The name of the LLM service to switch to. Must be either "OpenAI" or "Google".
+        llm: The name of the LLM service to switch to. Must be one of "OpenAI", "Google", or "Anthropic".
     """
-    new_llm = llm_openai if llm == "OpenAI" else llm_google
+    if llm == "OpenAI":
+        new_llm = llm_openai
+    elif llm == "Google":
+        new_llm = llm_google
+    elif llm == "Anthropic":
+        new_llm = llm_anthropic
+
     if llm_switcher.active_llm == new_llm:
         return SwitchLLMResult(status="success", message=f"Already using {llm} LLM service."), None
-    if llm == "OpenAI":
-        await task.queue_frames([ManuallySwitchServiceFrame(service=llm_openai)])
-    elif llm == "Google":
-        await task.queue_frames([ManuallySwitchServiceFrame(service=llm_google)])
+
+    await task.queue_frames([ManuallySwitchServiceFrame(service=new_llm)])
+
     return SwitchLLMResult(status="success", message=f"Switched to {llm} LLM service."), None
 
 
@@ -146,11 +152,13 @@ async def main():
         context_aggregator = LLMContextAggregatorPair(context)
 
         # LLM services
-        global llm_openai, llm_google, llm_switcher
+        global llm_openai, llm_google, llm_anthropic, llm_switcher
         llm_openai = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
         llm_google = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
+        llm_anthropic = AnthropicLLMService(api_key=os.getenv("ANTHROPIC_API_KEY"))
         llm_switcher = LLMSwitcher(
-            llms=[llm_openai, llm_google], strategy_type=ServiceSwitcherStrategyManual
+            llms=[llm_openai, llm_google, llm_anthropic],
+            strategy_type=ServiceSwitcherStrategyManual,
         )
 
         pipeline = Pipeline(
