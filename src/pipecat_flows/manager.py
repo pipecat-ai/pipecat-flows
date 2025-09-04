@@ -903,6 +903,16 @@ In all of these cases, you can provide a `name` in your new node's config for de
         try:
             messages = []
 
+            # Add an empty assistant message if the last message has a role "tool".
+            # This is a workaround for Mistral, which requires an assistant message following a tool message.
+            if (
+                len(self._context_aggregator.user()._context.messages) > 0
+                and self._context_aggregator.user()._context.messages[-1].get("role") == "tool"
+            ):
+                messages.append(
+                    {"role": "assistant", "content": " "}
+                )  # Keep the space in the content; an empty string does not work.
+
             # Add role messages if provided.
             # Note that these come before any possible summary message; some
             # LLMs only support a single system instruction, and the first role
