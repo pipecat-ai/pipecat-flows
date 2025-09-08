@@ -428,16 +428,18 @@ class AnthropicAdapter(LLMAdapter):
 
             prompt_messages = [
                 {
+                    "role": "system",
+                    "content": summary_prompt,
+                },
+                {
                     "role": "user",
                     "content": f"Conversation history: {messages}",
                 },
             ]
 
-            # TODO: update to use LLMContext once Anthropic supports it in Pipecat
-            # Once all services support LLMContext, we won't even need LLM-specific generate_summary methods
-            summary_context = OpenAILLMContext(messages=prompt_messages)
+            summary_context = LLMContext(messages=prompt_messages)
 
-            return await llm.run_inference(summary_context, summary_prompt)
+            return await llm.run_inference(summary_context)
 
         except Exception as e:
             logger.error(f"Anthropic summary generation failed: {e}", exc_info=True)
@@ -729,16 +731,20 @@ class AWSBedrockAdapter(LLMAdapter):
 
             prompt_messages = [
                 {
+                    "role": "system",
+                    "content": summary_prompt,
+                },
+                {
                     "role": "user",
                     "content": f"Conversation history: {messages}",
                 },
             ]
 
-            # TODO: update to use LLMContext once Anthropic supports it in Pipecat
+            # TODO: update to use LLMContext once AWS Bedrock supports it in Pipecat
             # Once all services support LLMContext, we won't even need LLM-specific generate_summary methods
             summary_context = OpenAILLMContext(messages=prompt_messages)
 
-            return await llm.run_inference(summary_context, summary_prompt)
+            return await llm.run_inference(summary_context)
 
         except Exception as e:
             logger.error(f"Bedrock summary generation failed: {e}", exc_info=True)
