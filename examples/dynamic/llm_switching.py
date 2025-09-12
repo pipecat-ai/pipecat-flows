@@ -67,7 +67,7 @@ async def switch_llm(flow_manager: FlowManager, llm: str) -> tuple[SwitchLLMResu
     if llm_switcher.active_llm == new_llm:
         return SwitchLLMResult(status="success", message=f"Already using {llm} LLM service."), None
 
-    await task.queue_frames([ManuallySwitchServiceFrame(service=new_llm)])
+    await flow_manager.task.queue_frames([ManuallySwitchServiceFrame(service=new_llm)])
 
     return SwitchLLMResult(status="success", message=f"Switched to {llm} LLM service."), None
 
@@ -181,7 +181,6 @@ async def main():
             ]
         )
 
-        global task
         task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
 
         # Initialize flow manager
