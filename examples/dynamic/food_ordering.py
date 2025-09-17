@@ -366,6 +366,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         # Kick off the conversation with the initial node
         await flow_manager.initialize(create_initial_node())
 
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info(f"Client disconnected")
+        await task.cancel()
+
     runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
     await runner.run(task)
 

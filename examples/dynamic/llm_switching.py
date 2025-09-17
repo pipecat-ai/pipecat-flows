@@ -206,6 +206,11 @@ async def main():
             logger.debug("Initializing flow manager")
             await flow_manager.initialize(create_main_node())
 
+        @transport.event_handler("on_client_disconnected")
+        async def on_client_disconnected(transport, client):
+            logger.info(f"Client disconnected")
+            await task.cancel()
+
         runner = PipelineRunner()
         await runner.run(task)
 
