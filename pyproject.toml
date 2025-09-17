@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pipecat-ai-flows"
-version = "0.0.21"
+dynamic = ["version"]
 description = "Conversation Flow management for Pipecat AI applications"
 license = { text = "BSD 2-Clause License" }
 readme = "README.md"
@@ -40,6 +40,7 @@ dev = [
     "pytest-cov~=4.1.0",
     "ruff~=0.12.1",
     "setuptools~=78.1.1",
+    "setuptools_scm~=8.3.1",
     "python-dotenv>=1.0.1,<2.0.0",
     "pipecat-ai[webrtc,daily,silero,deepgram,openai,cartesia,runner,anthropic,google,aws]>=0.0.79",
 ]
@@ -78,3 +79,7 @@ ignore = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.setuptools_scm]
+local_scheme = "no-local-version"
+fallback_version = "0.0.0-dev"
