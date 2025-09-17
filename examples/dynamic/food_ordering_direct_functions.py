@@ -16,13 +16,20 @@ The flow handles:
 3. Order confirmation and revision
 4. Order completion
 
+Multi-LLM Support:
+Set LLM_PROVIDER environment variable to choose your LLM provider.
+Supported: openai (default), anthropic, google, aws
+
 Requirements:
-- CARTESIA_API_KEY
-- OPENAI_API_KEY
-- DEEPGRAM_API_KEY
+- CARTESIA_API_KEY (for TTS)
+- DEEPGRAM_API_KEY (for STT)
+- DAILY_API_KEY (for transport)
+- LLM API key (varies by provider - see env.example)
 """
 
 import os
+import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -36,11 +43,13 @@ from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.utils.text.markdown_text_filter import MarkdownTextFilter
+
+sys.path.append(str(Path(__file__).parent.parent))
+from utils import create_llm
 
 from pipecat_flows import FlowManager, FlowResult, NodeConfig
 
@@ -278,7 +287,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         voice_id="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
         text_filters=[MarkdownTextFilter()],
     )
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
+    # LLM service is created using the create_llm function from utils.py
+    # Default is OpenAI; can be changed by setting LLM_PROVIDER environment variable
+    llm = create_llm()
 
     context = LLMContext()
     context_aggregator = LLMContextAggregatorPair(context)
