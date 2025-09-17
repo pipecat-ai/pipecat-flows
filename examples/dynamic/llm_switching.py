@@ -21,6 +21,7 @@ from pipecat.pipeline.service_switcher import ServiceSwitcherStrategyManual
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.anthropic.llm import AnthropicLLMService
 from pipecat.services.aws.llm import AWSBedrockLLMService
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -67,7 +68,16 @@ async def switch_llm(flow_manager: FlowManager, llm: str) -> tuple[SwitchLLMResu
     if llm_switcher.active_llm == new_llm:
         return SwitchLLMResult(status="success", message=f"Already using {llm} LLM service."), None
 
-    await flow_manager.task.queue_frames([ManuallySwitchServiceFrame(service=new_llm)])
+    # Typically, you would just switch LLMs like this:
+    # await flow_manager.task.queue_frames([ManuallySwitchServiceFrame(service=new_llm)])
+
+    # But because we're in a tool call, and tool calls result in upstream
+    # updates from the assistant context aggregator, we're pushing the
+    # LLM-switching frame upstream from the aggregator to guarantee that the
+    # switch happens before the LLM is run with the tool call result.
+    await context_aggregator.assistant().push_frame(
+        ManuallySwitchServiceFrame(service=new_llm), FrameDirection.UPSTREAM
+    )
 
     return SwitchLLMResult(status="success", message=f"Switched to {llm} LLM service."), None
 
@@ -152,6 +162,7 @@ async def main():
 
         # Shared context and aggregators for LLM services
         context = LLMContext()
+        global context_aggregator
         context_aggregator = LLMContextAggregatorPair(context)
 
         # LLM services
