@@ -1,46 +1,27 @@
 name: Publish to TestPyPI
 
-on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish (must match pyproject.toml, e.g. 0.0.4)'
-        required: true
-        type: string
+on: workflow_dispatch
 
 jobs:
   build:
     name: 'Build and upload wheels'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-tags: true
           fetch-depth: 100
-
       - name: Install uv
         uses: astral-sh/setup-uv@v3
         with:
           version: 'latest'
-
       - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Verify version matches
-        run: |
-          PROJECT_VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-          if [ "$PROJECT_VERSION" != "${{ github.event.inputs.version }}" ]; then
-            echo "Error: Input version (${{ github.event.inputs.version }}) does not match pyproject.toml version ($PROJECT_VERSION)"
-            exit 1
-          fi
-
+        run: uv python install 3.10
       - name: Install development dependencies
         run: uv sync --group dev
-
       - name: Build project
         run: uv build
-
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -62,10 +43,9 @@ jobs:
         with:
           name: wheels
           path: ./dist
-
-      - name: Publish to TestPyPI
+      - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository-url: https://test.pypi.org/legacy/
           verbose: true
           print-hash: true
+          repository-url: https://test.pypi.org/legacy/
