@@ -52,10 +52,7 @@ The repository includes several complete example implementations demonstrating v
 
 ### Available Examples
 
-- **Static Flows**: Pre-defined conversation paths including food ordering, movie exploration, patient intake, and travel planning
-- **Dynamic Flows**: Runtime-generated flows including insurance quotes, restaurant reservations, and warm transfers
-
-Each example is available in multiple LLM provider formats (OpenAI, Anthropic, Google Gemini, AWS Bedrock) to demonstrate cross-platform compatibility.
+The examples demonstrate various conversation flows including food ordering, restaurant reservations, patient intake, insurance quotes, and warm transfers. All examples support multiple LLM providers (OpenAI, Anthropic, Google Gemini, AWS Bedrock) to demonstrate cross-platform compatibility.
 
 ### Getting Started with Examples
 
@@ -72,7 +69,7 @@ uv pip install "pipecat-ai[daily,openai,deepgram,cartesia,silero,examples]"
 cp env.example .env  # Add your API keys
 
 # Run an example
-uv run python examples/static/food_ordering.py -u YOUR_DAILY_ROOM_URL
+uv run examples/food_ordering.py
 ```
 
 ## Contributing to the framework
@@ -104,11 +101,11 @@ The package includes a comprehensive test suite covering the core functionality.
 
 ### Setup Test Environment
 
-1. **Install Dependencies**:
-   ```bash
-   uv sync --group dev
-   uv add "pipecat-ai[google,aws,openai,anthropic]"
-   ```
+Install venv and dependencies:
+
+```bash
+uv sync --group dev
+```
 
 ### Running Tests
 
