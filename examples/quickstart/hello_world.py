@@ -8,6 +8,9 @@
 Requirements:
 - CARTESIA_API_KEY
 - GOOGLE_API_KEY
+
+Run the example:
+uv run hello_world.py
 """
 
 import os
