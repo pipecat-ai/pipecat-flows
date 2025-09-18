@@ -31,7 +31,8 @@ def create_llm(provider: str = None, model: str = None) -> Any:
         - openai: Requires OPENAI_API_KEY
         - anthropic: Requires ANTHROPIC_API_KEY
         - google: Requires GOOGLE_API_KEY
-        - aws: Requires AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
+        - aws: Uses AWS default credential chain (SSO, environment variables, or IAM roles)
+              Optionally set AWS_REGION (defaults to us-west-2)
 
     Usage:
         # Use default provider (from LLM_PROVIDER env var, defaults to OpenAI)
@@ -42,6 +43,9 @@ def create_llm(provider: str = None, model: str = None) -> Any:
 
         # Use specific provider and model
         llm = create_llm("openai", "gpt-4o-mini")
+
+        # Use AWS Bedrock (requires AWS credentials via SSO, env vars, or IAM)
+        llm = create_llm("aws")
     """
     if provider is None:
         provider = os.getenv("LLM_PROVIDER", "openai").lower()
@@ -67,9 +71,9 @@ def create_llm(provider: str = None, model: str = None) -> Any:
         },
         "aws": {
             "service": "pipecat.services.aws.llm.AWSBedrockLLMService",
-            "api_key_env": "AWS_SECRET_ACCESS_KEY",
+            "api_key_env": None,  # AWS uses default credential chain
             "default_model": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-            "region": "us-east-1",
+            "region": "us-west-2",
         },
     }
 
@@ -83,10 +87,13 @@ def create_llm(provider: str = None, model: str = None) -> Any:
     module = __import__(module_path, fromlist=[class_name])
     service_class = getattr(module, class_name)
 
-    # Get API key
-    api_key = os.getenv(config["api_key_env"])
-    if not api_key:
-        raise ValueError(f"Missing API key: {config['api_key_env']} for provider: {provider}")
+    # Get API key (skip for AWS which uses default credential chain)
+    if provider == "aws" or config["api_key_env"] is None:
+        api_key = None  # AWS uses default credential chain
+    else:
+        api_key = os.getenv(config["api_key_env"])
+        if not api_key:
+            raise ValueError(f"Missing API key: {config['api_key_env']} for provider: {provider}")
 
     # Use provided model or default
     selected_model = model or config["default_model"]
@@ -96,9 +103,9 @@ def create_llm(provider: str = None, model: str = None) -> Any:
 
     # Add AWS-specific parameters
     if provider == "aws":
-        kwargs["region"] = os.getenv("AWS_REGION", config["region"])
-        kwargs["aws_access_key_id"] = os.getenv("AWS_ACCESS_KEY_ID")
-        if not kwargs["aws_access_key_id"]:
-            raise ValueError("Missing AWS_ACCESS_KEY_ID for AWS provider")
+        kwargs["aws_region"] = os.getenv("AWS_REGION", config["region"])
+        kwargs["params"] = service_class.InputParams(temperature=0.8)
+        # Remove the generic api_key since AWS uses default credential chain
+        del kwargs["api_key"]
 
     return service_class(**kwargs)

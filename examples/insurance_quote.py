@@ -31,8 +31,6 @@ Requirements:
 """
 
 import os
-import sys
-from pathlib import Path
 from typing import TypedDict, Union
 
 from dotenv import load_dotenv

@@ -28,8 +28,6 @@ Requirements:
 """
 
 import os
-import sys
-from pathlib import Path
 from typing import List, TypedDict
 
 from dotenv import load_dotenv
