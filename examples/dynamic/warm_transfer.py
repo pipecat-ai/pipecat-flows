@@ -4,12 +4,12 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""'Warm Handoff' Example using Pipecat Dynamic Flows with OpenAI.
+"""'Warm Handoff' Example using Pipecat Dynamic Flows.
 
 This example demonstrates how to create a bot that transfers a customer to a human agent when the bot is unable to fulfill the customers's request.
 This example uses:
 - Pipecat Flows for conversation management
-- OpenAI gpt-4o as the LLM
+- Dynamic LLM selection (OpenAI, Anthropic, Google, AWS Bedrock)
 - Daily as the transport service
 
 The bot asks how they could be of assistance, and offers to provide information about store location and hours of operation, or begin placing an order.
@@ -28,10 +28,14 @@ The various parties join with the following Daily meeting token properties:
 The bot joins with a token with the following properties:
 - owner: true
 
+Multi-LLM Support:
+Set LLM_PROVIDER environment variable to choose your LLM provider.
+Supported: openai (default), anthropic, google, aws
+
 Requirements:
 - Daily room URL
 - Daily API key
-- OpenAI API key
+- LLM API key (varies by provider - see env.example)
 - Deepgram API key
 - Cartesia API key
 """
@@ -52,9 +56,9 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.runner.daily import configure
 from pipecat.services.cartesia.tts import CartesiaHttpTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 from pipecat.transports.daily.utils import (
     DailyMeetingTokenParams,
@@ -66,7 +70,7 @@ from pipecat_flows import ContextStrategyConfig, FlowManager, FlowResult, NodeCo
 from pipecat_flows.types import ActionConfig, ContextStrategy, FlowArgs, FlowsFunctionSchema
 
 sys.path.append(str(Path(__file__).parent.parent))
-from runner import configure
+from utils import create_llm
 
 load_dotenv(override=True)
 
@@ -631,7 +635,7 @@ async def main():
             api_key=os.getenv("CARTESIA_API_KEY"),
             voice_id="d46abd1d-2d02-43e8-819f-51fb652c1c61",  # Newsman
         )
-        llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
+        llm = create_llm()
 
         # Initialize context
         context = LLMContext()

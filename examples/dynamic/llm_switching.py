@@ -7,7 +7,6 @@
 import asyncio
 import os
 import sys
-from pathlib import Path
 
 import aiohttp
 from dotenv import load_dotenv
@@ -22,6 +21,7 @@ from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.processors.frame_processor import FrameDirection
+from pipecat.runner.daily import configure
 from pipecat.services.anthropic.llm import AnthropicLLMService
 from pipecat.services.aws.llm import AWSBedrockLLMService
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -31,11 +31,6 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
 from pipecat_flows import FlowManager, FlowResult, NodeConfig
-
-sys.path.append(str(Path(__file__).parent.parent))
-
-from runner import configure
-
 from pipecat_flows.types import ContextStrategy, ContextStrategyConfig
 
 load_dotenv(override=True)
