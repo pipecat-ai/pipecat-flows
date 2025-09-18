@@ -6,36 +6,28 @@ This directory contains complete example implementations demonstrating various f
 
 ### Quickstart
 
-See [Quick Start README](./examples/quickstart/README.md).
+See [quickstart/README.md](./quickstart/README.md) for a beginner-friendly introduction to Pipecat Flows.
 
-### Static Flows
+### Main Examples
 
-In the `static/` directory, you'll find these examples:
+#### Core Flow Examples
 
-- `food_ordering.py` - A restaurant order flow demonstrating node and edge functions
-- `food_ordering_direct_functions.py` - Same flow using direct function registration
-- `movie_explorer_openai.py` - Movie information bot demonstrating real API integration with TMDB
-- `movie_explorer_anthropic.py` - The same movie information demo adapted for Anthropic's format
-- `movie_explorer_gemini.py` - The same movie explorer demo adapted for Google Gemini's format
-- `patient_intake_openai.py` - A medical intake system showing complex state management
-- `patient_intake_anthropic.py` - The same medical intake demo adapted for Anthropic's format
-- `patient_intake_aws_bedrock.py` - The same medical intake demo adapted for AWS Bedrock
-- `patient_intake_gemini.py` - The same medical intake demo adapted for Gemini's format
-- `travel_planner.py` - A vacation planning assistant with parallel paths
+- `food_ordering.py` - Restaurant order flow demonstrating node and edge functions
+- `restaurant_reservation.py` - Reservation system with availability checking
+- `patient_intake.py` - Medical intake system showing complex state management
+- `insurance_quote.py` - Insurance quote system with data collection
 
-### Dynamic Flows
+#### Implementation Patterns
 
-In the `dynamic/` directory, you'll find these examples:
+- `food_ordering_direct_functions.py` - Food ordering using direct function registration
+- `restaurant_reservation_direct_functions.py` - Reservation system using direct function registration
+- `llm_switching.py` - Switching between different LLM providers during conversation
 
-- `insurance_openai.py` - An insurance quote system using OpenAI's format
-- `insurance_anthropic.py` - The same insurance system adapted for Anthropic's format
-- `insurance_aws_bedrock.py` - The same insurance system adapted for AWS Bedrock
-- `insurance_gemini.py` - The insurance system implemented with Google's format
-- `restaurant_reservation.py` - A reservation system with availability checking
-- `restaurant_reservation_direct_functions.py` - Same reservation system using direct function registration
-- `warm_transfer.py` - Demonstrates transferring calls between different flows
+#### Advanced Features
 
-Each LLM provider (OpenAI, Anthropic, Google, AWS Bedrock) has slightly different function calling formats, but Pipecat Flows handles these differences internally while maintaining a consistent API for developers.
+- `warm_transfer.py` - Transferring calls between different flows (DailyTransport only)
+
+**Note:** All examples support multiple LLM providers (OpenAI, Anthropic, Google, AWS Bedrock) and transport options unless otherwise specified. Pipecat Flows handles the different function calling formats internally while maintaining a consistent API for developers.
 
 ## Setup and Installation
 
@@ -96,7 +88,41 @@ Looking for a Daily API key and room URL? Sign up on the [Daily Dashboard](https
 Run any example using:
 
 ```bash
-uv run python examples/static/food_ordering.py -u YOUR_DAILY_ROOM_URL
+uv run examples/food_ordering.py
 ```
 
-Replace `food_ordering.py` with any other example file, and provide your Daily room URL.
+Open http://localhost:7860/client in your browser to talk to your bot.
+
+## Other Transports
+
+The examples use Pipecat development runner, which supports using multiple clients. Join using either the SmallWebRTCTransport, DailyTransport, or FastAPIWebsocketTransport with Twilio/Telnyx/Plivo/Exotel:
+
+- SmallWebRTCTransport:
+
+  ```bash
+  uv run examples/food_ordering.py
+  ```
+
+- DailyTransport:
+
+  ```bash
+  uv run examples/food_ordering.py --transport daily
+  ```
+
+- Twilio (or other telephony provider):
+
+  Start an ngrok tunnel:
+
+  ```bash
+  ngrok http 7860
+  ```
+
+  > Tip: Use `--subdomain` for a reusable ngrok URL.
+
+  Run the bot:
+
+  ```bash
+  uv run examples/food_ordering.py --transport twilio --proxy your-ngrok.ngrok.io
+  ```
+
+  replacing `your-ngrok` with your ngrok subdomain.

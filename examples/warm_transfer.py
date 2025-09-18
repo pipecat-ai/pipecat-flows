@@ -65,12 +65,10 @@ from pipecat.transports.daily.utils import (
     DailyMeetingTokenProperties,
     DailyRESTHelper,
 )
+from utils import create_llm
 
 from pipecat_flows import ContextStrategyConfig, FlowManager, FlowResult, NodeConfig
 from pipecat_flows.types import ActionConfig, ContextStrategy, FlowArgs, FlowsFunctionSchema
-
-sys.path.append(str(Path(__file__).parent.parent))
-from utils import create_llm
 
 load_dotenv(override=True)
 

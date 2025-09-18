@@ -47,8 +47,6 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.utils.text.markdown_text_filter import MarkdownTextFilter
-
-sys.path.append(str(Path(__file__).parent.parent))
 from utils import create_llm
 
 from pipecat_flows import FlowManager, FlowResult, NodeConfig
