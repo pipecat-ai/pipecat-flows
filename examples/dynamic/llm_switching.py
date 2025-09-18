@@ -4,11 +4,29 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-import asyncio
+"""A dynamic LLM switching flow example for Pipecat Flows.
+
+This example demonstrates how to dynamically switch between different LLM providers
+during a conversation using Pipecat's LLMSwitcher.
+
+Multi-LLM Support:
+This example requires API keys for all supported LLM providers:
+- OpenAI (default), Google, Anthropic, and AWS Bedrock
+- Users can switch between providers in real-time during conversation
+
+Requirements:
+- CARTESIA_API_KEY (required for TTS)
+- DEEPGRAM_API_KEY (required for STT)
+- DAILY_API_KEY (optional for transport)
+- OPENAI_API_KEY (for OpenAI LLM)
+- GOOGLE_API_KEY (for Google LLM)
+- ANTHROPIC_API_KEY (for Anthropic LLM)
+- AWS credentials configured (for AWS Bedrock LLM)
+"""
+
 import os
 import sys
 
-import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -21,14 +39,17 @@ from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.processors.frame_processor import FrameDirection
-from pipecat.runner.daily import configure
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
 from pipecat.services.anthropic.llm import AnthropicLLMService
 from pipecat.services.aws.llm import AWSBedrockLLMService
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.google.llm import GoogleLLMService
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transports.daily.transport import DailyParams
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 
 from pipecat_flows import FlowManager, FlowResult, NodeConfig
 from pipecat_flows.types import ContextStrategy, ContextStrategyConfig
@@ -37,6 +58,24 @@ load_dotenv(override=True)
 
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
+
+transport_params = {
+    "daily": lambda: DailyParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(),
+    ),
+    "twilio": lambda: FastAPIWebsocketParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(),
+    ),
+    "webrtc": lambda: TransportParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(),
+    ),
+}
 
 
 class SwitchLLMResult(FlowResult):
@@ -133,82 +172,77 @@ def create_main_node(summarize: bool = False) -> NodeConfig:
 
 
 # Main setup
-async def main():
-    async with aiohttp.ClientSession() as session:
-        (room_url, _) = await configure(session)
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+    """Run the LLM switching bot."""
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
-        transport = DailyTransport(
-            room_url,
-            None,
-            "LLM Switcher Bot",
-            DailyParams(
-                audio_in_enabled=True,
-                audio_out_enabled=True,
-                vad_analyzer=SileroVADAnalyzer(),
-            ),
-        )
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+    )
 
-        stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    # Shared context and aggregators for LLM services
+    context = LLMContext()
+    global context_aggregator
+    context_aggregator = LLMContextAggregatorPair(context)
 
-        tts = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
-        )
+    # LLM services
+    global llm_openai, llm_google, llm_anthropic, llm_aws, llm_switcher
+    llm_openai = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    llm_google = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
+    llm_anthropic = AnthropicLLMService(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    llm_aws = AWSBedrockLLMService(
+        aws_region="us-west-2",
+        model="us.anthropic.claude-3-5-haiku-20241022-v1:0",
+        params=AWSBedrockLLMService.InputParams(temperature=0.8, latency="optimized"),
+    )
+    llm_switcher = LLMSwitcher(
+        llms=[llm_openai, llm_google, llm_anthropic, llm_aws],
+        strategy_type=ServiceSwitcherStrategyManual,
+    )
 
-        # Shared context and aggregators for LLM services
-        context = LLMContext()
-        global context_aggregator
-        context_aggregator = LLMContextAggregatorPair(context)
+    pipeline = Pipeline(
+        [
+            transport.input(),
+            stt,
+            context_aggregator.user(),
+            llm_switcher,
+            tts,
+            transport.output(),
+            context_aggregator.assistant(),
+        ]
+    )
 
-        # LLM services
-        global llm_openai, llm_google, llm_anthropic, llm_aws, llm_switcher
-        llm_openai = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-        llm_google = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
-        llm_anthropic = AnthropicLLMService(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        llm_aws = AWSBedrockLLMService(
-            aws_region="us-west-2",
-            model="us.anthropic.claude-3-5-haiku-20241022-v1:0",
-            params=AWSBedrockLLMService.InputParams(temperature=0.8, latency="optimized"),
-        )
-        llm_switcher = LLMSwitcher(
-            llms=[llm_openai, llm_google, llm_anthropic, llm_aws],
-            strategy_type=ServiceSwitcherStrategyManual,
-        )
+    task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
 
-        pipeline = Pipeline(
-            [
-                transport.input(),
-                stt,
-                context_aggregator.user(),
-                llm_switcher,
-                tts,
-                transport.output(),
-                context_aggregator.assistant(),
-            ]
-        )
+    # Initialize flow manager
+    flow_manager = FlowManager(
+        task=task,
+        llm=llm_switcher,
+        context_aggregator=context_aggregator,
+    )
 
-        task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
+    @transport.event_handler("on_client_connected")
+    async def on_client_connected(transport, participant):
+        logger.debug("Initializing flow manager")
+        await flow_manager.initialize(create_main_node())
 
-        # Initialize flow manager
-        flow_manager = FlowManager(
-            task=task,
-            llm=llm_switcher,
-            context_aggregator=context_aggregator,
-        )
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info(f"Client disconnected")
+        await task.cancel()
 
-        @transport.event_handler("on_client_connected")
-        async def on_client_connected(transport, participant):
-            logger.debug("Initializing flow manager")
-            await flow_manager.initialize(create_main_node())
+    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
+    await runner.run(task)
 
-        @transport.event_handler("on_client_disconnected")
-        async def on_client_disconnected(transport, client):
-            logger.info(f"Client disconnected")
-            await task.cancel()
 
-        runner = PipelineRunner()
-        await runner.run(task)
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+    transport = await create_transport(runner_args, transport_params)
+    await run_bot(transport, runner_args)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    from pipecat.runner.run import main
+
+    main()
