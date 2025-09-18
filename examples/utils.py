@@ -53,23 +53,23 @@ def create_llm(provider: str = None, model: str = None) -> Any:
         "openai": {
             "service": "pipecat.services.openai.llm.OpenAILLMService",
             "api_key_env": "OPENAI_API_KEY",
-            "default_model": "gpt-4o",
+            "default_model": "gpt-4.1",
         },
         "anthropic": {
             "service": "pipecat.services.anthropic.llm.AnthropicLLMService",
             "api_key_env": "ANTHROPIC_API_KEY",
-            "default_model": "claude-3-5-sonnet-20241022",
+            "default_model": "claude-sonnet-4-20250514",
         },
         "google": {
             "service": "pipecat.services.google.llm.GoogleLLMService",
             "api_key_env": "GOOGLE_API_KEY",
-            "default_model": "gemini-2.0-flash-exp",
+            "default_model": "gemini-2.0-flash",
         },
         "aws": {
-            "service": "pipecat.services.aws.llm.AWSLLMService",
+            "service": "pipecat.services.aws.llm.AWSBedrockLLMService",
             "api_key_env": "AWS_SECRET_ACCESS_KEY",
-            "default_model": "anthropic.claude-3-5-sonnet-20241022-v2:0",
-            "region": "us-west-2",
+            "default_model": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            "region": "us-east-1",
         },
     }
 
