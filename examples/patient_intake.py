@@ -265,10 +265,16 @@ def create_prescriptions_node() -> NodeConfig:
 
     return NodeConfig(
         name="get_prescriptions",
+        role_messages=[
+            {
+                "role": "system",
+                "content": "You are Jessica, an agent for Tri-County Health Services. You must ALWAYS use one of the available functions to progress the conversation. Be professional but friendly.",
+            }
+        ],
         task_messages=[
             {
                 "role": "system",
-                "content": "This step is for collecting prescriptions. Ask them what prescriptions they're taking, including the dosage. After recording prescriptions (or confirming none), proceed to allergies.",
+                "content": "This step is for collecting prescriptions. Ask them what prescriptions they're taking, including the dosage. Get to the point by saying 'Thanks for confirming that. First up, what prescriptions are you currently taking, including the dosage for each medication?'. After recording prescriptions (or confirming none), proceed to allergies.",
             }
         ],
         context_strategy=ContextStrategyConfig(strategy=ContextStrategy.RESET),
