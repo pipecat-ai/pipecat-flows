@@ -4,12 +4,33 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
+"""A dynamic restaurant reservation flow example using Direct Functions.
+
+This example demonstrates a restaurant reservation system using dynamic flows with
+direct functions where conversation paths are determined at runtime.
+Direct functions combine the function definition and handler in a single function.
+
+The flow handles:
+1. Greeting and party size collection
+2. Time preference gathering with availability checking
+3. Alternative time suggestions when unavailable
+4. Reservation confirmation
+
+Multi-LLM Support:
+Set LLM_PROVIDER environment variable to choose your LLM provider.
+Supported: openai (default), anthropic, google, aws
+
+Requirements:
+- CARTESIA_API_KEY (for TTS)
+- DEEPGRAM_API_KEY (for STT)
+- DAILY_API_KEY (for transport)
+- LLM API key (varies by provider - see env.example)
+"""
+
 import asyncio
 import os
 import sys
-from pathlib import Path
 
-import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -18,22 +39,37 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transports.daily.transport import DailyParams
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
+from pipecat.utils.text.markdown_text_filter import MarkdownTextFilter
+from utils import create_llm
 
 from pipecat_flows import FlowManager, FlowResult, NodeConfig
 
-sys.path.append(str(Path(__file__).parent.parent))
-import argparse
-
-from runner import configure
-
 load_dotenv(override=True)
 
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
+transport_params = {
+    "daily": lambda: DailyParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(),
+    ),
+    "twilio": lambda: FastAPIWebsocketParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(),
+    ),
+    "webrtc": lambda: TransportParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(),
+    ),
+}
 
 
 # Mock reservation system
@@ -216,70 +252,92 @@ def create_end_node() -> NodeConfig:
     }
 
 
-# Main setup
-async def main(wait_for_user: bool):
-    async with aiohttp.ClientSession() as session:
-        (room_url, _) = await configure(session)
+async def run_bot(
+    transport: BaseTransport, runner_args: RunnerArguments, wait_for_user: bool = False
+):
+    """Run the restaurant reservation bot with direct functions."""
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        text_filters=[MarkdownTextFilter()],
+    )
+    # LLM service is created using the create_llm function from utils.py
+    # Default is OpenAI; can be changed by setting LLM_PROVIDER environment variable
+    llm = create_llm()
 
-        transport = DailyTransport(
-            room_url,
-            None,
-            "Reservation bot",
-            DailyParams(
-                audio_in_enabled=True,
-                audio_out_enabled=True,
-                vad_analyzer=SileroVADAnalyzer(),
-            ),
-        )
+    context = LLMContext()
+    context_aggregator = LLMContextAggregatorPair(context)
 
-        stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-        tts = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
-        )
-        llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
+    pipeline = Pipeline(
+        [
+            transport.input(),
+            stt,
+            context_aggregator.user(),
+            llm,
+            tts,
+            transport.output(),
+            context_aggregator.assistant(),
+        ]
+    )
 
-        context = LLMContext()
-        context_aggregator = LLMContextAggregatorPair(context)
+    task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
 
-        pipeline = Pipeline(
-            [
-                transport.input(),
-                stt,
-                context_aggregator.user(),
-                llm,
-                tts,
-                transport.output(),
-                context_aggregator.assistant(),
-            ]
-        )
+    # Initialize flow manager in dynamic mode
+    flow_manager = FlowManager(
+        task=task,
+        llm=llm,
+        context_aggregator=context_aggregator,
+        transport=transport,
+    )
 
-        task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
+    @transport.event_handler("on_client_connected")
+    async def on_client_connected(transport, client):
+        logger.info("Client connected")
+        # Kick off the conversation with the initial node
+        await flow_manager.initialize(create_initial_node(wait_for_user))
 
-        # Initialize flow manager
-        flow_manager = FlowManager(
-            task=task,
-            llm=llm,
-            context_aggregator=context_aggregator,
-        )
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info(f"Client disconnected")
+        await task.cancel()
 
-        @transport.event_handler("on_first_participant_joined")
-        async def on_first_participant_joined(transport, participant):
-            await transport.capture_participant_transcription(participant["id"])
-            logger.debug("Initializing flow manager")
-            await flow_manager.initialize(create_initial_node(wait_for_user))
+    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
+    await runner.run(task)
 
-        runner = PipelineRunner()
-        await runner.run(task)
+
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+    # Use the global flag if available, otherwise default to False
+    wait_for_user = globals().get("WAIT_FOR_USER", False)
+
+    transport = await create_transport(runner_args, transport_params)
+    await run_bot(transport, runner_args, wait_for_user)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Restaurant reservation bot")
+    import argparse
+    import sys
+
+    # Parse our custom argument first
+    parser = argparse.ArgumentParser(description="Restaurant reservation bot with direct functions")
     parser.add_argument(
         "--wait-for-user",
         action="store_true",
         help="If set, the bot will wait for the user to speak first",
     )
-    args = parser.parse_args()
 
-    asyncio.run(main(args.wait_for_user))
+    # Parse only our known args, leave the rest for the runner
+    args, remaining = parser.parse_known_args()
+
+    # Store the flag globally so bot() can access it
+    WAIT_FOR_USER = args.wait_for_user
+
+    # Remove our custom arg from sys.argv and let the runner handle the rest
+    if "--wait-for-user" in sys.argv:
+        sys.argv.remove("--wait-for-user")
+
+    # Now run the standard runner
+    from pipecat.runner.run import main
+
+    main()

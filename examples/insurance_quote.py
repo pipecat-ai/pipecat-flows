@@ -3,14 +3,14 @@
 #
 # SPDX-License-Identifier: BSD 2-Clause License
 #
-"""Insurance Quote Example using Pipecat Dynamic Flows with AWS Bedrock.
+"""Insurance Quote Example using Pipecat Dynamic Flows.
 
 This example demonstrates how to create a conversational insurance quote bot using:
 - Dynamic flow management for flexible conversation paths
-- AWS Bedrock for natural language understanding
-- Simple function handlers for processing user input
+- LLM-driven function calls for consistent behavior
 - Node configurations for different conversation states
 - Pre/post actions for user feedback
+- Transition logic based on user responses
 
 The flow allows users to:
 1. Provide their age
@@ -19,40 +19,59 @@ The flow allows users to:
 4. Adjust coverage options
 5. Complete the quote process
 
+Multi-LLM Support:
+Set LLM_PROVIDER environment variable to choose your LLM provider.
+Supported: openai (default), anthropic, google, aws
+
 Requirements:
-- Daily room URL
-- Google API key
-- Deepgram API key
+- CARTESIA_API_KEY (for TTS)
+- DEEPGRAM_API_KEY (for STT)
+- DAILY_API_KEY (for transport)
+- LLM API key (varies by provider - see env.example)
 """
 
-import asyncio
 import os
-import sys
-from pathlib import Path
 from typing import TypedDict, Union
 
-import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
-from pipecat.services.aws.llm import AWSBedrockLLMService
-from pipecat.services.aws.stt import AWSTranscribeSTTService
-from pipecat.services.aws.tts import AWSPollyTTSService
-from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
+from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.deepgram.stt import DeepgramSTTService
+from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transports.daily.transport import DailyParams
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
+from pipecat.utils.text.markdown_text_filter import MarkdownTextFilter
+from utils import create_llm
 
 from pipecat_flows import FlowArgs, FlowManager, FlowResult, FlowsFunctionSchema, NodeConfig
 
-sys.path.append(str(Path(__file__).parent.parent))
-from runner import configure
-
 load_dotenv(override=True)
 
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
+transport_params = {
+    "daily": lambda: DailyParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(),
+    ),
+    "twilio": lambda: FastAPIWebsocketParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(),
+    ),
+    "webrtc": lambda: TransportParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(),
+    ),
+}
 
 
 # Type definitions
@@ -170,7 +189,7 @@ async def end_quote(args: FlowArgs) -> tuple[FlowResult, NodeConfig]:
     return result, next_node
 
 
-# Node configurations using FlowsFunctionSchema
+# Node configurations
 def create_initial_node() -> NodeConfig:
     """Create the initial node asking for age."""
     return {
@@ -180,15 +199,14 @@ def create_initial_node() -> NodeConfig:
                 "role": "system",
                 "content": (
                     "You are a friendly insurance agent. Your responses will be "
-                    "converted to audio, so avoid special characters. "
-                    "Always wait for customer responses before calling functions. "
-                    "Only call functions after receiving relevant information from the customer."
+                    "converted to audio, so avoid special characters. Always use "
+                    "the available functions to progress the conversation naturally."
                 ),
             }
         ],
         "task_messages": [
             {
-                "role": "user",
+                "role": "system",
                 "content": "Start by asking for the customer's age.",
             }
         ],
@@ -210,12 +228,8 @@ def create_marital_status_node() -> NodeConfig:
         "name": "marital_status",
         "task_messages": [
             {
-                "role": "user",
-                "content": (
-                    "Ask about the customer's marital status (single or married). "
-                    "Wait for their response before calling collect_marital_status. "
-                    "Only call the function after they provide their status."
-                ),
+                "role": "system",
+                "content": "Ask about the customer's marital status for premium calculation.",
             }
         ],
         "functions": [
@@ -236,11 +250,11 @@ def create_quote_calculation_node(age: int, marital_status: str) -> NodeConfig:
         "name": "quote_calculation",
         "task_messages": [
             {
-                "role": "user",
+                "role": "system",
                 "content": (
                     f"Calculate a quote for {age} year old {marital_status} customer. "
-                    "Call calculate_quote with their information. "
-                    "After receiving the quote, explain the details and ask if they'd like to adjust coverage."
+                    "First, call calculate_quote with their information. "
+                    "Then explain the quote details and ask if they'd like to adjust coverage."
                 ),
             }
         ],
@@ -267,7 +281,7 @@ def create_quote_results_node(
         "name": "quote_results",
         "task_messages": [
             {
-                "role": "user",
+                "role": "system",
                 "content": (
                     f"Quote details:\n"
                     f"Monthly Premium: ${quote['monthly_premium']:.2f}\n"
@@ -309,7 +323,7 @@ def create_end_node() -> NodeConfig:
         "name": "end",
         "task_messages": [
             {
-                "role": "user",
+                "role": "system",
                 "content": (
                     "Thank the customer for their time and end the conversation. "
                     "Mention that a representative will contact them about the quote."
@@ -320,70 +334,65 @@ def create_end_node() -> NodeConfig:
     }
 
 
-async def main():
-    """Main function to set up and run the insurance quote bot."""
-    async with aiohttp.ClientSession() as session:
-        (room_url, _) = await configure(session)
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+    """Run the insurance quote bot."""
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        text_filters=[MarkdownTextFilter()],
+    )
+    # LLM service is created using the create_llm function from utils.py
+    # Default is OpenAI; can be changed by setting LLM_PROVIDER environment variable
+    llm = create_llm()
 
-        # Initialize services
-        transport = DailyTransport(
-            room_url,
-            None,
-            "Insurance Quote Bot",
-            DailyParams(
-                audio_in_enabled=True,
-                audio_out_enabled=True,
-                vad_analyzer=SileroVADAnalyzer(),
-            ),
-        )
+    context = LLMContext()
+    context_aggregator = LLMContextAggregatorPair(context)
 
-        stt = AWSTranscribeSTTService()
-        tts = AWSPollyTTSService(
-            region="us-west-2",
-            voice_id="Joanna",
-            params=AWSPollyTTSService.InputParams(engine="generative", rate="1.1"),
-        )
-        llm = AWSBedrockLLMService(
-            aws_region="us-west-2",
-            model="us.anthropic.claude-3-5-haiku-20241022-v1:0",
-            params=AWSBedrockLLMService.InputParams(temperature=0.8, latency="optimized"),
-        )
+    pipeline = Pipeline(
+        [
+            transport.input(),
+            stt,
+            context_aggregator.user(),
+            llm,
+            tts,
+            transport.output(),
+            context_aggregator.assistant(),
+        ]
+    )
 
-        context = OpenAILLMContext()
-        context_aggregator = llm.create_context_aggregator(context)
+    task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
 
-        # Create pipeline
-        pipeline = Pipeline(
-            [
-                transport.input(),
-                stt,
-                context_aggregator.user(),
-                llm,
-                tts,
-                transport.output(),
-                context_aggregator.assistant(),
-            ]
-        )
+    # Initialize flow manager in dynamic mode
+    flow_manager = FlowManager(
+        task=task,
+        llm=llm,
+        context_aggregator=context_aggregator,
+        transport=transport,
+    )
 
-        task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
+    @transport.event_handler("on_client_connected")
+    async def on_client_connected(transport, client):
+        logger.info("Client connected")
+        # Kick off the conversation with the initial node
+        await flow_manager.initialize(create_initial_node())
 
-        # Initialize flow manager
-        flow_manager = FlowManager(
-            task=task,
-            llm=llm,
-            context_aggregator=context_aggregator,
-        )
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info(f"Client disconnected")
+        await task.cancel()
 
-        @transport.event_handler("on_first_participant_joined")
-        async def on_first_participant_joined(transport, participant):
-            await transport.capture_participant_transcription(participant["id"])
-            # Initialize flow
-            await flow_manager.initialize(create_initial_node())
+    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
+    await runner.run(task)
 
-        # Run the pipeline
-        runner = PipelineRunner()
-        await runner.run(task)
+
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+    transport = await create_transport(runner_args, transport_params)
+    await run_bot(transport, runner_args)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    from pipecat.runner.run import main
+
+    main()
