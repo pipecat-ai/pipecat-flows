@@ -690,7 +690,7 @@ def create_adapter(llm, context_aggregator) -> LLMAdapter:
 
     # Try to find OpenAILLMService for inheritance check
     try:
-        module = sys.modules.get("pipecat.services.openai")
+        module = sys.modules.get("pipecat.services.openai.llm")
         if module:
             openai_service = getattr(module, "OpenAILLMService", None)
             if openai_service and issubclass(llm_class, openai_service):
