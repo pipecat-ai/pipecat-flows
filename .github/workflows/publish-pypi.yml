@@ -23,7 +23,7 @@ jobs:
         with:
           version: 'latest'
       - name: Set up Python
-        run: uv python install 3.10
+        run: uv python install 3.12
       - name: Install development dependencies
         run: uv sync --group dev
       - name: Build project
@@ -70,7 +70,7 @@ jobs:
         with:
           name: wheels
           path: ./dist
-      - name: Publish to PyPI
+      - name: Publish to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           verbose: true
