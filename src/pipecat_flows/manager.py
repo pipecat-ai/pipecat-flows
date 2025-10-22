@@ -954,6 +954,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 else LLMMessagesAppendFrame
             )
 
+            print("[pk][flows] queueing frame to update LLM context with messages:", messages)
             await self._task.queue_frames(
                 [frame_type(messages=messages), LLMSetToolsFrame(tools=functions)]
             )
