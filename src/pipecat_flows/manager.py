@@ -62,6 +62,7 @@ from pipecat_flows.types import (
     FlowArgs,
     FlowConfig,
     FlowResult,
+    FlowsDirectFunction,
     FlowsDirectFunctionWrapper,
     FlowsFunctionSchema,
     FunctionHandler,
@@ -102,6 +103,7 @@ class FlowManager:
         flow_config: Optional[FlowConfig] = None,
         context_strategy: Optional[ContextStrategyConfig] = None,
         transport: Optional[BaseTransport] = None,
+        global_functions: Optional[List[FlowsFunctionSchema | FlowsDirectFunction]] = None,
     ):
         """Initialize the flow manager.
 
@@ -124,6 +126,10 @@ class FlowManager:
             context_strategy: Context strategy configuration for managing conversation
                 context during transitions.
             transport: Transport instance for communication.
+            global_functions: Optional list of FlowsFunctionSchemas or FlowsDirectFunctions
+                that will be available at every node. These functions are registered once
+                during initialization and automatically included alongside node-specific
+                functions.
 
         Raises:
             ValueError: If any transition handler is not a valid async callable.
@@ -146,6 +152,7 @@ class FlowManager:
             strategy=ContextStrategy.APPEND
         )
         self._transport = transport
+        self._global_functions = global_functions or []
 
         # Set up static or dynamic mode
         if flow_config:
@@ -782,6 +789,9 @@ In all of these cases, you can provide a `name` in your new node's config for de
 
             # Get functions list with default empty list if not provided
             functions_list = node_config.get("functions", [])
+
+            # Mix in global functions that should be available at every node
+            functions_list = self._global_functions + functions_list
 
             async def register_function_schema(schema: FlowsFunctionSchema):
                 """Helper to register a single FlowsFunctionSchema."""
