@@ -26,6 +26,7 @@ Requirements:
 """
 
 import os
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -85,6 +86,10 @@ class SushiOrderResult(FlowResult):
     count: int
     type: str
     price: float
+
+
+class DeliveryEstimateResult(FlowResult):
+    time: str
 
 
 # Pre-action handlers
@@ -359,12 +364,31 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
 
-    # Initialize flow manager in dynamic mode
+    # Define "global" functions available at every node
+    async def get_delivery_estimate(
+        args: FlowArgs, flow_manager: FlowManager
+    ) -> tuple[DeliveryEstimateResult, None]:
+        """Provide delivery estimate information."""
+        delivery_time = datetime.now() + timedelta(minutes=30)
+        return DeliveryEstimateResult(
+            time=f"{delivery_time}",
+        ), None
+
+    get_delivery_estimate_func = FlowsFunctionSchema(
+        name="get_delivery_estimate",
+        handler=get_delivery_estimate,
+        description="Get a delivery estimate for the current order",
+        properties={},
+        required=[],
+    )
+
+    # Initialize flow manager
     flow_manager = FlowManager(
         task=task,
         llm=llm,
         context_aggregator=context_aggregator,
         transport=transport,
+        global_functions=[get_delivery_estimate_func],
     )
 
     @transport.event_handler("on_client_connected")
