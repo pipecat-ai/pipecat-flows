@@ -102,6 +102,7 @@ class FlowManager:
         flow_config: Optional[FlowConfig] = None,
         context_strategy: Optional[ContextStrategyConfig] = None,
         transport: Optional[BaseTransport] = None,
+        default_tools: Optional[List[FlowsFunctionSchema]] = None,
     ):
         """Initialize the flow manager.
 
@@ -124,6 +125,9 @@ class FlowManager:
             context_strategy: Context strategy configuration for managing conversation
                 context during transitions.
             transport: Transport instance for communication.
+            default_tools: Optional list of FlowsFunctionSchema that will be available
+                at every node. These tools are registered once during initialization
+                and automatically included alongside node-specific tools.
 
         Raises:
             ValueError: If any transition handler is not a valid async callable.
@@ -146,6 +150,7 @@ class FlowManager:
             strategy=ContextStrategy.APPEND
         )
         self._transport = transport
+        self._default_tools = default_tools or []
 
         # Set up static or dynamic mode
         if flow_config:
@@ -165,6 +170,7 @@ class FlowManager:
         self._state: Dict[str, Any] = {}  # Internal state storage
         self._current_functions: Set[str] = set()  # Track registered functions
         self._current_node: Optional[str] = None
+        self._default_function_names: Set[str] = set()  # Track default tool names
 
         self._showed_deprecation_warning_for_transition_fields = False
         self._showed_deprecation_warning_for_set_node = False
@@ -303,6 +309,40 @@ class FlowManager:
         if not inspect.iscoroutinefunction(callback):
             raise ValueError(f"Transition callback for {name} must be async")
 
+    async def _register_default_tools(self) -> None:
+        """Register default tools that will be available at every node.
+
+        This method is called during initialization to register all default tools
+        with the LLM. These tools will be automatically included in every node's
+        tool set.
+        """
+        if not self._default_tools:
+            return
+
+        for tool_schema in self._default_tools:
+            try:
+                # Create transition function for the default tool
+                transition_func = await self._create_transition_func(
+                    tool_schema.name,
+                    tool_schema.handler,
+                    tool_schema.transition_to,
+                    tool_schema.transition_callback,
+                )
+
+                # Register function with LLM
+                self._llm.register_function(
+                    tool_schema.name,
+                    transition_func,
+                )
+
+                # Track this as a default function
+                self._default_function_names.add(tool_schema.name)
+                logger.debug(f"Registered default tool: {tool_schema.name}")
+
+            except Exception as e:
+                logger.error(f"Failed to register default tool {tool_schema.name}: {str(e)}")
+                raise FlowError(f"Default tool registration failed: {str(e)}") from e
+
     async def initialize(self, initial_node: Optional[NodeConfig] = None) -> None:
         """Initialize the flow manager.
 
@@ -336,6 +376,9 @@ class FlowManager:
         try:
             self._initialized = True
             logger.debug(f"Initialized {self.__class__.__name__}")
+
+            # Register default tools
+            await self._register_default_tools()
 
             # Set initial node
             node_name = None
@@ -832,13 +875,27 @@ In all of these cases, you can provide a `name` in your new node's config for de
 
             # Create ToolsSchema with standard function schemas
             standard_functions = []
+
+            # Add default tools first (if any)
+            if self._default_tools:
+                for default_tool in self._default_tools:
+                    standard_functions.append(default_tool.to_function_schema())
+                logger.debug(f"Added {len(self._default_tools)} default tools to node {node_id}")
+
+            # Add node-specific tools
             for tool in tools:
                 # Convert FlowsFunctionSchema to standard FunctionSchema for the LLM
                 standard_functions.append(tool.to_function_schema())
 
-            # Use provider adapter to format tools, passing original configs for Gemini adapter
+            # Combine original configs for Gemini adapter (default_tools + node functions)
+            combined_original_configs = []
+            if self._default_tools:
+                combined_original_configs.extend(self._default_tools)
+            combined_original_configs.extend(functions_list)
+
+            # Use provider adapter to format all tools together
             formatted_tools = self._adapter.format_functions(
-                standard_functions, original_configs=functions_list
+                standard_functions, original_configs=combined_original_configs
             )
 
             # Update LLM context
