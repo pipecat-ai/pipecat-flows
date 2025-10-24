@@ -5,6 +5,16 @@ All notable changes to **Pipecat Flows** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Added support for `global_functions` parameter in `FlowManager` initialization. Global functions are available at every node in a flow without needing to be specified in each node's configuration. Supports both `FlowsFunctionSchema` and `FlowsDirectFunction` types.
+
+### Changed
+
+- Updated food ordering examples ([food_ordering.py](examples/food_ordering.py) and [food_ordering_direct_functions.py](examples/food_ordering_direct_functions.py)) to demonstrate global function usage with a delivery estimate function.
+
 ## [0.0.21] - 2025-09-17
 
 ### Added
