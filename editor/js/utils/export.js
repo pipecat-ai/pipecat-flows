@@ -62,6 +62,7 @@ export function generateFlowConfig(graphInstance) {
           // Create base function configuration
           const funcConfig = {
             type: "function",
+            name: targetNode.properties.function.name,
             function: { ...targetNode.properties.function },
           };
 
