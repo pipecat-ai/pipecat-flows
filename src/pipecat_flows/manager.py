@@ -1072,10 +1072,8 @@ In all of these cases, you can provide a `name` in your new node's config for de
 
             # Warn about usage of deprecated transition_to and transition_callback
             if (
-                has_transition_to
-                or has_transition_callback
-                and not self._showed_deprecation_warning_for_transition_fields
-            ):
+                has_transition_to or has_transition_callback
+            ) and not self._showed_deprecation_warning_for_transition_fields:
                 self._showed_deprecation_warning_for_transition_fields = True
                 with warnings.catch_warnings():
                     warnings.simplefilter("always")
