@@ -154,7 +154,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(mock_summary in str(m) for m in update_frame.messages))
 
     async def test_reset_with_summary_timeout(self):
-        """Test RESET_WITH_SUMMARY fallback on timeout."""
+        """Test RESET_WITH_SUMMARY fallback to APPEND on timeout."""
         flow_manager = FlowManager(
             task=self.mock_task,
             llm=self.mock_llm,
@@ -169,16 +169,16 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         # Mock timeout
         self.mock_llm.run_inference.side_effect = AsyncMock(side_effect=TimeoutError)
 
-        # Set nodes and verify fallback to RESET
+        # Set nodes and verify fallback to APPEND
         await flow_manager._set_node("first", self.sample_node)
         self.mock_task.queue_frames.reset_mock()
 
         await flow_manager._set_node("second", self.sample_node)
 
-        # Verify UpdateFrame was used (RESET behavior)
+        # Verify UpdateFrame was used (APPEND behavior)
         second_call = self.mock_task.queue_frames.call_args_list[0]
         second_frames = second_call[0][0]
-        self.assertTrue(any(isinstance(f, LLMMessagesUpdateFrame) for f in second_frames))
+        self.assertTrue(any(isinstance(f, LLMMessagesAppendFrame) for f in second_frames))
 
     async def test_provider_specific_summary_formatting(self):
         """Test summary formatting for different LLM providers."""

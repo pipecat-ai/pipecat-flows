@@ -9,11 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added support for `global_functions` parameter in `FlowManager` initialization. Global functions are available at every node in a flow without needing to be specified in each node's configuration. Supports both `FlowsFunctionSchema` and `FlowsDirectFunction` types.
+- Added support for `global_functions` parameter in `FlowManager`
+  initialization. Global functions are available at every node in a flow
+  without needing to be specified in each node's configuration. Supports both
+  `FlowsFunctionSchema` and `FlowsDirectFunction` types.
 
 ### Changed
 
-- Updated food ordering examples ([food_ordering.py](examples/food_ordering.py) and [food_ordering_direct_functions.py](examples/food_ordering_direct_functions.py)) to demonstrate global function usage with a delivery estimate function.
+- Changed the fallback strategy to `APPEND` in the event that
+  `RESET_WITH_SUMMARY` fails.
+
+- Updated food ordering examples ([food_ordering.py](examples/food_ordering.py)
+  and [food_ordering_direct_functions.py](examples/food_ordering_direct_functions.py))
+  to demonstrate global function usage with a delivery estimate function.
 
 ## [0.0.21] - 2025-09-17
 
