@@ -944,13 +944,15 @@ In all of these cases, you can provide a `name` in your new node's config for de
                         messages.append(summary_message)
                         logger.debug(f"Added conversation summary to context: {summary_message}")
                     else:
-                        # Fall back to RESET strategy if summary fails
-                        logger.warning("Failed to generate summary, falling back to RESET strategy")
-                        update_config.strategy = ContextStrategy.RESET
+                        # Fall back to APPEND strategy if summary fails
+                        logger.warning(
+                            "Failed to generate summary, falling back to APPEND strategy"
+                        )
+                        update_config.strategy = ContextStrategy.APPEND
 
                 except asyncio.TimeoutError:
-                    logger.warning("Summary generation timed out, falling back to RESET strategy")
-                    update_config.strategy = ContextStrategy.RESET
+                    logger.warning("Summary generation timed out, falling back to APPEND strategy")
+                    update_config.strategy = ContextStrategy.APPEND
 
             # Add task messages
             messages.extend(task_messages)
