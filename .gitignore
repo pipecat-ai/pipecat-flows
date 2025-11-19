@@ -1,136 +1,13 @@
-# Dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# Production build
-dist/
-build/
-
-# IDE - VSCode
-.vscode/
-*.code-workspace
-.history
-
-# IDE - WebStorm/IntelliJ
-.idea/
-*.iml
-*.iws
-*.ipr
-
-# IDE - Sublime Text
-*.sublime-workspace
-*.sublime-project
-
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-
-# Windows
-Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-ehthumbs_vista.db
-*.lnk
-
-# Local development settings
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Debug logs
-logs/
-*.log
-npm-debug.log*
-
-# Optional: Cache directories
-.cache/
-.npm/
-.eslintcache
-
-# Optional: Editor directories and files
-.project
-.settings/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Auto-generated docs
-docs/api
-docs/_build/
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-develop-eggs/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-.python-version
-*.pyc
-
-# Virtual Environment
-venv/
-ENV/
+.vscode
 env/
-.env/
-.venv/
-env.bak/
-venv.bak/
+__pycache__/
+*~
+venv
+.venv
+/.idea
+#*#
 
-# Testing
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
-htmlcov/
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# Distribution / packaging
+# Distribution / Packaging
 .Python
 build/
 develop-eggs/
@@ -149,3 +26,28 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+.DS_Store
+.env
+fly.toml
+
+# Examples
+examples/**/node_modules/
+examples/**/.expo/
+examples/**/dist/
+examples/**/npm-debug.*
+examples/**/*.jks
+examples/**/*.p8
+examples/**/*.p12
+examples/**/*.key
+examples/**/*.mobileprovision
+examples/**/*.orig.*
+examples/**/web-build/
+
+# macOS
+.DS_Store
+
+# Documentation
+docs/_build/
+
+# uv
+.python-version
