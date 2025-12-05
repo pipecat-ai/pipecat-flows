@@ -62,17 +62,17 @@ def create_llm(provider: str = None, model: str = None) -> Any:
         "anthropic": {
             "service": "pipecat.services.anthropic.llm.AnthropicLLMService",
             "api_key_env": "ANTHROPIC_API_KEY",
-            "default_model": "claude-sonnet-4-20250514",
+            "default_model": "claude-sonnet-4-5-20250929",
         },
         "google": {
             "service": "pipecat.services.google.llm.GoogleLLMService",
             "api_key_env": "GOOGLE_API_KEY",
-            "default_model": "gemini-2.0-flash",
+            "default_model": "gemini-2.5-flash",
         },
         "aws": {
             "service": "pipecat.services.aws.llm.AWSBedrockLLMService",
             "api_key_env": None,  # AWS uses default credential chain
-            "default_model": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            "default_model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
             "region": "us-west-2",
         },
     }
