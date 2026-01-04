@@ -253,6 +253,8 @@ class FlowsFunctionSchema:
         properties: Dictionary defining parameter types and descriptions.
         required: List of required parameter names.
         handler: Function handler to process the function call.
+        cancel_on_interruption: Whether to cancel this function call when an
+            interruption occurs. Defaults to True.
         transition_to: Target node to transition to after function execution.
 
             .. deprecated:: 0.0.18
@@ -271,6 +273,7 @@ class FlowsFunctionSchema:
     properties: Dict[str, Any]
     required: List[str]
     handler: Optional[FunctionHandler] = None
+    cancel_on_interruption: bool = True
     transition_to: Optional[str] = None
     transition_callback: Optional[Callable] = None
 

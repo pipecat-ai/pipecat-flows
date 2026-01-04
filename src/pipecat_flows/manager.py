@@ -652,6 +652,8 @@ class FlowManager:
         handler: Optional[Callable | FlowsDirectFunctionWrapper],
         transition_to: Optional[str] = None,
         transition_callback: Optional[Callable] = None,
+        *,
+        cancel_on_interruption: bool = True,
     ) -> None:
         """Register a function with the LLM if not already registered.
 
@@ -662,6 +664,8 @@ class FlowManager:
             transition_to: Optional node to transition to (static flows)
             transition_callback: Optional transition callback (dynamic flows)
             new_functions: Set to track newly registered functions for this node
+            cancel_on_interruption: Whether to cancel this function call when an
+                interruption occurs. Defaults to True.
 
         Raises:
             FlowError: If function registration fails
@@ -682,6 +686,7 @@ class FlowManager:
                 self._llm.register_function(
                     name,
                     transition_func,
+                    cancel_on_interruption=cancel_on_interruption,
                 )
 
                 new_functions.add(name)
@@ -802,6 +807,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     handler=schema.handler,
                     transition_to=schema.transition_to,
                     transition_callback=schema.transition_callback,
+                    cancel_on_interruption=schema.cancel_on_interruption,
                 )
 
             async def register_direct_function(func):
