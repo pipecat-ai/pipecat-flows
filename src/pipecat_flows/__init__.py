@@ -22,6 +22,7 @@ from .exceptions import (
     InvalidFunctionError,
 )
 from .manager import FlowManager
+from .realtime_manager import RealtimeFlowManager
 from .types import (
     ConsolidatedFunctionResult,
     ContextStrategy,
@@ -37,8 +38,9 @@ from .types import (
 )
 
 __all__ = [
-    # Flow Manager
+    # Flow Managers
     "FlowManager",
+    "RealtimeFlowManager",
     # Types
     "ContextStrategy",
     "ContextStrategyConfig",

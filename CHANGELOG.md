@@ -5,6 +5,34 @@ All notable changes to **Pipecat Flows** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Added `RealtimeFlowManager` class for handling node transitions with OpenAI/Azure
+  Realtime LLM services. This addresses the issue where Realtime LLMs auto-respond
+  with stale context during transitions.
+  
+  Key features:
+  - Pauses audio input during transitions to prevent race conditions
+  - Pre-syncs new node instructions to session before transition
+  - Uses event-based waiting for `session.updated` confirmation (not hardcoded delay)
+  - Triggers `_create_response()` explicitly with correct context
+  
+  Usage:
+  ```python
+  from pipecat_flows import RealtimeFlowManager
+  
+  flow_manager = RealtimeFlowManager(
+      task=task,
+      llm=realtime_llm,
+      context_aggregator=context_aggregator
+  )
+  await flow_manager.initialize(initial_node)
+  ```
+  
+  Fixes #66.
+
 ## [0.0.22] - 2025-11-18
 
 ### Added
