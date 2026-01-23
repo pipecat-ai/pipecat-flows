@@ -300,6 +300,34 @@ class FlowsFunctionSchema:
         )
 
 
+def flows_direct_function(*, cancel_on_interruption: bool = True) -> Callable[[Callable], Callable]:
+    """Decorator to attach Flows-specific metadata to a direct function.
+
+    This decorator allows configuring Flows-specific behavior for direct functions
+    without modifying the function signature or requiring separate configuration.
+
+    Args:
+        cancel_on_interruption: Whether to cancel the function call when the user
+            interrupts. Defaults to True.
+
+    Returns:
+        A decorator that attaches the metadata to the function.
+
+    Example:
+        @flows_direct_function(cancel_on_interruption=False)
+        async def long_running_task(flow_manager: FlowManager, query: str):
+            '''Perform a long-running task that should not be cancelled.'''
+            # ... implementation
+            return {"status": "complete"}, None
+    """
+
+    def decorator(func: Callable) -> Callable:
+        func._flows_cancel_on_interruption = cancel_on_interruption
+        return func
+
+    return decorator
+
+
 class FlowsDirectFunctionWrapper(BaseDirectFunctionWrapper):
     """Wrapper around a FlowsDirectFunction for metadata extraction and invocation.
 
@@ -333,6 +361,13 @@ class FlowsDirectFunctionWrapper(BaseDirectFunctionWrapper):
             super().validate_function(function)
         except Exception as e:
             raise InvalidFunctionError(str(e)) from e
+
+    def _initialize_metadata(self):
+        """Initialize metadata from function signature, docstring, and decorator."""
+        super()._initialize_metadata()
+        # Read Flows-specific metadata from decorator (defaults to True for
+        # backward compatibility)
+        self.cancel_on_interruption = getattr(self.function, "_flows_cancel_on_interruption", True)
 
     async def invoke(self, args: Mapping[str, Any], flow_manager: "FlowManager"):
         """Invoke the wrapped function with the provided arguments.

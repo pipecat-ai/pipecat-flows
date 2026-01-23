@@ -820,6 +820,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     handler=direct_function,
                     transition_to=None,
                     transition_callback=None,
+                    cancel_on_interruption=direct_function.cancel_on_interruption,
                 )
 
             for func_config in functions_list:
