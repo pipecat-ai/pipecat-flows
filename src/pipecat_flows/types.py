@@ -301,10 +301,10 @@ class FlowsFunctionSchema:
 
 
 def flows_direct_function(*, cancel_on_interruption: bool = True) -> Callable[[Callable], Callable]:
-    """Decorator to attach Flows-specific metadata to a direct function.
+    """Decorator to attach additional metadata to a Pipecat direct function.
 
-    This decorator allows configuring Flows-specific behavior for direct functions
-    without modifying the function signature or requiring separate configuration.
+    This metadata can be used, for example, to store the additional arguments
+    that should be used when registering the function with the Pipecat service.
 
     Args:
         cancel_on_interruption: Whether to cancel the function call when the user
@@ -316,7 +316,11 @@ def flows_direct_function(*, cancel_on_interruption: bool = True) -> Callable[[C
     Example:
         @flows_direct_function(cancel_on_interruption=False)
         async def long_running_task(flow_manager: FlowManager, query: str):
-            '''Perform a long-running task that should not be cancelled.'''
+            '''Perform a long-running task that should not be cancelled on interruption.
+            
+            Args:
+                query: The query to process.
+            '''
             # ... implementation
             return {"status": "complete"}, None
     """
