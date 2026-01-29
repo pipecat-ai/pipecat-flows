@@ -367,10 +367,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     pipeline = Pipeline(
         [
             transport.input(),
-            stt,
+            stt, # comment out if using LLM_PROVIDER="gemini_live"
             context_aggregator.user(),
             llm,
-            tts,
+            tts, # comment out if using LLM_PROVIDER="gemini_live"
             transport.output(),
             context_aggregator.assistant(),
         ]

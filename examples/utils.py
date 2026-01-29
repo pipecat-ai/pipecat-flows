@@ -33,6 +33,7 @@ def create_llm(provider: str = None, model: str = None) -> Any:
         - google: Requires GOOGLE_API_KEY
         - aws: Uses AWS default credential chain (SSO, environment variables, or IAM roles)
               Optionally set AWS_REGION (defaults to us-west-2)
+        - gemini_live: Requires GOOGLE_API_KEY
 
     Usage:
         # Use default provider (from LLM_PROVIDER env var, defaults to OpenAI)
@@ -75,6 +76,11 @@ def create_llm(provider: str = None, model: str = None) -> Any:
             "default_model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
             "region": "us-west-2",
         },
+        "gemini_live": {
+            "service": "pipecat.services.google.gemini_live.llm.GeminiLiveLLMService",
+            "api_key_env": "GOOGLE_API_KEY",
+            "default_model": "models/gemini-2.5-flash-native-audio-preview-12-2025",
+        }
     }
 
     config = configs.get(provider)
