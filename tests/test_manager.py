@@ -290,7 +290,13 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Test new style callback
         await flow_manager.set_node_from_config(new_style_node)
-        func = flow_manager._llm.register_function.call_args[0][1]
+        # Find the registered function by name (not using call_args since deactivated functions may be registered after)
+        func = None
+        for call in flow_manager._llm.register_function.call_args_list:
+            if call[0][0] == "new_style_function":
+                func = call[0][1]
+                break
+        self.assertIsNotNone(func, "new_style_function was not registered")
 
         # Reset context_updated callback
         context_updated_callback = None
@@ -338,7 +344,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         await flow_manager.set_node_from_config(valid_config)
 
         self.assertEqual(flow_manager._current_node, "test")
-        self.assertEqual(flow_manager._current_functions, set())
+        self.assertEqual(flow_manager._current_functions, {})
 
     async def test_function_registration(self):
         """Test function registration with LLM."""
@@ -779,7 +785,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Mock LLM to raise error on register_function
         flow_manager._llm.register_function.side_effect = Exception("Registration error")
 
-        new_functions = set()
+        new_functions = {}
         with self.assertRaises(FlowError):
             await flow_manager._register_function("test", new_functions, None)
 
@@ -823,11 +829,14 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Mock task to raise error on queue_frames
         flow_manager._task.queue_frames.side_effect = Exception("Queue error")
 
+        from pipecat_flows.types import ContextStrategy, ContextStrategyConfig
+
         with self.assertRaises(FlowError):
             await flow_manager._update_llm_context(
                 role_messages=[],
                 task_messages=[{"role": "system", "content": "Test"}],
                 functions=[],
+                strategy=ContextStrategyConfig(strategy=ContextStrategy.APPEND),
             )
 
     async def test_function_declarations_processing(self):
@@ -1383,8 +1392,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Set node and verify it works without error
         await flow_manager.set_node_from_config(node_config)
 
-        # Verify current_functions is empty set
-        self.assertEqual(flow_manager._current_functions, set())
+        # Verify current_functions is empty dict
+        self.assertEqual(flow_manager._current_functions, {})
 
         # Verify LLM tools were still set (with empty or placeholder functions)
         tools_frames_call = [
@@ -1412,8 +1421,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Set node and verify it works without error
         await flow_manager.set_node_from_config(node_config)
 
-        # Verify current_functions is empty set
-        self.assertEqual(flow_manager._current_functions, set())
+        # Verify current_functions is empty dict
+        self.assertEqual(flow_manager._current_functions, {})
 
         # Verify LLM tools were still set (with empty or placeholder functions)
         tools_frames_call = [

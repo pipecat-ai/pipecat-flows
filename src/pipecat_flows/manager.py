@@ -154,6 +154,18 @@ class FlowManager:
         self._transport = transport
         self._global_functions = global_functions or []
 
+        # Cache global function names as an optimization when detecting deactivated functions later
+        self._global_function_names: Set[str] = set()
+        for func in self._global_functions:
+            if callable(func):
+                wrapper = FlowsDirectFunctionWrapper(function=func)
+                self._global_function_names.add(wrapper.name)
+            elif isinstance(func, FlowsFunctionSchema):
+                self._global_function_names.add(func.name)
+            else:
+                name = create_adapter(llm, context_aggregator).get_function_name(func)
+                self._global_function_names.add(name)
+
         # Set up static or dynamic mode
         if flow_config:
             warnings.warn(
@@ -170,7 +182,7 @@ class FlowManager:
             logger.debug("Initialized in dynamic mode")
 
         self._state: Dict[str, Any] = {}  # Internal state storage
-        self._current_functions: Set[str] = set()  # Track registered functions
+        self._current_functions: Dict[str, FlowsFunctionSchema] = {}  # Track registered functions
         self._current_node: Optional[str] = None
 
         self._showed_deprecation_warning_for_transition_fields = False
@@ -645,15 +657,60 @@ class FlowManager:
 
         raise FlowError(error_message)
 
+    def _create_deactivated_function_schema(
+        self, original_schema: FlowsFunctionSchema
+    ) -> FlowsFunctionSchema:
+        """Create a function schema for deactivated functions with a dummy handler.
+
+        Creates a copy of the original function schema but replaces the handler
+        with a dummy that returns an error message indicating the function is
+        deactivated. This is used when carrying over functions from a previous
+        node during APPEND context strategy transitions.
+
+        Args:
+            original_schema: The original FlowsFunctionSchema to create a
+                deactivated version of.
+
+        Returns:
+            A new FlowsFunctionSchema with the same name/description/properties
+            but with a dummy handler that returns a deactivation message.
+        """
+
+        async def deactivated_handler(args: FlowArgs, flow_manager: "FlowManager") -> FlowResult:
+            """Dummy handler for deactivated functions."""
+            return {
+                "status": "error",
+                "error": (
+                    f"Function '{original_schema.name}' is deactivated and should not be called. "
+                    f"Please use the currently active functions instead."
+                ),
+            }
+
+        # Only add prefix if not already deactivated (idempotent)
+        description = original_schema.description
+        if not description.startswith("[DEACTIVATED]"):
+            description = f"[DEACTIVATED] {description}"
+
+        return FlowsFunctionSchema(
+            name=original_schema.name,
+            description=description,
+            properties=original_schema.properties,
+            required=original_schema.required,
+            handler=deactivated_handler,
+            cancel_on_interruption=True,
+            transition_to=None,
+            transition_callback=None,
+        )
+
     async def _register_function(
         self,
         name: str,
-        new_functions: Set[str],
         handler: Optional[Callable | FlowsDirectFunctionWrapper],
         transition_to: Optional[str] = None,
         transition_callback: Optional[Callable] = None,
         *,
         cancel_on_interruption: bool = True,
+        force: bool = False,
     ) -> None:
         """Register a function with the LLM if not already registered.
 
@@ -663,14 +720,19 @@ class FlowManager:
                     If string starts with '__function__:', extracts the function name after the prefix.
             transition_to: Optional node to transition to (static flows)
             transition_callback: Optional transition callback (dynamic flows)
-            new_functions: Set to track newly registered functions for this node
+            new_functions: Dict tracking functions for this node (used to check if already registered)
             cancel_on_interruption: Whether to cancel this function call when an
                 interruption occurs. Defaults to True.
+            force: If True, register even if function already exists (for re-registering
+                deactivated functions with new handlers). Defaults to False.
 
         Raises:
             FlowError: If function registration fails
         """
-        if name not in self._current_functions:
+        should_register = force or (
+            name not in self._current_functions.keys()
+        )
+        if should_register:
             try:
                 # Handle special token format (e.g. "__function__:function_name")
                 if isinstance(handler, str) and handler.startswith("__function__:"):
@@ -689,7 +751,6 @@ class FlowManager:
                     cancel_on_interruption=cancel_on_interruption,
                 )
 
-                new_functions.add(name)
                 logger.debug(f"Registered function: {name}")
             except Exception as e:
                 logger.error(f"Failed to register function {name}: {str(e)}")
@@ -790,7 +851,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
 
             # Register functions and prepare tools
             tools: List[FlowsFunctionSchema | FlowsDirectFunctionWrapper] = []
-            new_functions: Set[str] = set()
+            new_functions: Dict[str, FlowsFunctionSchema] = {}
 
             # Get functions list with default empty list if not provided
             functions_list = node_config.get("functions", [])
@@ -798,17 +859,20 @@ In all of these cases, you can provide a `name` in your new node's config for de
             # Mix in global functions that should be available at every node
             functions_list = self._global_functions + functions_list
 
-            async def register_function_schema(schema: FlowsFunctionSchema):
+            async def register_function_schema(schema: FlowsFunctionSchema, is_deactivated: bool = False):
                 """Helper to register a single FlowsFunctionSchema."""
                 tools.append(schema)
                 await self._register_function(
                     name=schema.name,
-                    new_functions=new_functions,
                     handler=schema.handler,
                     transition_to=schema.transition_to,
                     transition_callback=schema.transition_callback,
                     cancel_on_interruption=schema.cancel_on_interruption,
+                    force=is_deactivated,  # Force re-registration for deactivated functions
                 )
+                # Store the schema for potential future deactivation (including deactivated ones
+                # so they persist across multiple transitions)
+                new_functions[schema.name] = schema
 
             async def register_direct_function(func):
                 """Helper to register a single direct function."""
@@ -816,12 +880,21 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 tools.append(direct_function)
                 await self._register_function(
                     name=direct_function.name,
-                    new_functions=new_functions,
                     handler=direct_function,
                     transition_to=None,
                     transition_callback=None,
                     cancel_on_interruption=direct_function.cancel_on_interruption,
                 )
+                # Store a FlowsFunctionSchema representation for potential future deactivation
+                schema = FlowsFunctionSchema(
+                    name=direct_function.name,
+                    description=direct_function.description,
+                    properties=direct_function.properties,
+                    required=direct_function.required,
+                    handler=None,  # Will be replaced if deactivated
+                    cancel_on_interruption=direct_function.cancel_on_interruption,
+                )
+                new_functions[direct_function.name] = schema
 
             for func_config in functions_list:
                 # Handle direct functions
@@ -847,6 +920,38 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     )
                     await register_function_schema(schema)
 
+            # Determine effective context strategy for this transition
+            effective_strategy = (
+                node_config.get("context_strategy") or self._context_strategy
+            )
+
+            # For APPEND strategy, carry over deactivated functions from
+            # previous node, since there may be context messages that reference
+            # them
+            deactivated_function_names: List[str] = []
+            if (
+                self._current_node is not None
+                and effective_strategy.strategy == ContextStrategy.APPEND
+            ):
+                # Find functions from previous node that aren't in the new node
+                # (excluding global functions, which are always present)
+                new_function_names = set(new_functions.keys())
+                for prev_name, prev_schema in self._current_functions.items():
+                    if (
+                        prev_name not in new_function_names
+                        and prev_name not in self._global_function_names
+                    ):
+                        # Create deactivated stub with same schema but dummy handler
+                        deactivated_schema = self._create_deactivated_function_schema(prev_schema)
+                        await register_function_schema(deactivated_schema, is_deactivated=True)
+                        deactivated_function_names.append(prev_name)
+
+                if deactivated_function_names:
+                    logger.debug(
+                        f"Carrying over {len(deactivated_function_names)} deactivated functions: "
+                        f"{', '.join(deactivated_function_names)}"
+                    )
+
             # Create ToolsSchema with standard function schemas
             standard_functions = []
             for tool in tools:
@@ -858,12 +963,25 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 standard_functions, original_configs=functions_list
             )
 
+            # Prepare task messages, injecting deactivated function warning if needed
+            task_messages = list(node_config["task_messages"])  # Copy to avoid mutating original
+            if deactivated_function_names:
+                deactivated_warning = {
+                    "role": "system",
+                    "content": (
+                        f"IMPORTANT: The following functions are deactivated and should NOT be "
+                        f"called: {', '.join(deactivated_function_names)}. If you call them, they "
+                        f"will return an error."
+                    ),
+                }
+                task_messages.insert(0, deactivated_warning)
+
             # Update LLM context
             await self._update_llm_context(
                 role_messages=node_config.get("role_messages"),
-                task_messages=node_config["task_messages"],
+                task_messages=task_messages,
                 functions=formatted_tools,
-                strategy=node_config.get("context_strategy"),
+                strategy=effective_strategy,
             )
             logger.debug("Updated LLM context")
 
@@ -904,7 +1022,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
         role_messages: Optional[List[dict]],
         task_messages: List[dict],
         functions: List[dict],
-        strategy: Optional[ContextStrategyConfig] = None,
+        strategy: ContextStrategyConfig,
     ) -> None:
         """Update LLM context with new messages and functions.
 
@@ -912,7 +1030,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
             role_messages: Optional role messages to add to context.
             task_messages: Task messages to add to context.
             functions: New functions to make available.
-            strategy: Optional context update configuration.
+            strategy: Context strategy configuration for this transition.
 
         Raises:
             FlowError: If context update fails.
@@ -927,7 +1045,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
             if role_messages:
                 messages.extend(role_messages)
 
-            update_config = strategy or self._context_strategy
+            update_config = strategy
 
             if (
                 update_config.strategy == ContextStrategy.RESET_WITH_SUMMARY
