@@ -48,7 +48,7 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
-from utils import create_llm
+from utils import create_llm, needs_stt_tts
 
 from pipecat_flows import (
     ContextStrategy,
@@ -300,7 +300,7 @@ def create_allergies_node() -> NodeConfig:
         task_messages=[
             {
                 "role": "developer",
-                "content": "Collect allergy information. Ask about any allergies they have. After recording allergies (or confirming none), proceed to medical conditions.",
+                "content": "Your job now is to collect allergy information. Ask about any allergies they have. After recording allergies (or confirming none), proceed to medical conditions.",
             }
         ],
         functions=[record_allergies_func],
@@ -336,7 +336,7 @@ def create_conditions_node() -> NodeConfig:
         task_messages=[
             {
                 "role": "developer",
-                "content": "Collect medical condition information. Ask about any medical conditions they have. After recording conditions (or confirming none), proceed to visit reasons.",
+                "content": "Your job now is to collect medical condition information. Ask about any medical conditions they have. After recording conditions (or confirming none), proceed to visit reasons.",
             }
         ],
         functions=[record_conditions_func],
@@ -460,10 +460,14 @@ def create_end_node() -> NodeConfig:
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Run the patient intake bot."""
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-    tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY")) if needs_stt_tts() else None
+    tts = (
+        CartesiaTTSService(
+            api_key=os.getenv("CARTESIA_API_KEY"),
+            voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        )
+        if needs_stt_tts()
+        else None
     )
     # LLM service is created using the create_llm function from utils.py
     # Default is OpenAI; can be changed by setting LLM_PROVIDER environment variable
@@ -476,15 +480,20 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
 
     pipeline = Pipeline(
-        [
-            transport.input(),
-            stt,
-            context_aggregator.user(),
-            llm,
-            tts,
-            transport.output(),
-            context_aggregator.assistant(),
-        ]
+        list(
+            filter(
+                None,
+                [
+                    transport.input(),
+                    stt,
+                    context_aggregator.user(),
+                    llm,
+                    tts,
+                    transport.output(),
+                    context_aggregator.assistant(),
+                ],
+            )
+        )
     )
 
     task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))

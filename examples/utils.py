@@ -14,12 +14,8 @@ import os
 from typing import Any
 
 
-def create_llm(provider: str = None, model: str = None) -> Any:
+def create_llm() -> Any:
     """Create an LLM service instance based on environment configuration.
-
-    Args:
-        provider: LLM provider name. If None, uses LLM_PROVIDER env var (defaults to 'openai')
-        model: Model name. If None, uses provider's default model
 
     Returns:
         Configured LLM service instance
@@ -36,22 +32,10 @@ def create_llm(provider: str = None, model: str = None) -> Any:
         - gemini_live: Requires GOOGLE_API_KEY
 
     Usage:
-        # Use default provider (from LLM_PROVIDER env var, defaults to OpenAI)
+        # Use provider from LLM_PROVIDER env var (defaults to OpenAI)
         llm = create_llm()
-
-        # Use specific provider
-        llm = create_llm("anthropic")
-
-        # Use specific provider and model
-        llm = create_llm("openai", "gpt-4o-mini")
-
-        # Use AWS Bedrock (requires AWS credentials via SSO, env vars, or IAM)
-        llm = create_llm("aws")
     """
-    if provider is None:
-        provider = os.getenv("LLM_PROVIDER", "openai").lower()
-    else:
-        provider = provider.lower()
+    provider = _resolve_provider()
 
     # Provider configurations
     configs = {
@@ -80,7 +64,7 @@ def create_llm(provider: str = None, model: str = None) -> Any:
             "service": "pipecat.services.google.gemini_live.llm.GeminiLiveLLMService",
             "api_key_env": "GOOGLE_API_KEY",
             "default_model": "models/gemini-2.5-flash-native-audio-preview-12-2025",
-        }
+        },
     }
 
     config = configs.get(provider)
@@ -101,8 +85,8 @@ def create_llm(provider: str = None, model: str = None) -> Any:
         if not api_key:
             raise ValueError(f"Missing API key: {config['api_key_env']} for provider: {provider}")
 
-    # Use provided model or default
-    selected_model = model or config["default_model"]
+    # Use default model
+    selected_model = config["default_model"]
 
     # Build kwargs
     kwargs = {"api_key": api_key, "model": selected_model}
@@ -115,3 +99,21 @@ def create_llm(provider: str = None, model: str = None) -> Any:
         del kwargs["api_key"]
 
     return service_class(**kwargs)
+
+
+def needs_stt_tts() -> bool:
+    """Return True when STT/TTS should be enabled for the LLM service specified by environment configuration.
+
+    Returns:
+        True if STT/TTS should be enabled, False if the provider handles audio natively.
+    """
+    return _resolve_provider() != "gemini_live"
+
+
+def _resolve_provider() -> str:
+    """Resolve the LLM provider name from environment configuration.
+
+    Returns:
+        Lower-cased provider name.
+    """
+    return os.getenv("LLM_PROVIDER", "openai").lower()
