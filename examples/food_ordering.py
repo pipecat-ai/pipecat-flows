@@ -52,7 +52,7 @@ from pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy import (
     TurnAnalyzerUserTurnStopStrategy,
 )
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
-from utils import create_llm
+from utils import create_llm, needs_stt_tts
 
 from pipecat_flows import (
     FlowArgs,
@@ -168,6 +168,8 @@ def create_pizza_node() -> NodeConfig:
         size = args["size"]
         pizza_type = args["type"]
 
+        print("[pk] Selected pizza:", size, pizza_type)
+
         # Simple pricing
         base_price = {"small": 10.00, "medium": 15.00, "large": 20.00}
         price = base_price[size]
@@ -232,6 +234,8 @@ def create_sushi_node() -> NodeConfig:
         """Handle sushi roll count and type selection."""
         count = args["count"]
         roll_type = args["type"]
+
+        print("[pk] Selected sushi:", count, roll_type)
 
         # Simple pricing: $8 per roll
         price = count * 8.00
@@ -345,10 +349,14 @@ def create_end_node() -> NodeConfig:
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Run the food ordering bot."""
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-    tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY")) if needs_stt_tts() else None
+    tts = (
+        CartesiaTTSService(
+            api_key=os.getenv("CARTESIA_API_KEY"),
+            voice_id="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
+        )
+        if needs_stt_tts()
+        else None
     )
     # LLM service is created using the create_llm function from utils.py
     # Default is OpenAI; can be changed by setting LLM_PROVIDER environment variable
@@ -365,15 +373,20 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
 
     pipeline = Pipeline(
-        [
-            transport.input(),
-            stt, # comment out if using LLM_PROVIDER="gemini_live"
-            context_aggregator.user(),
-            llm,
-            tts, # comment out if using LLM_PROVIDER="gemini_live"
-            transport.output(),
-            context_aggregator.assistant(),
-        ]
+        list(
+            filter(
+                None,
+                [
+                    transport.input(),
+                    stt,
+                    context_aggregator.user(),
+                    llm,
+                    tts,
+                    transport.output(),
+                    context_aggregator.assistant(),
+                ],
+            )
+        )
     )
 
     task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))

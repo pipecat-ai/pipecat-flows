@@ -698,7 +698,8 @@ class TestDeactivatedFunctions(unittest.IsolatedAsyncioTestCase):
         frames = queue_frames_call[0][0]
         messages_frame = next(f for f in frames if isinstance(f, LLMMessagesAppendFrame))
         warning_found = any(
-            "function_a" in str(msg.get("content", "")) and "deactivated" in str(msg.get("content", "")).lower()
+            "function_a" in str(msg.get("content", ""))
+            and "deactivated" in str(msg.get("content", "")).lower()
             for msg in messages_frame.messages
         )
         self.assertTrue(warning_found, "function_a should be marked as deactivated")

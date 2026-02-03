@@ -74,7 +74,7 @@ from pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy import (
     TurnAnalyzerUserTurnStopStrategy,
 )
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
-from utils import create_llm
+from utils import create_llm, needs_stt_tts
 
 from pipecat_flows import ContextStrategyConfig, FlowManager, FlowResult, NodeConfig
 from pipecat_flows.types import ActionConfig, ContextStrategy, FlowArgs, FlowsFunctionSchema
@@ -277,7 +277,7 @@ def create_initial_customer_interaction_node() -> NodeConfig:
         role_messages=[
             {
                 "role": "system",
-                "content": "You are an assistant for ABC Widget Company. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
+                "content": "You are an assistant for ABC Widget Company. You must ALWAYS use the available functions to progress the conversation. When you've decided to call a function to progress the conversation, do not also respond; the function call by itself is enough. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
             }
         ],
         task_messages=[
@@ -329,7 +329,10 @@ def create_continued_customer_interaction_node() -> NodeConfig:
         task_messages=[
             {
                 "role": "system",
-                "content": """Ask the customer there's anything else you could help them with today, or if they'd like to end the conversation. If they need more help, re-offer the two choices you offered before: you could provide store location and hours of operation, or begin placing an order.
+                "content": """
+                Finish helping the customer with their previous request, if you haven't already.
+
+                Then ask the customer there's anything else you could help them with today, or if they'd like to end the conversation. If they need more help, re-offer the two choices you offered before: you could provide store location and hours of operation, or begin placing an order.
 
                 To help the customer:
                 - Use the check_store_location_and_hours_of_operation function to check store location and hours of operation to provide to the customer
@@ -637,10 +640,14 @@ async def main():
                 vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
             ),
         )
-        stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-        tts = CartesiaHttpTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="d46abd1d-2d02-43e8-819f-51fb652c1c61",  # Newsman
+        stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY")) if needs_stt_tts() else None
+        tts = (
+            CartesiaHttpTTSService(
+                api_key=os.getenv("CARTESIA_API_KEY"),
+                voice_id="d46abd1d-2d02-43e8-819f-51fb652c1c61",  # Newsman
+            )
+            if needs_stt_tts()
+            else None
         )
         llm = create_llm()
 
@@ -659,15 +666,20 @@ async def main():
 
         # Create pipeline
         pipeline = Pipeline(
-            [
-                transport.input(),
-                stt,
-                context_aggregator.user(),
-                llm,
-                tts,
-                transport.output(),
-                context_aggregator.assistant(),
-            ]
+            list(
+                filter(
+                    None,
+                    [
+                        transport.input(),
+                        stt,
+                        context_aggregator.user(),
+                        llm,
+                        tts,
+                        transport.output(),
+                        context_aggregator.assistant(),
+                    ],
+                )
+            )
         )
         task = PipelineTask(pipeline=pipeline, params=PipelineParams(allow_interruptions=True))
 
@@ -732,8 +744,13 @@ async def main():
 
         # Prepare hold music args
         flow_manager.state["hold_music_args"] = {
-            "script_path": Path(__file__).parent.parent / "assets" / "hold_music" / "hold_music.py",
+            "script_path": Path(__file__).parent.parent
+            / "examples"
+            / "assets"
+            / "hold_music"
+            / "hold_music.py",
             "wav_file_path": Path(__file__).parent.parent
+            / "examples"
             / "assets"
             / "hold_music"
             / "hold_music.wav",

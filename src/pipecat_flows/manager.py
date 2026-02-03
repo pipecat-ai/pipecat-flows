@@ -728,9 +728,7 @@ class FlowManager:
         Raises:
             FlowError: If function registration fails
         """
-        should_register = force or (
-            name not in self._current_functions.keys()
-        )
+        should_register = force or (name not in self._current_functions.keys())
         if should_register:
             try:
                 # Handle special token format (e.g. "__function__:function_name")
@@ -858,7 +856,9 @@ In all of these cases, you can provide a `name` in your new node's config for de
             # Mix in global functions that should be available at every node
             functions_list = self._global_functions + functions_list
 
-            async def register_function_schema(schema: FlowsFunctionSchema, is_deactivated: bool = False):
+            async def register_function_schema(
+                schema: FlowsFunctionSchema, is_deactivated: bool = False
+            ):
                 """Helper to register a single FlowsFunctionSchema."""
                 tools.append(schema)
                 await self._register_function(
@@ -920,9 +920,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     await register_function_schema(schema)
 
             # Determine effective context strategy for this transition
-            effective_strategy = (
-                node_config.get("context_strategy") or self._context_strategy
-            )
+            effective_strategy = node_config.get("context_strategy") or self._context_strategy
 
             # If RESET_WITH_SUMMARY is not supported for this LLM, fall back to
             # APPEND and log a warning. In the future, we may want to add
