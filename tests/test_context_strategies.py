@@ -860,3 +860,311 @@ class TestDeactivatedFunctions(unittest.IsolatedAsyncioTestCase):
                     content,
                     "function_a should not be in deactivation warning since it's now active",
                 )
+
+    async def test_reactivated_function_is_re_registered_with_llm(self):
+        """Test that reactivated functions are re-registered with the LLM."""
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+            context_strategy=ContextStrategyConfig(strategy=ContextStrategy.APPEND),
+        )
+        await flow_manager.initialize()
+
+        function_a_handler = AsyncMock(return_value={"status": "success"})
+
+        # First node with function_a
+        first_node: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "First task."}],
+            "functions": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "function_a",
+                        "handler": function_a_handler,
+                        "description": "Function A",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                },
+            ],
+        }
+
+        await flow_manager._set_node("first", first_node)
+
+        # Count initial registrations for function_a
+        initial_registrations = sum(
+            1
+            for call in self.mock_llm.register_function.call_args_list
+            if call[0][0] == "function_a"
+        )
+        self.assertEqual(initial_registrations, 1, "function_a should be registered once initially")
+
+        # Second node without function_a (it becomes deactivated)
+        second_node: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Second task."}],
+            "functions": [],
+        }
+
+        await flow_manager._set_node("second", second_node)
+
+        # Count registrations after deactivation
+        deactivation_registrations = sum(
+            1
+            for call in self.mock_llm.register_function.call_args_list
+            if call[0][0] == "function_a"
+        )
+        self.assertEqual(
+            deactivation_registrations, 2, "function_a should be re-registered when deactivated"
+        )
+
+        # Third node brings back function_a
+        third_node: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Third task."}],
+            "functions": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "function_a",
+                        "handler": function_a_handler,
+                        "description": "Function A restored",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                },
+            ],
+        }
+
+        await flow_manager._set_node("third", third_node)
+
+        # Count registrations after reactivation
+        final_registrations = sum(
+            1
+            for call in self.mock_llm.register_function.call_args_list
+            if call[0][0] == "function_a"
+        )
+        self.assertEqual(
+            final_registrations,
+            3,
+            "function_a should be re-registered when reactivated (total 3 registrations)",
+        )
+
+    async def test_reactivated_function_handler_works(self):
+        """Test that a reactivated function's handler actually works (not the deactivated dummy)."""
+        from pipecat.services.llm_service import FunctionCallParams
+
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+            context_strategy=ContextStrategyConfig(strategy=ContextStrategy.APPEND),
+        )
+        await flow_manager.initialize()
+
+        # Track actual handler calls
+        real_handler_called = []
+
+        async def real_handler(args, flow_manager):
+            real_handler_called.append(args)
+            return {"status": "real_success", "data": args.get("input", "none")}
+
+        # First node with function_a
+        first_node: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "First task."}],
+            "functions": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "function_a",
+                        "handler": real_handler,
+                        "description": "Function A",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                },
+            ],
+        }
+
+        await flow_manager._set_node("first", first_node)
+
+        # Second node without function_a (deactivates it)
+        second_node: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Second task."}],
+            "functions": [],
+        }
+
+        await flow_manager._set_node("second", second_node)
+
+        # Third node brings back function_a
+        third_node: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Third task."}],
+            "functions": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "function_a",
+                        "handler": real_handler,
+                        "description": "Function A restored",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                },
+            ],
+        }
+
+        await flow_manager._set_node("third", third_node)
+
+        # Get the registered function handler from the most recent registration
+        # The last call for function_a should be the reactivated one
+        function_a_calls = [
+            call
+            for call in self.mock_llm.register_function.call_args_list
+            if call[0][0] == "function_a"
+        ]
+        last_registered_handler = function_a_calls[-1][0][1]
+
+        # Create mock params to call the handler
+        mock_result_callback = AsyncMock()
+        mock_params = MagicMock(spec=FunctionCallParams)
+        mock_params.arguments = {"input": "test_value"}
+        mock_params.result_callback = mock_result_callback
+
+        # Call the registered handler
+        await last_registered_handler(mock_params)
+
+        # Verify the real handler was called, not the deactivated dummy
+        self.assertEqual(len(real_handler_called), 1, "Real handler should have been called")
+        self.assertEqual(real_handler_called[0], {"input": "test_value"})
+
+        # Verify result callback was called with success (not error)
+        mock_result_callback.assert_called_once()
+        result = mock_result_callback.call_args[0][0]
+        self.assertEqual(result.get("status"), "real_success")
+        self.assertNotIn("error", result)
+
+    async def test_reactivated_function_description_no_deactivated_prefix(self):
+        """Test that reactivated function's stored schema has no [DEACTIVATED] prefix."""
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+            context_strategy=ContextStrategyConfig(strategy=ContextStrategy.APPEND),
+        )
+        await flow_manager.initialize()
+
+        handler = AsyncMock(return_value={"status": "success"})
+
+        # First node with function_a
+        first_node: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "First task."}],
+            "functions": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "function_a",
+                        "handler": handler,
+                        "description": "Original description",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                },
+            ],
+        }
+
+        await flow_manager._set_node("first", first_node)
+        self.assertEqual(
+            flow_manager._current_functions["function_a"].description, "Original description"
+        )
+
+        # Second node without function_a (deactivates it)
+        second_node: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Second task."}],
+            "functions": [],
+        }
+
+        await flow_manager._set_node("second", second_node)
+        self.assertTrue(
+            flow_manager._current_functions["function_a"].description.startswith("[DEACTIVATED]")
+        )
+
+        # Third node reactivates function_a
+        third_node: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Third task."}],
+            "functions": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "function_a",
+                        "handler": handler,
+                        "description": "Restored description",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                },
+            ],
+        }
+
+        await flow_manager._set_node("third", third_node)
+
+        # Verify stored schema has clean description
+        self.assertEqual(
+            flow_manager._current_functions["function_a"].description,
+            "Restored description",
+            "Reactivated function should have clean description without [DEACTIVATED] prefix",
+        )
+        self.assertFalse(
+            flow_manager._current_functions["function_a"].description.startswith("[DEACTIVATED]")
+        )
+
+    async def test_functions_always_registered_on_each_transition(self):
+        """Test that functions are always re-registered on each node transition."""
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+            context_strategy=ContextStrategyConfig(strategy=ContextStrategy.APPEND),
+        )
+        await flow_manager.initialize()
+
+        handler = AsyncMock(return_value={"status": "success"})
+
+        # Node with function_a and function_b
+        node_with_both: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Task."}],
+            "functions": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "function_a",
+                        "handler": handler,
+                        "description": "Function A",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "function_b",
+                        "handler": handler,
+                        "description": "Function B",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                },
+            ],
+        }
+
+        # First transition
+        await flow_manager._set_node("first", node_with_both)
+
+        first_transition_registrations = {
+            call[0][0] for call in self.mock_llm.register_function.call_args_list
+        }
+        self.assertIn("function_a", first_transition_registrations)
+        self.assertIn("function_b", first_transition_registrations)
+
+        initial_call_count = len(self.mock_llm.register_function.call_args_list)
+
+        # Second transition with same functions
+        await flow_manager._set_node("second", node_with_both)
+
+        # Verify functions were registered again
+        new_call_count = len(self.mock_llm.register_function.call_args_list)
+        new_registrations = new_call_count - initial_call_count
+
+        self.assertGreaterEqual(
+            new_registrations, 2, "Both functions should be re-registered on second transition"
+        )
