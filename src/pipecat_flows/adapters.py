@@ -47,6 +47,16 @@ class LLMAdapter:
     - AWS Bedrock: Uses Anthropic-compatible format
     """
 
+    def __init__(self, supports_summarization: bool = True) -> None:
+        """Initialize the adapter.
+
+        Args:
+            supports_summarization: Indicates if the LLM supports generating
+                summaries (which determines whether generate_summary() can be
+                used).
+        """
+        self.supports_summarization = supports_summarization
+
     def get_function_name(self, function_def: Union[Dict[str, Any], FlowsFunctionSchema]) -> str:
         """Extract function name from provider-specific function definition or schema.
 
@@ -171,6 +181,9 @@ class LLMAdapter:
             Generated summary text, or None if generation fails.
         """
         try:
+            if not self.supports_summarization:
+                raise RuntimeError("This LLM does not support generating summaries.")
+
             if isinstance(context, LLMContext):
                 messages = context.get_messages()
             else:
@@ -216,6 +229,16 @@ class UniversalLLMAdapter(LLMAdapter):
     Disallows provider-specific function definitions and requires functions to
     be in the standard FlowsFunctionSchema format.
     """
+
+    def __init__(self, supports_summarization: bool) -> None:
+        """Initialize the adapter.
+
+        Args:
+            supports_summarization: Indicates if the LLM supports generating
+                summaries (which determines whether generate_summary() can be
+                used).
+        """
+        super().__init__(supports_summarization=supports_summarization)
 
     def _get_function_name_from_dict(self, function_def: Dict[str, Any]) -> str:
         raise RuntimeError(
@@ -664,13 +687,14 @@ def create_adapter(llm, context_aggregator) -> LLMAdapter:
     Raises:
         ValueError: If LLM type is not supported or required dependency not installed.
     """
+    llm_type = type(llm).__name__
+    llm_class = type(llm)
+
     if isinstance(context_aggregator, LLMContextAggregatorPair):
         # Universal LLMContext is in use, so we need the universal adapter
         logger.debug("Creating universal adapter")
-        return UniversalLLMAdapter()
-
-    llm_type = type(llm).__name__
-    llm_class = type(llm)
+        llm_supports_summarization = llm_type not in ["GeminiLiveLLMService"]
+        return UniversalLLMAdapter(supports_summarization=llm_supports_summarization)
 
     if llm_type == "OpenAILLMService":
         logger.debug("Creating OpenAI adapter")

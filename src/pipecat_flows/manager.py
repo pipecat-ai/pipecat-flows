@@ -924,6 +924,19 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 node_config.get("context_strategy") or self._context_strategy
             )
 
+            # If RESET_WITH_SUMMARY is not supported for this LLM, fall back to
+            # APPEND and log a warning. In the future, we may want to add
+            # support for specifying a summarization LLM.
+            if (
+                effective_strategy.strategy == ContextStrategy.RESET_WITH_SUMMARY
+                and not self._adapter.supports_summarization
+            ):
+                logger.warning(
+                    f"Context strategy RESET_WITH_SUMMARY is not supported by the current LLM. "
+                    f"Falling back to APPEND strategy for node {node_id}."
+                )
+                effective_strategy = ContextStrategyConfig(strategy=ContextStrategy.APPEND)
+
             # For APPEND strategy, carry over deactivated functions from
             # the previous node, since there may be context messages that call
             # or reference them. This helps LLMs better understand their
@@ -971,7 +984,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 deactivated_warning = {
                     "role": "system",
                     "content": (
-                        f"IMPORTANT: The following functions are deactivated and should NOT be "
+                        f"IMPORTANT: The following functions are now DEACTIVATED and should NO LONGER be "
                         f"called: {', '.join(deactivated_function_names)}. If you call them, they "
                         f"will return an error."
                     ),
