@@ -660,6 +660,15 @@ class FlowManager:
 
         raise FlowError(error_message)
 
+    # Prefix used to mark deactivated function descriptions
+    _DEACTIVATED_PREFIX = "[DEACTIVATED] "
+
+    def _add_deactivated_prefix(self, description: str) -> str:
+        """Add the [DEACTIVATED] prefix to a description if not already present."""
+        if not description.startswith(self._DEACTIVATED_PREFIX):
+            return f"{self._DEACTIVATED_PREFIX}{description}"
+        return description
+
     def _create_deactivated_function_schema(
         self, original_schema: FlowsFunctionSchema
     ) -> FlowsFunctionSchema:
@@ -690,9 +699,7 @@ class FlowManager:
             }
 
         # Only add prefix if not already deactivated (idempotent)
-        description = original_schema.description
-        if not description.startswith("[DEACTIVATED]"):
-            description = f"[DEACTIVATED] {description}"
+        description = self._add_deactivated_prefix(original_schema.description)
 
         return FlowsFunctionSchema(
             name=original_schema.name,
@@ -714,9 +721,12 @@ class FlowManager:
         *,
         cancel_on_interruption: bool = True,
         timeout_secs: Optional[float] = None,
-        force: bool = False,
     ) -> None:
-        """Register a function with the LLM if not already registered.
+        """Register a function with the LLM.
+
+        Always registers the function, replacing any existing registration.
+        This ensures that handlers are properly updated when a function is
+        deactivated or reactivated upon transitioning nodes.
 
         Args:
             name: Name of the function to register
@@ -728,40 +738,36 @@ class FlowManager:
                 interruption occurs. Defaults to True.
             timeout_secs: Optional per-tool timeout in seconds, overriding the global
                 ``function_call_timeout_secs``. Defaults to None (use global timeout).
-            force: If True, register even if function already exists (for re-registering
-                deactivated functions with new handlers). Defaults to False.
 
         Raises:
             FlowError: If function registration fails
         """
-        should_register = force or (name not in self._current_functions.keys())
-        if should_register:
-            try:
-                # Handle special token format (e.g. "__function__:function_name")
-                if isinstance(handler, str) and handler.startswith("__function__:"):
-                    func_name = handler.split(":")[1]
-                    handler = self._lookup_function(func_name)
+        try:
+            # Handle special token format (e.g. "__function__:function_name")
+            if isinstance(handler, str) and handler.startswith("__function__:"):
+                func_name = handler.split(":")[1]
+                handler = self._lookup_function(func_name)
 
-                # Create transition function
-                transition_func = await self._create_transition_func(
-                    name, handler, transition_to, transition_callback
-                )
+            # Create transition function
+            transition_func = await self._create_transition_func(
+                name, handler, transition_to, transition_callback
+            )
 
-                # Register function with LLM (or LLMSwitcher)
-                kwargs = {}
-                if timeout_secs is not None:
-                    kwargs["timeout_secs"] = timeout_secs
-                self._llm.register_function(
-                    name,
-                    transition_func,
-                    cancel_on_interruption=cancel_on_interruption,
-                    **kwargs,
-                )
+            # Register function with LLM (or LLMSwitcher)
+            kwargs = {}
+            if timeout_secs is not None:
+                kwargs["timeout_secs"] = timeout_secs
+            self._llm.register_function(
+                name,
+                transition_func,
+                cancel_on_interruption=cancel_on_interruption,
+                **kwargs,
+            )
 
-                logger.debug(f"Registered function: {name}")
-            except Exception as e:
-                logger.error(f"Failed to register function {name}: {str(e)}")
-                raise FlowError(f"Function registration failed: {str(e)}") from e
+            logger.debug(f"Registered function: {name}")
+        except Exception as e:
+            logger.error(f"Failed to register function {name}: {str(e)}")
+            raise FlowError(f"Function registration failed: {str(e)}") from e
 
     async def set_node_from_config(self, node_config: NodeConfig) -> None:
         """Set up a new conversation node and transition to it.
@@ -866,9 +872,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
             # Mix in global functions that should be available at every node
             functions_list = self._global_functions + functions_list
 
-            async def register_function_schema(
-                schema: FlowsFunctionSchema, is_deactivated: bool = False
-            ):
+            async def register_function_schema(schema: FlowsFunctionSchema):
                 """Helper to register a single FlowsFunctionSchema."""
                 tools.append(schema)
                 await self._register_function(
@@ -878,10 +882,10 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     transition_callback=schema.transition_callback,
                     cancel_on_interruption=schema.cancel_on_interruption,
                     timeout_secs=schema.timeout_secs,
-                    force=is_deactivated,  # Force re-registration for deactivated functions
                 )
-                # Store the schema for potential future deactivation (including deactivated ones
-                # so they persist across multiple transitions)
+                # Track that we registered this function in the current node.
+                # This will be useful if we need to carry it over as a
+                # "deactivated" function into the next node.
                 new_functions[schema.name] = schema
 
             async def register_direct_function(func):
@@ -896,7 +900,10 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     cancel_on_interruption=direct_function.cancel_on_interruption,
                     timeout_secs=direct_function.timeout_secs,
                 )
-                # Store a FlowsFunctionSchema representation for potential future deactivation
+                # Track that we registered this function in the current node.
+                # This will be useful if we need to carry it over as a
+                # "deactivated" function into the next node. Track it as a 
+                # FlowsFunctionSchema for ease of editing to be "deactivated".
                 schema = FlowsFunctionSchema(
                     name=direct_function.name,
                     description=direct_function.description,
@@ -947,12 +954,13 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 )
                 effective_strategy = ContextStrategyConfig(strategy=ContextStrategy.APPEND)
 
-            # For APPEND strategy, carry over deactivated functions from
-            # the previous node, since there may be context messages that call
-            # or reference them. This helps LLMs better understand their
-            # context, and also prevents errors: Gemini Live is particularly
-            # sensitive, erroring out when it has context messages (even text
-            # messages) referring to missing functions.
+            # For APPEND strategy, carry over functions from the previous node
+            # that aren't in the current node (but marking them as
+            # "deactivated"), since there may be historical context messages
+            # that call or reference them. This helps LLMs better understand
+            # their context, and also prevents errors: Gemini Live is
+            # particularly sensitive, erroring out when it has context messages
+            # (even text messages) referring to missing functions.
             deactivated_function_names: List[str] = []
             if (
                 self._current_node is not None
@@ -968,7 +976,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     ):
                         # Create deactivated stub with same schema but dummy handler
                         deactivated_schema = self._create_deactivated_function_schema(prev_schema)
-                        await register_function_schema(deactivated_schema, is_deactivated=True)
+                        await register_function_schema(deactivated_schema)
                         deactivated_function_names.append(prev_name)
 
                 if deactivated_function_names:
@@ -1012,9 +1020,10 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 deactivated_warning = {
                     "role": "developer",
                     "content": (
-                        f"IMPORTANT: The following functions are now DEACTIVATED and should NO LONGER be "
+                        f"IMPORTANT: The following functions are currently DEACTIVATED and should NOT be "
                         f"called: {', '.join(deactivated_function_names)}. If you call them, they "
-                        f"will return an error."
+                        f"will return an error. ALL OTHER AVAILABLE FUNCTIONS should be considered "
+                        "currently ACTIVE and callable."
                     ),
                 }
                 task_messages.insert(0, deactivated_warning)
