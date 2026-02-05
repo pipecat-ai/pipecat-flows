@@ -154,8 +154,6 @@ def create_pizza_node() -> NodeConfig:
         size = args["size"]
         pizza_type = args["type"]
 
-        print("[pk] Selected pizza:", size, pizza_type)
-
         # Simple pricing
         base_price = {"small": 10.00, "medium": 15.00, "large": 20.00}
         price = base_price[size]
@@ -220,8 +218,6 @@ def create_sushi_node() -> NodeConfig:
         """Handle sushi roll count and type selection."""
         count = args["count"]
         roll_type = args["type"]
-
-        print("[pk] Selected sushi:", count, roll_type)
 
         # Simple pricing: $8 per roll
         price = count * 8.00
