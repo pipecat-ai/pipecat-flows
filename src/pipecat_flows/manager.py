@@ -890,7 +890,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 )
                 # Track that we registered this function in the current node.
                 # This will be useful if we need to carry it over as a
-                # "deactivated" function into the next node. Track it as a 
+                # "deactivated" function into the next node. Track it as a
                 # FlowsFunctionSchema for ease of editing to be "deactivated".
                 schema = FlowsFunctionSchema(
                     name=direct_function.name,
