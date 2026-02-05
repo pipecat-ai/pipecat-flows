@@ -34,6 +34,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Non-decorated direct functions continue to work with `cancel_on_interruption=True`
   (the default behavior).
 
+- Added support for using Gemini Live (`GeminiLiveLLMService`) with Pipecat
+  Flows. Updated examples to support `LLM_PROVIDER=gemini_live`, accordingly.
+  Note that using Gemini Live requires that you use `LLMContext` and
+  `LLMContextAggregatorPair` rather than the deprecated `OpenAILLMContext` and
+  associated aggregators.
+
+### Changed
+
+- When transitioning from one node to the next, any functions in the previous
+  node that are absent in the new node now get "carried over", in that they're
+  still passed to the LLM, but in a "deactivated" state. Deactivation involves:
+  - Adding a special prefix to the function description
+  - Adding special context messages telling the LLM which functions to avoid
+    calling
+
+  Providing LLMs with deactivated functions helps them understand historical
+  context that might contain references to previously-active functions. Gemini
+  Live is particularly sensitive, erroring out when its context (even the text
+  messages) refer to missing functions.
+
 ## [0.0.22] - 2025-11-18
 
 ### Added
