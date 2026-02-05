@@ -80,6 +80,14 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             ContextStrategyConfig(strategy=ContextStrategy.RESET_WITH_SUMMARY)
 
+    def _get_all_queued_frames(self):
+        """Helper to collect all frames from all queue_frames calls."""
+        all_frames = []
+        for call in self.mock_task.queue_frames.call_args_list:
+            frames = call[0][0]
+            all_frames.extend(frames)
+        return all_frames
+
     async def test_default_strategy(self):
         """Test default context strategy (APPEND)."""
         flow_manager = FlowManager(
@@ -91,8 +99,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
 
         # First node should use UpdateFrame regardless of strategy
         await flow_manager._set_node("first", self.sample_node)
-        first_call = self.mock_task.queue_frames.call_args_list[0]
-        first_frames = first_call[0][0]
+        first_frames = self._get_all_queued_frames()
         self.assertTrue(any(isinstance(f, LLMMessagesUpdateFrame) for f in first_frames))
 
         # Reset mock
@@ -100,8 +107,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
 
         # Subsequent node should use AppendFrame with default strategy
         await flow_manager._set_node("second", self.sample_node)
-        second_call = self.mock_task.queue_frames.call_args_list[0]
-        second_frames = second_call[0][0]
+        second_frames = self._get_all_queued_frames()
         self.assertTrue(any(isinstance(f, LLMMessagesAppendFrame) for f in second_frames))
 
     async def test_reset_strategy(self):
@@ -120,8 +126,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
 
         # Second node should use UpdateFrame with RESET strategy
         await flow_manager._set_node("second", self.sample_node)
-        second_call = self.mock_task.queue_frames.call_args_list[0]
-        second_frames = second_call[0][0]
+        second_frames = self._get_all_queued_frames()
         self.assertTrue(any(isinstance(f, LLMMessagesUpdateFrame) for f in second_frames))
 
     async def test_reset_with_summary_success(self):
@@ -148,8 +153,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         await flow_manager._set_node("second", self.sample_node)
 
         # Verify summary was included in context update
-        second_call = self.mock_task.queue_frames.call_args_list[0]
-        second_frames = second_call[0][0]
+        second_frames = self._get_all_queued_frames()
         update_frame = next(f for f in second_frames if isinstance(f, LLMMessagesUpdateFrame))
         self.assertTrue(any(mock_summary in str(m) for m in update_frame.messages))
 
@@ -175,9 +179,8 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
 
         await flow_manager._set_node("second", self.sample_node)
 
-        # Verify UpdateFrame was used (APPEND behavior)
-        second_call = self.mock_task.queue_frames.call_args_list[0]
-        second_frames = second_call[0][0]
+        # Verify AppendFrame was used (fallback to APPEND behavior on timeout)
+        second_frames = self._get_all_queued_frames()
         self.assertTrue(any(isinstance(f, LLMMessagesAppendFrame) for f in second_frames))
 
     async def test_provider_specific_summary_formatting(self):
@@ -234,8 +237,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         await flow_manager._set_node("second", node_with_strategy)
 
         # Verify UpdateFrame was used (RESET behavior) despite global APPEND
-        second_call = self.mock_task.queue_frames.call_args_list[0]
-        second_frames = second_call[0][0]
+        second_frames = self._get_all_queued_frames()
         self.assertTrue(any(isinstance(f, LLMMessagesUpdateFrame) for f in second_frames))
 
     async def test_summary_generation_content(self):
@@ -299,9 +301,11 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         await flow_manager._set_node("second", new_node)
 
         # Verify context structure
-        update_call = self.mock_task.queue_frames.call_args_list[0]
-        update_frames = update_call[0][0]
-        messages_frame = next(f for f in update_frames if isinstance(f, LLMMessagesUpdateFrame))
+        all_frames = self._get_all_queued_frames()
+        messages_frame = next(
+            (f for f in all_frames if isinstance(f, LLMMessagesUpdateFrame)), None
+        )
+        self.assertIsNotNone(messages_frame, "LLMMessagesUpdateFrame should be queued")
 
         # Verify order: summary message, then new task messages
         self.assertTrue(mock_summary in str(messages_frame.messages[0]))
@@ -333,6 +337,14 @@ class TestDeactivatedFunctions(unittest.IsolatedAsyncioTestCase):
         self.mock_context_aggregator.user = MagicMock()
         self.mock_context_aggregator.user.return_value = MagicMock()
         self.mock_context_aggregator.user.return_value._context = MagicMock()
+
+    def _get_all_queued_frames(self):
+        """Helper to collect all frames from all queue_frames calls."""
+        all_frames = []
+        for call in self.mock_task.queue_frames.call_args_list:
+            frames = call[0][0]
+            all_frames.extend(frames)
+        return all_frames
 
     async def test_deactivated_functions_carried_over_on_append(self):
         """Test that functions from previous node are carried over as deactivated on APPEND."""
@@ -442,9 +454,11 @@ class TestDeactivatedFunctions(unittest.IsolatedAsyncioTestCase):
         await flow_manager._set_node("second", second_node)
 
         # Verify warning message was injected
-        queue_frames_call = self.mock_task.queue_frames.call_args_list[0]
-        frames = queue_frames_call[0][0]
-        messages_frame = next(f for f in frames if isinstance(f, LLMMessagesAppendFrame))
+        all_frames = self._get_all_queued_frames()
+        messages_frame = next(
+            (f for f in all_frames if isinstance(f, LLMMessagesAppendFrame)), None
+        )
+        self.assertIsNotNone(messages_frame, "LLMMessagesAppendFrame should be queued")
 
         # Check that warning message is present
         warning_found = any(
@@ -557,9 +571,11 @@ class TestDeactivatedFunctions(unittest.IsolatedAsyncioTestCase):
         await flow_manager._set_node("second", second_node)
 
         # Verify warning message mentions node_function but NOT global_function
-        queue_frames_call = self.mock_task.queue_frames.call_args_list[0]
-        frames = queue_frames_call[0][0]
-        messages_frame = next(f for f in frames if isinstance(f, LLMMessagesAppendFrame))
+        all_frames = self._get_all_queued_frames()
+        messages_frame = next(
+            (f for f in all_frames if isinstance(f, LLMMessagesAppendFrame)), None
+        )
+        self.assertIsNotNone(messages_frame, "LLMMessagesAppendFrame should be queued")
 
         for msg in messages_frame.messages:
             content = str(msg.get("content", ""))
@@ -694,9 +710,11 @@ class TestDeactivatedFunctions(unittest.IsolatedAsyncioTestCase):
         await flow_manager._set_node("second", second_node)
 
         # Verify function_a was deactivated
-        queue_frames_call = self.mock_task.queue_frames.call_args_list[0]
-        frames = queue_frames_call[0][0]
-        messages_frame = next(f for f in frames if isinstance(f, LLMMessagesAppendFrame))
+        all_frames = self._get_all_queued_frames()
+        messages_frame = next(
+            (f for f in all_frames if isinstance(f, LLMMessagesAppendFrame)), None
+        )
+        self.assertIsNotNone(messages_frame, "LLMMessagesAppendFrame should be queued")
         warning_found = any(
             "function_a" in str(msg.get("content", ""))
             and "deactivated" in str(msg.get("content", "")).lower()
@@ -726,9 +744,11 @@ class TestDeactivatedFunctions(unittest.IsolatedAsyncioTestCase):
         await flow_manager._set_node("third", third_node)
 
         # Verify both function_a and function_b are mentioned as deactivated
-        queue_frames_call = self.mock_task.queue_frames.call_args_list[0]
-        frames = queue_frames_call[0][0]
-        messages_frame = next(f for f in frames if isinstance(f, LLMMessagesAppendFrame))
+        all_frames = self._get_all_queued_frames()
+        messages_frame = next(
+            (f for f in all_frames if isinstance(f, LLMMessagesAppendFrame)), None
+        )
+        self.assertIsNotNone(messages_frame, "LLMMessagesAppendFrame should be queued")
 
         warning_content = ""
         for msg in messages_frame.messages:
@@ -848,9 +868,11 @@ class TestDeactivatedFunctions(unittest.IsolatedAsyncioTestCase):
         )
 
         # Verify no deactivation warning was issued for function_a
-        queue_frames_call = self.mock_task.queue_frames.call_args_list[0]
-        frames = queue_frames_call[0][0]
-        messages_frame = next(f for f in frames if isinstance(f, LLMMessagesAppendFrame))
+        all_frames = self._get_all_queued_frames()
+        messages_frame = next(
+            (f for f in all_frames if isinstance(f, LLMMessagesAppendFrame)), None
+        )
+        self.assertIsNotNone(messages_frame, "LLMMessagesAppendFrame should be queued")
 
         for msg in messages_frame.messages:
             content = str(msg.get("content", ""))
@@ -1167,4 +1189,119 @@ class TestDeactivatedFunctions(unittest.IsolatedAsyncioTestCase):
 
         self.assertGreaterEqual(
             new_registrations, 2, "Both functions should be re-registered on second transition"
+        )
+
+    async def test_deactivated_warnings_transform_frame_queued(self):
+        """Test that an LLMMessagesTransformFrame is queued to remove old warnings."""
+        from pipecat.frames.frames import LLMMessagesTransformFrame
+
+        from pipecat_flows.manager import FlowManager
+
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+            context_strategy=ContextStrategyConfig(strategy=ContextStrategy.APPEND),
+        )
+        await flow_manager.initialize()
+
+        handler = AsyncMock(return_value={"status": "success"})
+
+        # First node with function_a
+        first_node: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "First task."}],
+            "functions": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "function_a",
+                        "handler": handler,
+                        "description": "Function A",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                },
+            ],
+        }
+
+        await flow_manager._set_node("first", first_node)
+        self.mock_task.queue_frames.reset_mock()
+
+        # Second node with only function_b (function_a becomes deactivated)
+        second_node: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Second task."}],
+            "functions": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "function_b",
+                        "handler": handler,
+                        "description": "Function B",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                },
+            ],
+        }
+
+        await flow_manager._set_node("second", second_node)
+
+        # Verify LLMMessagesTransformFrame was queued
+        all_frames = []
+        for call in self.mock_task.queue_frames.call_args_list:
+            frames = call[0][0]
+            all_frames.extend(frames)
+
+        transform_frames = [f for f in all_frames if isinstance(f, LLMMessagesTransformFrame)]
+        self.assertGreater(
+            len(transform_frames),
+            0,
+            "LLMMessagesTransformFrame should be queued to remove old warnings",
+        )
+
+    async def test_deactivated_warnings_transform_function_removes_warnings(self):
+        """Test that the transform function correctly removes deactivated warning messages."""
+        from pipecat_flows.manager import FlowManager
+
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+            context_strategy=ContextStrategyConfig(strategy=ContextStrategy.APPEND),
+        )
+        await flow_manager.initialize()
+
+        warning_marker = FlowManager._DEACTIVATED_FUNCTIONS_MESSAGE_PREFIX
+
+        # Test messages with warnings mixed in
+        input_messages = [
+            {"role": "system", "content": f"{warning_marker}Old warning 1"},
+            {"role": "user", "content": "Hello"},
+            {"role": "system", "content": f"{warning_marker}Old warning 2"},
+            {"role": "assistant", "content": "Hi there"},
+            {"role": "system", "content": f"{warning_marker}Old warning 3"},
+            {"role": "system", "content": "Regular system message"},
+        ]
+
+        # Apply the transform method directly
+        result = flow_manager._remove_deactivated_functions_messages(input_messages)
+
+        # Verify all warnings were removed
+        warning_count = sum(
+            1
+            for msg in result
+            if isinstance(msg.get("content", ""), str) and msg["content"].startswith(warning_marker)
+        )
+        self.assertEqual(warning_count, 0, "All warnings should be removed")
+
+        # Verify non-warning messages are preserved
+        self.assertEqual(len(result), 3, "Should have 3 messages remaining")
+        user_messages = [msg for msg in result if msg.get("role") == "user"]
+        assistant_messages = [msg for msg in result if msg.get("role") == "assistant"]
+        system_messages = [msg for msg in result if msg.get("role") == "system"]
+        self.assertEqual(len(user_messages), 1, "User message should be preserved")
+        self.assertEqual(len(assistant_messages), 1, "Assistant message should be preserved")
+        self.assertEqual(len(system_messages), 1, "Non-warning system message should be preserved")
+        self.assertEqual(
+            system_messages[0]["content"],
+            "Regular system message",
+            "Regular system message content should be preserved",
         )

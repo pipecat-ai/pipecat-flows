@@ -35,13 +35,14 @@ from loguru import logger
 from pipecat.frames.frames import (
     FunctionCallResultProperties,
     LLMMessagesAppendFrame,
+    LLMMessagesTransformFrame,
     LLMMessagesUpdateFrame,
     LLMRunFrame,
     LLMSetToolsFrame,
 )
 from pipecat.pipeline.llm_switcher import LLMSwitcher
 from pipecat.pipeline.task import PipelineTask
-from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext, LLMContextMessage
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.base_transport import BaseTransport
@@ -658,13 +659,34 @@ class FlowManager:
         raise FlowError(error_message)
 
     # Prefix used to mark deactivated function descriptions
-    _DEACTIVATED_PREFIX = "[DEACTIVATED] "
+    _DEACTIVATED_FUNCTION_PREFIX = "[DEACTIVATED] "
+
+    # Prefix used to mark "deactivated functions" messages in context
+    _DEACTIVATED_FUNCTIONS_MESSAGE_PREFIX = "[DEACTIVATED_FUNCTIONS_MESSAGE] "
 
     def _add_deactivated_prefix(self, description: str) -> str:
         """Add the [DEACTIVATED] prefix to a description if not already present."""
-        if not description.startswith(self._DEACTIVATED_PREFIX):
-            return f"{self._DEACTIVATED_PREFIX}{description}"
+        if not description.startswith(self._DEACTIVATED_FUNCTION_PREFIX):
+            return f"{self._DEACTIVATED_FUNCTION_PREFIX}{description}"
         return description
+
+    def _remove_deactivated_functions_messages(
+        self, messages: List[LLMContextMessage]
+    ) -> List[LLMContextMessage]:
+        """Transform function that removes deactivated function warning messages.
+
+        Suitable for use with LLMMessagesTransformFrame. Filters out any messages
+        with the deactivated functions message prefix, ensuring only the most
+        recent warning is present in the context.
+        """
+        return [
+            msg
+            for msg in messages
+            if not (
+                isinstance(msg.get("content"), str)
+                and msg["content"].startswith(self._DEACTIVATED_FUNCTIONS_MESSAGE_PREFIX)
+            )
+        ]
 
     def _create_deactivated_function_schema(
         self, original_schema: FlowsFunctionSchema
@@ -942,13 +964,13 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 )
                 effective_strategy = ContextStrategyConfig(strategy=ContextStrategy.APPEND)
 
-            # For APPEND strategy, carry over functions from the previous node
-            # that aren't in the current node (but marking them as
-            # "deactivated"), since there may be historical context messages
-            # that call or reference them. This helps LLMs better understand
-            # their context, and also prevents errors: Gemini Live is
-            # particularly sensitive, erroring out when it has context messages
-            # (even text messages) referring to missing functions.
+            # For APPEND strategy on non-first nodes, carry over functions from
+            # the previous node that aren't in the current node (but marking
+            # them as "deactivated"), since there may be historical context
+            # messages that call or reference them. This helps LLMs better
+            # understand their context, and also prevents errors: Gemini Live
+            # is particularly sensitive, erroring out when it has context
+            # messages (even text messages) referring to missing functions.
             deactivated_function_names: List[str] = []
             if (
                 self._current_node is not None
@@ -984,19 +1006,35 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 standard_functions, original_configs=functions_list
             )
 
-            # Prepare task messages, injecting deactivated function warning if needed
+            # Remove any prior "deactivated functions" messages from context
+            # to prevent buildup (only one up-to-date one is needed). Only
+            # needed for APPEND strategy on non-first nodes, since
+            # RESET/RESET_WITH_SUMMARY replace the entire context.
+            if (
+                self._current_node is not None
+                and effective_strategy.strategy == ContextStrategy.APPEND
+            ):
+                await self._task.queue_frames(
+                    [
+                        LLMMessagesTransformFrame(
+                            transform=self._remove_deactivated_functions_messages
+                        )
+                    ]
+                )
+
             task_messages = list(node_config["task_messages"])  # Copy to avoid mutating original
             if deactivated_function_names:
-                deactivated_warning = {
+                deactivated_functions_message = {
                     "role": "system",
                     "content": (
+                        f"{self._DEACTIVATED_FUNCTIONS_MESSAGE_PREFIX}"
                         f"IMPORTANT: The following functions are currently DEACTIVATED and should NOT be "
                         f"called: {', '.join(deactivated_function_names)}. If you call them, they "
                         f"will return an error. ALL OTHER AVAILABLE FUNCTIONS should be considered "
                         "currently ACTIVE and callable."
                     ),
                 }
-                task_messages.insert(0, deactivated_warning)
+                task_messages.insert(0, deactivated_functions_message)
 
             # Update LLM context
             await self._update_llm_context(

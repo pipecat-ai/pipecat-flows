@@ -97,6 +97,14 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             },
         }
 
+    def _get_all_queued_frames(self):
+        """Helper to collect all frames from all queue_frames calls."""
+        all_frames = []
+        for call in self.mock_task.queue_frames.call_args_list:
+            frames = call[0][0]
+            all_frames.extend(frames)
+        return all_frames
+
     async def test_static_flow_initialization(self):
         """Test initialization of a static flow configuration."""
         flow_manager = FlowManager(
@@ -175,12 +183,11 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # The first call should be for the context update
         self.assertTrue(self.mock_task.queue_frames.called)
 
-        # Get the first call (context update)
-        first_call = self.mock_task.queue_frames.call_args_list[0]
-        first_frames = first_call[0][0]
+        # Collect all queued frames
+        all_frames = self._get_all_queued_frames()
 
         # For subsequent nodes, should use AppendFrame by default
-        append_frames = [f for f in first_frames if isinstance(f, LLMMessagesAppendFrame)]
+        append_frames = [f for f in all_frames if isinstance(f, LLMMessagesAppendFrame)]
         self.assertTrue(len(append_frames) > 0, "Should have at least one AppendFrame")
 
         # Verify that LLM completion was triggered by checking LLMRunFrame instantiation
@@ -1040,8 +1047,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Set first node and verify UpdateFrame
         await flow_manager.set_node_from_config(first_node)
-        first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
-        first_frames = first_call[0][0]
+        first_frames = self._get_all_queued_frames()
         update_frames = [f for f in first_frames if isinstance(f, LLMMessagesUpdateFrame)]
         self.assertEqual(len(update_frames), 1)
 
@@ -1054,8 +1060,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         await flow_manager.set_node_from_config(second_node)
 
         # Verify AppendFrame for second node
-        first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
-        second_frames = first_call[0][0]
+        second_frames = self._get_all_queued_frames()
         append_frames = [f for f in second_frames if isinstance(f, LLMMessagesAppendFrame)]
         self.assertEqual(len(append_frames), 1)
 
@@ -1078,8 +1083,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # First node should use UpdateFrame
         await flow_manager.set_node_from_config(test_node)
-        first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
-        first_frames = first_call[0][0]
+        first_frames = self._get_all_queued_frames()
         self.assertTrue(
             any(isinstance(f, LLMMessagesUpdateFrame) for f in first_frames),
             "First node should use UpdateFrame",
@@ -1094,8 +1098,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Second node should use AppendFrame
         await flow_manager.set_node_from_config(test_node)
-        first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
-        second_frames = first_call[0][0]
+        second_frames = self._get_all_queued_frames()
         self.assertTrue(
             any(isinstance(f, LLMMessagesAppendFrame) for f in second_frames),
             "Subsequent nodes should use AppendFrame",
