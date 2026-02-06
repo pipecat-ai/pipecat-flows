@@ -75,12 +75,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed interrupted transition leaving flow permanently stuck when a user
   interruption cancelled a function call mid-execution (#234).
 
-- Added support for using Gemini Live (`GeminiLiveLLMService`) with Pipecat
-  Flows. Updated examples to support `LLM_PROVIDER=gemini_live`, accordingly.
-  Note that using Gemini Live requires that you use `LLMContext` and
-  `LLMContextAggregatorPair` rather than the deprecated `OpenAILLMContext` and
-  associated aggregators.
-
 ### Changed
 
 - When transitioning from one node to the next, any functions in the previous
@@ -91,9 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     calling
 
   Providing LLMs with deactivated functions helps them understand historical
-  context that might contain references to previously-active functions. Gemini
-  Live is particularly sensitive, erroring out when its context (even the text
-  messages) refer to missing functions.
+  context that might contain references to previously-active functions.
 
 ## [0.0.22] - 2025-11-18
 
