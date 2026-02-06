@@ -951,26 +951,11 @@ In all of these cases, you can provide a `name` in your new node's config for de
             # Determine effective context strategy for this transition
             effective_strategy = node_config.get("context_strategy") or self._context_strategy
 
-            # If RESET_WITH_SUMMARY is not supported for this LLM, fall back to
-            # APPEND and log a warning. In the future, we may want to add
-            # support for specifying a summarization LLM.
-            if (
-                effective_strategy.strategy == ContextStrategy.RESET_WITH_SUMMARY
-                and not self._adapter.supports_summarization
-            ):
-                logger.warning(
-                    f"Context strategy RESET_WITH_SUMMARY is not supported by the current LLM. "
-                    f"Falling back to APPEND strategy for node {node_id}."
-                )
-                effective_strategy = ContextStrategyConfig(strategy=ContextStrategy.APPEND)
-
             # For APPEND strategy on non-first nodes, carry over functions from
             # the previous node that aren't in the current node (but marking
             # them as "deactivated"), since there may be historical context
             # messages that call or reference them. This helps LLMs better
-            # understand their context, and also prevents errors: Gemini Live
-            # is particularly sensitive, erroring out when it has context
-            # messages (even text messages) referring to missing functions.
+            # understand their context.
             deactivated_function_names: List[str] = []
             if (
                 self._current_node is not None

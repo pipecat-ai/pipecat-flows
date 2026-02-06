@@ -63,7 +63,7 @@ from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
-from utils import create_llm, needs_stt_tts
+from utils import create_llm
 
 from pipecat_flows import (
     FlowArgs,
@@ -246,15 +246,11 @@ def create_final_node() -> NodeConfig:
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     logger.info(f"Starting bot")
 
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY")) if needs_stt_tts() else None
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
-    tts = (
-        CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
-        )
-        if needs_stt_tts()
-        else None
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
     )
 
     # LLM service is created using the create_llm function from utils.py
@@ -274,21 +270,16 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
     pipeline = Pipeline(
-        list(
-            filter(
-                None,
-                [
-                    transport.input(),
-                    rtvi,
-                    stt,
-                    context_aggregator.user(),
-                    llm,
-                    tts,
-                    transport.output(),
-                    context_aggregator.assistant(),
-                ],
-            )
-        )
+        [
+            transport.input(),
+            rtvi,
+            stt,
+            context_aggregator.user(),
+            llm,
+            tts,
+            transport.output(),
+            context_aggregator.assistant(),
+        ]
     )
 
     task = PipelineTask(

@@ -52,7 +52,7 @@ from pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy import (
     TurnAnalyzerUserTurnStopStrategy,
 )
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
-from utils import create_llm, needs_stt_tts
+from utils import create_llm
 
 from pipecat_flows import (
     FlowArgs,
@@ -345,14 +345,10 @@ def create_end_node() -> NodeConfig:
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Run the food ordering bot."""
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY")) if needs_stt_tts() else None
-    tts = (
-        CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
-        )
-        if needs_stt_tts()
-        else None
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
     )
     # LLM service is created using the create_llm function from utils.py
     # Default is OpenAI; can be changed by setting LLM_PROVIDER environment variable
@@ -369,20 +365,15 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
 
     pipeline = Pipeline(
-        list(
-            filter(
-                None,
-                [
-                    transport.input(),
-                    stt,
-                    context_aggregator.user(),
-                    llm,
-                    tts,
-                    transport.output(),
-                    context_aggregator.assistant(),
-                ],
-            )
-        )
+        [
+            transport.input(),
+            stt,
+            context_aggregator.user(),
+            llm,
+            tts,
+            transport.output(),
+            context_aggregator.assistant(),
+        ]
     )
 
     task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))

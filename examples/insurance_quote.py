@@ -57,7 +57,7 @@ from pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy import (
     TurnAnalyzerUserTurnStopStrategy,
 )
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
-from utils import create_llm, needs_stt_tts
+from utils import create_llm
 
 from pipecat_flows import FlowArgs, FlowManager, FlowResult, FlowsFunctionSchema, NodeConfig
 
@@ -115,12 +115,12 @@ INSURANCE_RATES = {
 
 
 # Function handlers
-async def record_age(
+async def collect_age(
     args: FlowArgs, flow_manager: FlowManager
 ) -> tuple[AgeCollectionResult, NodeConfig]:
     """Process age collection."""
     age = args["age"]
-    logger.debug(f"record_age handler executing with age: {age}")
+    logger.debug(f"collect_age handler executing with age: {age}")
 
     flow_manager.state["age"] = age
     result = AgeCollectionResult(age=age)
@@ -130,12 +130,12 @@ async def record_age(
     return result, next_node
 
 
-async def record_marital_status(
+async def collect_marital_status(
     args: FlowArgs, flow_manager: FlowManager
 ) -> tuple[MaritalStatusResult, NodeConfig]:
     """Process marital status collection."""
     status = args["marital_status"]
-    logger.debug(f"record_marital_status handler executing with status: {status}")
+    logger.debug(f"collect_marital_status handler executing with status: {status}")
 
     result = MaritalStatusResult(marital_status=status)
 
@@ -208,25 +208,23 @@ def create_initial_node() -> NodeConfig:
                 "content": (
                     "You are a friendly insurance agent. Your responses will be "
                     "converted to audio, so avoid special characters. Always use "
-                    "the available functions to progress the conversation naturally. "
-                    "When you've decided to call a function, do not also respond; "
-                    "the function call by itself is enough."
+                    "the available functions to progress the conversation naturally."
                 ),
             }
         ],
         "task_messages": [
             {
                 "role": "system",
-                "content": "Start by asking for the customer's age, then record their response using the record_age function.",
+                "content": "Start by asking for the customer's age.",
             }
         ],
         "functions": [
             FlowsFunctionSchema(
-                name="record_age",
+                name="collect_age",
                 description="Record customer's age",
                 properties={"age": {"type": "integer"}},
                 required=["age"],
-                handler=record_age,
+                handler=collect_age,
             )
         ],
     }
@@ -244,11 +242,11 @@ def create_marital_status_node() -> NodeConfig:
         ],
         "functions": [
             FlowsFunctionSchema(
-                name="record_marital_status",
+                name="collect_marital_status",
                 description="Record marital status after customer provides it",
                 properties={"marital_status": {"type": "string", "enum": ["single", "married"]}},
                 required=["marital_status"],
-                handler=record_marital_status,
+                handler=collect_marital_status,
             )
         ],
     }
@@ -297,11 +295,11 @@ def create_quote_results_node(
                     f"Monthly Premium: ${quote['monthly_premium']:.2f}\n"
                     f"Coverage Amount: ${quote['coverage_amount']:,}\n"
                     f"Deductible: ${quote['deductible']:,}\n\n"
-                    "Explain these quote details to the customer. If they then request changes, "
-                    "use update_coverage to recalculate their quote. If this is an updated quote (from a previous quote), explain how their "
+                    "Explain these quote details to the customer. When they request changes, "
+                    "use update_coverage to recalculate their quote. Explain how their "
                     "changes affected the premium and compare it to their previous quote. "
                     "Ask if they'd like to make any other adjustments or if they're ready "
-                    "to end the quote process. "
+                    "to end the quote process."
                 ),
             }
         ],
@@ -346,14 +344,10 @@ def create_end_node() -> NodeConfig:
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Run the insurance quote bot."""
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY")) if needs_stt_tts() else None
-    tts = (
-        CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
-        )
-        if needs_stt_tts()
-        else None
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
     )
     # LLM service is created using the create_llm function from utils.py
     # Default is OpenAI; can be changed by setting LLM_PROVIDER environment variable
@@ -370,20 +364,15 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
 
     pipeline = Pipeline(
-        list(
-            filter(
-                None,
-                [
-                    transport.input(),
-                    stt,
-                    context_aggregator.user(),
-                    llm,
-                    tts,
-                    transport.output(),
-                    context_aggregator.assistant(),
-                ],
-            )
-        )
+        [
+            transport.input(),
+            stt,
+            context_aggregator.user(),
+            llm,
+            tts,
+            transport.output(),
+            context_aggregator.assistant(),
+        ]
     )
 
     task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
