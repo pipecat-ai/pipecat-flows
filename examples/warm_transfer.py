@@ -732,8 +732,13 @@ async def main():
 
         # Prepare hold music args
         flow_manager.state["hold_music_args"] = {
-            "script_path": Path(__file__).parent.parent / "assets" / "hold_music" / "hold_music.py",
+            "script_path": Path(__file__).parent.parent
+            / "examples"
+            / "assets"
+            / "hold_music"
+            / "hold_music.py",
             "wav_file_path": Path(__file__).parent.parent
+            / "examples"
             / "assets"
             / "hold_music"
             / "hold_music.wav",

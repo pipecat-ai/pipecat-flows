@@ -97,6 +97,14 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             },
         }
 
+    def _get_all_queued_frames(self):
+        """Helper to collect all frames from all queue_frames calls."""
+        all_frames = []
+        for call in self.mock_task.queue_frames.call_args_list:
+            frames = call[0][0]
+            all_frames.extend(frames)
+        return all_frames
+
     async def test_static_flow_initialization(self):
         """Test initialization of a static flow configuration."""
         flow_manager = FlowManager(
@@ -175,12 +183,11 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # The first call should be for the context update
         self.assertTrue(self.mock_task.queue_frames.called)
 
-        # Get the first call (context update)
-        first_call = self.mock_task.queue_frames.call_args_list[0]
-        first_frames = first_call[0][0]
+        # Collect all queued frames
+        all_frames = self._get_all_queued_frames()
 
         # For subsequent nodes, should use AppendFrame by default
-        append_frames = [f for f in first_frames if isinstance(f, LLMMessagesAppendFrame)]
+        append_frames = [f for f in all_frames if isinstance(f, LLMMessagesAppendFrame)]
         self.assertTrue(len(append_frames) > 0, "Should have at least one AppendFrame")
 
         # Verify that LLM completion was triggered by checking LLMRunFrame instantiation
@@ -290,7 +297,13 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Test new style callback
         await flow_manager.set_node_from_config(new_style_node)
-        func = flow_manager._llm.register_function.call_args[0][1]
+        # Find the registered function by name (not using call_args since deactivated functions may be registered after)
+        func = None
+        for call in flow_manager._llm.register_function.call_args_list:
+            if call[0][0] == "new_style_function":
+                func = call[0][1]
+                break
+        self.assertIsNotNone(func, "new_style_function was not registered")
 
         # Reset context_updated callback
         context_updated_callback = None
@@ -338,7 +351,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         await flow_manager.set_node_from_config(valid_config)
 
         self.assertEqual(flow_manager._current_node, "test")
-        self.assertEqual(flow_manager._current_functions, set())
+        self.assertEqual(flow_manager._current_functions, {})
 
     async def test_function_registration(self):
         """Test function registration with LLM."""
@@ -779,7 +792,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Mock LLM to raise error on register_function
         flow_manager._llm.register_function.side_effect = Exception("Registration error")
 
-        new_functions = set()
+        new_functions = {}
         with self.assertRaises(FlowError):
             await flow_manager._register_function("test", new_functions, None)
 
@@ -823,11 +836,14 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Mock task to raise error on queue_frames
         flow_manager._task.queue_frames.side_effect = Exception("Queue error")
 
+        from pipecat_flows.types import ContextStrategy, ContextStrategyConfig
+
         with self.assertRaises(FlowError):
             await flow_manager._update_llm_context(
                 role_messages=[],
                 task_messages=[{"role": "system", "content": "Test"}],
                 functions=[],
+                strategy=ContextStrategyConfig(strategy=ContextStrategy.APPEND),
             )
 
     async def test_function_declarations_processing(self):
@@ -1031,8 +1047,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Set first node and verify UpdateFrame
         await flow_manager.set_node_from_config(first_node)
-        first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
-        first_frames = first_call[0][0]
+        first_frames = self._get_all_queued_frames()
         update_frames = [f for f in first_frames if isinstance(f, LLMMessagesUpdateFrame)]
         self.assertEqual(len(update_frames), 1)
 
@@ -1045,8 +1060,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         await flow_manager.set_node_from_config(second_node)
 
         # Verify AppendFrame for second node
-        first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
-        second_frames = first_call[0][0]
+        second_frames = self._get_all_queued_frames()
         append_frames = [f for f in second_frames if isinstance(f, LLMMessagesAppendFrame)]
         self.assertEqual(len(append_frames), 1)
 
@@ -1069,8 +1083,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # First node should use UpdateFrame
         await flow_manager.set_node_from_config(test_node)
-        first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
-        first_frames = first_call[0][0]
+        first_frames = self._get_all_queued_frames()
         self.assertTrue(
             any(isinstance(f, LLMMessagesUpdateFrame) for f in first_frames),
             "First node should use UpdateFrame",
@@ -1085,8 +1098,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Second node should use AppendFrame
         await flow_manager.set_node_from_config(test_node)
-        first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
-        second_frames = first_call[0][0]
+        second_frames = self._get_all_queued_frames()
         self.assertTrue(
             any(isinstance(f, LLMMessagesAppendFrame) for f in second_frames),
             "Subsequent nodes should use AppendFrame",
@@ -1383,8 +1395,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Set node and verify it works without error
         await flow_manager.set_node_from_config(node_config)
 
-        # Verify current_functions is empty set
-        self.assertEqual(flow_manager._current_functions, set())
+        # Verify current_functions is empty dict
+        self.assertEqual(flow_manager._current_functions, {})
 
         # Verify LLM tools were still set (with empty or placeholder functions)
         tools_frames_call = [
@@ -1412,8 +1424,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Set node and verify it works without error
         await flow_manager.set_node_from_config(node_config)
 
-        # Verify current_functions is empty set
-        self.assertEqual(flow_manager._current_functions, set())
+        # Verify current_functions is empty dict
+        self.assertEqual(flow_manager._current_functions, {})
 
         # Verify LLM tools were still set (with empty or placeholder functions)
         tools_frames_call = [

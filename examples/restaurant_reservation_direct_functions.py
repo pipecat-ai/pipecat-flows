@@ -150,7 +150,7 @@ async def check_availability(
     Check availability for requested time.
 
     Args:
-        time (str): Requested reservation time in "HH:MM AM/PM" format. Must be between 5 PM and 10 PM.
+        time (str): Requested reservation time in "HH:MM AM/PM" format, with NO leading 0s (e.g. "6:00 PM"). Must be between 5 PM and 10 PM.
         party_size (int): Number of people in the party.
     """
     # Check availability with mock API
@@ -163,8 +163,10 @@ async def check_availability(
 
     # Next node: confirmation or no availability
     if is_available:
+        logger.debug("Time is available, transitioning to confirmation node")
         next_node = create_confirmation_node()
     else:
+        logger.debug(f"Time not available, storing alternatives: {alternative_times}")
         next_node = create_no_availability_node(alternative_times)
 
     return result, next_node
@@ -219,7 +221,7 @@ def create_confirmation_node() -> NodeConfig:
         "task_messages": [
             {
                 "role": "system",
-                "content": "Confirm the reservation details and ask if they need anything else.",
+                "content": "Confirm the reservation details and ask if they need anything else. If they don't, go ahead and end the conversation by calling the appropriate function.",
             }
         ],
         "functions": [end_conversation],

@@ -139,7 +139,7 @@ def create_initial_node() -> NodeConfig:
         role_messages=[
             {
                 "role": "system",
-                "content": "You are an order-taking assistant. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
+                "content": "You are an order-taking assistant. You must ALWAYS use the available functions to progress the conversation. When you've decided to call a function to progress the conversation, do not also respond; the function call by itself is enough. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
             }
         ],
         task_messages=[

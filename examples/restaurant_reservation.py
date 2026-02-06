@@ -235,7 +235,7 @@ def create_confirmation_node() -> NodeConfig:
         "task_messages": [
             {
                 "role": "system",
-                "content": "Confirm the reservation details and ask if they need anything else.",
+                "content": "Confirm the reservation details and ask if they need anything else. If they don't, go ahead and end the conversation by calling the appropriate function.",
             }
         ],
         "functions": [end_conversation_schema],

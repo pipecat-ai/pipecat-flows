@@ -34,6 +34,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Non-decorated direct functions continue to work with `cancel_on_interruption=True`
   (the default behavior).
 
+### Changed
+
+- When transitioning from one node to the next, any functions in the previous
+  node that are absent in the new node now get "carried over", in that they're
+  still passed to the LLM, but in a "deactivated" state. Deactivation involves:
+  - Adding a special prefix to the function description
+  - Adding special context messages telling the LLM which functions to avoid
+    calling
+
+  Providing LLMs with deactivated functions helps them understand historical
+  context that might contain references to previously-active functions.
+
 ## [0.0.22] - 2025-11-18
 
 ### Added
