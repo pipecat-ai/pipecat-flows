@@ -48,7 +48,7 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
-from utils import create_llm, needs_stt_tts
+from utils import create_llm
 
 from pipecat_flows import FlowManager, FlowResult, NodeConfig
 
@@ -183,7 +183,7 @@ def create_initial_node() -> NodeConfig:
     """Create the initial node for food type selection."""
     return NodeConfig(
         name="initial",
-        role_message="You are an order-taking assistant. You must ALWAYS use the available functions to progress the conversation. When you've decided to call a function to progress the conversation, do not also respond; the function call by itself is enough. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
+        role_message="You are an order-taking assistant. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
         task_messages=[
             {
                 "role": "developer",
@@ -276,14 +276,10 @@ def create_end_node() -> NodeConfig:
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Run the food ordering bot with direct functions."""
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY")) if needs_stt_tts() else None
-    tts = (
-        CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
-        )
-        if needs_stt_tts()
-        else None
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
     )
     # LLM service is created using the create_llm function from utils.py
     # Default is OpenAI; can be changed by setting LLM_PROVIDER environment variable
@@ -296,20 +292,15 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
 
     pipeline = Pipeline(
-        list(
-            filter(
-                None,
-                [
-                    transport.input(),
-                    stt,
-                    context_aggregator.user(),
-                    llm,
-                    tts,
-                    transport.output(),
-                    context_aggregator.assistant(),
-                ],
-            )
-        )
+        [
+            transport.input(),
+            stt,
+            context_aggregator.user(),
+            llm,
+            tts,
+            transport.output(),
+            context_aggregator.assistant(),
+        ]
     )
 
     task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
