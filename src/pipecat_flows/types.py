@@ -313,14 +313,11 @@ def flows_direct_function(*, cancel_on_interruption: bool = True) -> Callable[[C
     Returns:
         A decorator that attaches the metadata to the function.
 
-    Example:
+    Example::
+
         @flows_direct_function(cancel_on_interruption=False)
         async def long_running_task(flow_manager: FlowManager, query: str):
-            '''Perform a long-running task that should not be cancelled on interruption.
-            
-            Args:
-                query: The query to process.
-            '''
+            '''Perform a long-running task that should not be cancelled on interruption.'''
             # ... implementation
             return {"status": "complete"}, None
     """
