@@ -29,9 +29,7 @@ import sys
 
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import ManuallySwitchServiceFrame
 from pipecat.pipeline.llm_switcher import LLMSwitcher
 from pipecat.pipeline.pipeline import Pipeline
@@ -55,10 +53,6 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
-from pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy import (
-    TurnAnalyzerUserTurnStopStrategy,
-)
-from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 from pipecat_flows import FlowManager, FlowResult, NodeConfig
 from pipecat_flows.types import ContextStrategy, ContextStrategyConfig
@@ -72,17 +66,14 @@ transport_params = {
     "daily": lambda: DailyParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
-        vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
     ),
     "twilio": lambda: FastAPIWebsocketParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
-        vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
     ),
     "webrtc": lambda: TransportParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
-        vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
     ),
 }
 
@@ -195,11 +186,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     global context_aggregator
     context_aggregator = LLMContextAggregatorPair(
         context,
-        user_params=LLMUserAggregatorParams(
-            user_turn_strategies=UserTurnStrategies(
-                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
-            ),
-        ),
+        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
     )
 
     # LLM services
