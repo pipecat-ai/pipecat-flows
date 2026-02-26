@@ -682,6 +682,13 @@ class FlowManager:
                     name, handler, transition_to, transition_callback
                 )
 
+                # Edge functions (those with transitions) must always complete,
+                # even during interruptions, to avoid leaving the flow stuck
+                # with a pending transition that never executes (see #234).
+                is_edge_function = bool(transition_to) or bool(transition_callback)
+                if is_edge_function:
+                    cancel_on_interruption = False
+
                 # Register function with LLM (or LLMSwitcher)
                 self._llm.register_function(
                     name,
