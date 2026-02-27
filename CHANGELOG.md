@@ -31,8 +31,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       return {"status": "complete"}, None
   ```
 
-  Non-decorated direct functions continue to work with `cancel_on_interruption=True`
-  (the default behavior).
+  Non-decorated direct functions use `cancel_on_interruption=False` by default,
+  ensuring all function calls complete even during user interruptions.
+
+### Changed
+
+- Changed `cancel_on_interruption` default from `True` to `False` in both
+  `FlowsFunctionSchema` and `@flows_direct_function`. Function calls now
+  complete even during user interruptions by default, preventing stalled
+  transitions and dropped results.
+
+### Fixed
+
+- Fixed interrupted transition leaving flow permanently stuck when a user
+  interruption cancelled a function call mid-execution (#234).
 
 ## [0.0.22] - 2025-11-18
 
