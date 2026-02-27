@@ -273,7 +273,7 @@ class FlowsFunctionSchema:
     properties: Dict[str, Any]
     required: List[str]
     handler: Optional[FunctionHandler] = None
-    cancel_on_interruption: bool = True
+    cancel_on_interruption: bool = False
     transition_to: Optional[str] = None
     transition_callback: Optional[Callable] = None
 
@@ -300,7 +300,7 @@ class FlowsFunctionSchema:
         )
 
 
-def flows_direct_function(*, cancel_on_interruption: bool = True) -> Callable[[Callable], Callable]:
+def flows_direct_function(*, cancel_on_interruption: bool = False) -> Callable[[Callable], Callable]:
     """Decorator to attach additional metadata to a Pipecat direct function.
 
     This metadata can be used, for example, to store the additional arguments
