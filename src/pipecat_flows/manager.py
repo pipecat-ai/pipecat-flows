@@ -654,6 +654,7 @@ class FlowManager:
         transition_callback: Optional[Callable] = None,
         *,
         cancel_on_interruption: bool = True,
+        timeout_secs: Optional[float] = None,
     ) -> None:
         """Register a function with the LLM if not already registered.
 
@@ -666,6 +667,8 @@ class FlowManager:
             new_functions: Set to track newly registered functions for this node
             cancel_on_interruption: Whether to cancel this function call when an
                 interruption occurs. Defaults to True.
+            timeout_secs: Optional per-tool timeout in seconds, overriding the global
+                ``function_call_timeout_secs``. Defaults to None (use global timeout).
 
         Raises:
             FlowError: If function registration fails
@@ -683,10 +686,23 @@ class FlowManager:
                 )
 
                 # Register function with LLM (or LLMSwitcher)
+                kwargs = {}
+                if timeout_secs is not None:
+                    # Only pass timeout_secs if the LLM supports it
+                    sig = inspect.signature(self._llm.register_function)
+                    if "timeout_secs" in sig.parameters:
+                        kwargs["timeout_secs"] = timeout_secs
+                    else:
+                        logger.warning(
+                            f"timeout_secs={timeout_secs} specified for function '{name}' "
+                            "but the current LLM service does not support it. "
+                            "Upgrade pipecat-ai to use per-tool timeouts."
+                        )
                 self._llm.register_function(
                     name,
                     transition_func,
                     cancel_on_interruption=cancel_on_interruption,
+                    **kwargs,
                 )
 
                 new_functions.add(name)
@@ -808,6 +824,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     transition_to=schema.transition_to,
                     transition_callback=schema.transition_callback,
                     cancel_on_interruption=schema.cancel_on_interruption,
+                    timeout_secs=schema.timeout_secs,
                 )
 
             async def register_direct_function(func):
@@ -821,6 +838,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     transition_to=None,
                     transition_callback=None,
                     cancel_on_interruption=direct_function.cancel_on_interruption,
+                    timeout_secs=direct_function.timeout_secs,
                 )
 
             for func_config in functions_list:
