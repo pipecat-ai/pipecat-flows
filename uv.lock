@@ -2267,7 +2267,7 @@ wheels = [
 
 [[package]]
 name = "nltk"
-version = "3.9.2"
+version = "3.9.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -2275,9 +2275,9 @@ dependencies = [
     { name = "regex" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f9/76/3a5e4312c19a028770f86fd7c058cf9f4ec4321c6cf7526bab998a5b683c/nltk-3.9.2.tar.gz", hash = "sha256:0f409e9b069ca4177c1903c3e843eef90c7e92992fa4931ae607da6de49e1419", size = 2887629, upload-time = "2025-10-01T07:19:23.764Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e1/8f/915e1c12df07c70ed779d18ab83d065718a926e70d3ea33eb0cd66ffb7c0/nltk-3.9.3.tar.gz", hash = "sha256:cb5945d6424a98d694c2b9a0264519fab4363711065a46aa0ae7a2195b92e71f", size = 2923673, upload-time = "2026-02-24T12:05:53.833Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/60/90/81ac364ef94209c100e12579629dc92bf7a709a84af32f8c551b02c07e94/nltk-3.9.2-py3-none-any.whl", hash = "sha256:1e209d2b3009110635ed9709a67a1a3e33a10f799490fa71cf4bec218c11c88a", size = 1513404, upload-time = "2025-10-01T07:19:21.648Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/7e/9af5a710a1236e4772de8dfcc6af942a561327bb9f42b5b4a24d0cf100fd/nltk-3.9.3-py3-none-any.whl", hash = "sha256:60b3db6e9995b3dd976b1f0fa7dec22069b2677e759c28eb69b62ddd44870522", size = 1525385, upload-time = "2026-02-24T12:05:46.54Z" },
 ]
 
 [[package]]
@@ -2677,7 +2677,7 @@ wheels = [
 
 [[package]]
 name = "pipecat-ai"
-version = "0.0.103"
+version = "0.0.104"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -2700,9 +2700,9 @@ dependencies = [
     { name = "transformers" },
     { name = "wait-for2", marker = "python_full_version < '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/88/cd/5b5fbbe64edb7825cb5b1604480484dda760cb2d2a6655b9f3e4f33c87b1/pipecat_ai-0.0.103.tar.gz", hash = "sha256:9d08b8032a5a045a69202c83ce643f1ab6108aa6610122f566c152966171ad3c", size = 10974618, upload-time = "2026-02-21T00:44:09.557Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/de/3f/c8ff86747baad3c785ae3f0628a133493c6b4475deaf9681e9e9492f5231/pipecat_ai-0.0.104.tar.gz", hash = "sha256:24a13b8ad57742db6d69f73a7a5122f0805b19458a4d7f7c97f82387d2c433b7", size = 11042307, upload-time = "2026-03-03T05:26:08.011Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/20/ef/bd6c2022f16b6453bbe2348b254741ce221bec3e2729aed376503376bf07/pipecat_ai-0.0.103-py3-none-any.whl", hash = "sha256:cd05259cc2772a3fff38233a33f9fafad3a10a8ac1f371094ace97285b7ecc73", size = 10620793, upload-time = "2026-02-21T00:44:07.05Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/91/740b798d8d883a6f02d04cb6f6301895451405406e6707c22a6f2a0f5e8e/pipecat_ai-0.0.104-py3-none-any.whl", hash = "sha256:57e0de2bc31c4a0ff651277a8ff9408b908dedd5b8c9d8110d6bcb9f357b3bfd", size = 10673350, upload-time = "2026-03-03T05:26:05.442Z" },
 ]
 
 [package.optional-dependencies]
@@ -2729,10 +2729,6 @@ google = [
     { name = "google-cloud-texttospeech" },
     { name = "google-genai" },
     { name = "websockets" },
-]
-local-smart-turn-v3 = [
-    { name = "onnxruntime" },
-    { name = "transformers" },
 ]
 openai = [
     { name = "websockets" },
@@ -2768,7 +2764,7 @@ dependencies = [
 dev = [
     { name = "build" },
     { name = "pip-tools" },
-    { name = "pipecat-ai", extra = ["anthropic", "aws", "cartesia", "daily", "deepgram", "google", "local-smart-turn-v3", "openai", "runner", "silero", "webrtc", "websocket"] },
+    { name = "pipecat-ai", extra = ["anthropic", "aws", "cartesia", "daily", "deepgram", "google", "openai", "runner", "silero", "webrtc", "websocket"] },
     { name = "pre-commit" },
     { name = "pyright" },
     { name = "pytest" },
@@ -2825,14 +2821,14 @@ docs = [
 
 [[package]]
 name = "pipecat-ai-small-webrtc-prebuilt"
-version = "2.2.0"
+version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastapi", extra = ["all"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9a/9f/b06cc0e2eaeda811959c216dade3ed38c30d20e6327a2b22f80125072c5a/pipecat_ai_small_webrtc_prebuilt-2.2.0.tar.gz", hash = "sha256:5d73fe619225b97e383863a901060d1c986f088f4de004477856b085aaba76c4", size = 466005, upload-time = "2026-02-13T19:28:54.626Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2e/5f/b0f73bbc6997c22655f0495ce21a4cb176e192df1b5407f66fad8101c697/pipecat_ai_small_webrtc_prebuilt-2.3.0.tar.gz", hash = "sha256:10dc31db9978d68001ae941066fe460c533412a8984df71e5416d4ebeb9c0371", size = 469001, upload-time = "2026-02-25T17:18:43.316Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/26/71/20a015cea25dc57129ed6426fdf37a09aefe37f4dd60e3a42ba2d9e3bd1b/pipecat_ai_small_webrtc_prebuilt-2.2.0-py3-none-any.whl", hash = "sha256:e7917d23f51e5418667541a3e241b2de28a43eea35a5a9486721be3da04e719d", size = 466257, upload-time = "2026-02-13T19:28:53.188Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/bc/6193b639a53f4bac1c0fe29b1f8e0d49085c60e457b02a01e725eb7c093f/pipecat_ai_small_webrtc_prebuilt-2.3.0-py3-none-any.whl", hash = "sha256:b3ddaff8bbd56746fe3c58a2d721d3ccc94d17a33c16d78dcbce73d7526c1a05", size = 468881, upload-time = "2026-02-25T17:18:41.869Z" },
 ]
 
 [[package]]

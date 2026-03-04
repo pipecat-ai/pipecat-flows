@@ -311,6 +311,47 @@ class TestFlowsDirectFunctionDecorator(unittest.TestCase):
         )
         self.assertFalse(func.cancel_on_interruption)
 
+    def test_timeout_secs_defaults_to_none(self):
+        """Test that timeout_secs defaults to None for non-decorated functions."""
+
+        async def my_function(flow_manager: FlowManager):
+            return {"status": "success"}, None
+
+        func = FlowsDirectFunctionWrapper(function=my_function)
+        self.assertIsNone(func.timeout_secs)
+
+    def test_timeout_secs_can_be_set(self):
+        """Test that timeout_secs can be set via decorator."""
+
+        @flows_direct_function(timeout_secs=30)
+        async def my_function(flow_manager: FlowManager):
+            return {"status": "success"}, None
+
+        func = FlowsDirectFunctionWrapper(function=my_function)
+        self.assertEqual(func.timeout_secs, 30)
+
+    def test_decorator_preserves_function_metadata_with_timeout(self):
+        """Test that the decorator preserves function name and docstring with timeout_secs."""
+
+        @flows_direct_function(cancel_on_interruption=False, timeout_secs=15.5)
+        async def my_decorated_function(flow_manager: FlowManager, name: str):
+            """This is a decorated function.
+
+            Args:
+                name: The name to use.
+            """
+            return {"status": "success"}, None
+
+        func = FlowsDirectFunctionWrapper(function=my_decorated_function)
+        self.assertEqual(func.name, "my_decorated_function")
+        self.assertEqual(func.description, "This is a decorated function.")
+        self.assertEqual(
+            func.properties,
+            {"name": {"type": "string", "description": "The name to use."}},
+        )
+        self.assertFalse(func.cancel_on_interruption)
+        self.assertEqual(func.timeout_secs, 15.5)
+
 
 if __name__ == "__main__":
     unittest.main()
