@@ -688,16 +688,7 @@ class FlowManager:
                 # Register function with LLM (or LLMSwitcher)
                 kwargs = {}
                 if timeout_secs is not None:
-                    # Only pass timeout_secs if the LLM supports it
-                    sig = inspect.signature(self._llm.register_function)
-                    if "timeout_secs" in sig.parameters:
-                        kwargs["timeout_secs"] = timeout_secs
-                    else:
-                        logger.warning(
-                            f"timeout_secs={timeout_secs} specified for function '{name}' "
-                            "but the current LLM service does not support it. "
-                            "Upgrade pipecat-ai to use per-tool timeouts."
-                        )
+                    kwargs["timeout_secs"] = timeout_secs
                 self._llm.register_function(
                     name,
                     transition_func,
