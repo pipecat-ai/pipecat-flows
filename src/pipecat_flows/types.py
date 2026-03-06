@@ -255,6 +255,8 @@ class FlowsFunctionSchema:
         handler: Function handler to process the function call.
         cancel_on_interruption: Whether to cancel this function call when an
             interruption occurs. Defaults to True.
+        timeout_secs: Optional per-tool timeout in seconds, overriding the global
+            ``function_call_timeout_secs``. Defaults to None (use global timeout).
         transition_to: Target node to transition to after function execution.
 
             .. deprecated:: 0.0.18
@@ -274,6 +276,7 @@ class FlowsFunctionSchema:
     required: List[str]
     handler: Optional[FunctionHandler] = None
     cancel_on_interruption: bool = False
+    timeout_secs: Optional[float] = None
     transition_to: Optional[str] = None
     transition_callback: Optional[Callable] = None
 
@@ -301,7 +304,7 @@ class FlowsFunctionSchema:
 
 
 def flows_direct_function(
-    *, cancel_on_interruption: bool = False
+    *, cancel_on_interruption: bool = False, timeout_secs: Optional[float] = None
 ) -> Callable[[Callable], Callable]:
     """Decorator to attach additional metadata to a Pipecat direct function.
 
@@ -311,13 +314,15 @@ def flows_direct_function(
     Args:
         cancel_on_interruption: Whether to cancel the function call when the user
             interrupts. Defaults to True.
+        timeout_secs: Optional per-tool timeout in seconds, overriding the global
+            ``function_call_timeout_secs``. Defaults to None (use global timeout).
 
     Returns:
         A decorator that attaches the metadata to the function.
 
     Example::
 
-        @flows_direct_function(cancel_on_interruption=False)
+        @flows_direct_function(cancel_on_interruption=False, timeout_secs=30)
         async def long_running_task(flow_manager: FlowManager, query: str):
             '''Perform a long-running task that should not be cancelled on interruption.'''
             # ... implementation
@@ -326,6 +331,7 @@ def flows_direct_function(
 
     def decorator(func: Callable) -> Callable:
         func._flows_cancel_on_interruption = cancel_on_interruption
+        func._flows_timeout_secs = timeout_secs
         return func
 
     return decorator
@@ -368,9 +374,10 @@ class FlowsDirectFunctionWrapper(BaseDirectFunctionWrapper):
     def _initialize_metadata(self):
         """Initialize metadata from function signature, docstring, and decorator."""
         super()._initialize_metadata()
-        # Read Flows-specific metadata from decorator (defaults to True for
-        # backward compatibility)
+        # Read Flows-specific metadata from decorator (falling back to fields'
+        # defaults for backward compatibility)
         self.cancel_on_interruption = getattr(self.function, "_flows_cancel_on_interruption", True)
+        self.timeout_secs = getattr(self.function, "_flows_timeout_secs", None)
 
     async def invoke(self, args: Mapping[str, Any], flow_manager: "FlowManager"):
         """Invoke the wrapped function with the provided arguments.

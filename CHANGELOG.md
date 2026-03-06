@@ -5,6 +5,14 @@ All notable changes to **Pipecat Flows** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Added `timeout_secs` to `FlowsFunctionSchema` and `@flows_direct_function`
+  decorator for per-tool function call timeout control, overriding the global
+  `function_call_timeout_secs`.
+
 ## [0.0.23] - 2026-02-27
 
 ### Added
