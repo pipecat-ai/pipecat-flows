@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decorator for per-tool function call timeout control, overriding the global
   `function_call_timeout_secs`.
 
+### Changed
+
+- Updated the `pipecat-ai` minimum supported version to `0.0.105`.
+
 ## [0.0.23] - 2026-02-27
 
 ### Added
