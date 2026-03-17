@@ -15,7 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- ⚠️ `role_messages` are now sent as the LLM's system instruction via
+  `LLMUpdateSettingsFrame` instead of being included as system messages in the
+  conversation context.
+
+- `role_messages` now accepts a plain string in addition to the legacy
+  `List[Dict]` format.
+
 - Updated the `pipecat-ai` minimum supported version to `0.0.105`.
+
+### Fixed
+
+- Fixed a bug where `role_messages` were lost during `RESET` and
+  `RESET_WITH_SUMMARY` context strategy transitions when the new node did not
+  re-specify them.
 
 ## [0.0.23] - 2026-02-27
 
