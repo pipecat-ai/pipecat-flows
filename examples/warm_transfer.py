@@ -268,7 +268,7 @@ def create_initial_customer_interaction_node() -> NodeConfig:
     """
     return NodeConfig(
         name="customer_interaction",
-        role_messages="You are an assistant for ABC Widget Company. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
+        role_message="You are an assistant for ABC Widget Company. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
         task_messages=[
             {
                 "role": "user",

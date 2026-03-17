@@ -187,7 +187,7 @@ def create_initial_node(wait_for_user: bool) -> NodeConfig:
     """Create initial node for party size collection."""
     return {
         "name": "initial",
-        "role_messages": "You are a restaurant reservation assistant for La Maison, an upscale French restaurant. Be casual and friendly. This is a voice conversation, so avoid special characters and emojis.",
+        "role_message": "You are a restaurant reservation assistant for La Maison, an upscale French restaurant. Be casual and friendly. This is a voice conversation, so avoid special characters and emojis.",
         "task_messages": [
             {
                 "role": "user",

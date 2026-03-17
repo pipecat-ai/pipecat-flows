@@ -178,6 +178,7 @@ class FlowManager:
 
         self._showed_deprecation_warning_for_transition_fields = False
         self._showed_deprecation_warning_for_set_node = False
+        self._showed_deprecation_warning_for_role_messages = False
 
     @property
     def state(self) -> Dict[str, Any]:
@@ -870,9 +871,30 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 standard_functions, original_configs=functions_list
             )
 
+            # Resolve role_message vs role_messages
+            role_message = node_config.get("role_message")
+            role_messages = node_config.get("role_messages")
+
+            if role_message and role_messages:
+                logger.warning(
+                    "Both 'role_message' and 'role_messages' specified; using 'role_message'"
+                )
+
+            if role_messages and not role_message:
+                if not self._showed_deprecation_warning_for_role_messages:
+                    self._showed_deprecation_warning_for_role_messages = True
+                    warnings.warn(
+                        "'role_messages' is deprecated and will be removed in 1.0.0. "
+                        "Use 'role_message' (singular, str) instead.",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+
+            effective_role_messages = role_message or role_messages
+
             # Update LLM context
             await self._update_llm_context(
-                role_messages=node_config.get("role_messages"),
+                role_messages=effective_role_messages,
                 task_messages=node_config["task_messages"],
                 functions=formatted_tools,
                 strategy=node_config.get("context_strategy"),

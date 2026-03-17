@@ -147,7 +147,7 @@ async def summarize_conversation(flow_manager: FlowManager) -> tuple[None, NodeC
 def create_main_node(summarize: bool = False) -> NodeConfig:
     return NodeConfig(
         name="main",
-        role_messages="You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
+        role_message="You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
         context_strategy=ContextStrategyConfig(
             strategy=ContextStrategy.RESET_WITH_SUMMARY,
             summary_prompt="Summarize the conversation so far in a concise way.",

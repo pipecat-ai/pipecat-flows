@@ -78,7 +78,7 @@ def create_initial_node() -> NodeConfig:
 
     return {
         "name": "initial",
-        "role_messages": "You are an inquisitive child. Use very simple language. Ask simple questions. You must ALWAYS use one of the available functions to progress the conversation. Your responses will be converted to audio. Avoid outputting special characters and emojis.",
+        "role_message": "You are an inquisitive child. Use very simple language. Ask simple questions. You must ALWAYS use one of the available functions to progress the conversation. Your responses will be converted to audio. Avoid outputting special characters and emojis.",
         "task_messages": [
             {
                 "role": "user",

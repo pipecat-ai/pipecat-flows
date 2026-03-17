@@ -183,7 +183,7 @@ def create_initial_node() -> NodeConfig:
     """Create the initial node for food type selection."""
     return NodeConfig(
         name="initial",
-        role_messages="You are an order-taking assistant. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
+        role_message="You are an order-taking assistant. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
         task_messages=[
             {
                 "role": "user",

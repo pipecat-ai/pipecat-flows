@@ -218,7 +218,7 @@ def create_initial_node() -> NodeConfig:
 
     return NodeConfig(
         name="start",
-        role_messages="You are Jessica, an agent for Tri-County Health Services. You must ALWAYS use one of the available functions to progress the conversation. Be professional but friendly.",
+        role_message="You are Jessica, an agent for Tri-County Health Services. You must ALWAYS use one of the available functions to progress the conversation. Be professional but friendly.",
         task_messages=[
             {
                 "role": "user",
@@ -259,7 +259,7 @@ def create_prescriptions_node() -> NodeConfig:
 
     return NodeConfig(
         name="get_prescriptions",
-        role_messages="You are Jessica, an agent for Tri-County Health Services. You must ALWAYS use one of the available functions to progress the conversation. Be professional but friendly.",
+        role_message="You are Jessica, an agent for Tri-County Health Services. You must ALWAYS use one of the available functions to progress the conversation. Be professional but friendly.",
         task_messages=[
             {
                 "role": "user",

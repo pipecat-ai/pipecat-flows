@@ -91,7 +91,7 @@ def create_introduction_node() -> NodeConfig:
     )
     return NodeConfig(
         name="introduction",
-        role_messages="You are a warm, engaging podcast host with a natural conversational style. You're genuinely curious about your guests and skilled at making them feel comfortable while drawing out interesting insights. Your questions flow naturally, and you listen actively, building on what your guest shares.",
+        role_message="You are a warm, engaging podcast host with a natural conversational style. You're genuinely curious about your guests and skilled at making them feel comfortable while drawing out interesting insights. Your questions flow naturally, and you listen actively, building on what your guest shares.",
         task_messages=[
             {
                 "role": "user",

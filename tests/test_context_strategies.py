@@ -329,18 +329,18 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         )
         await flow_manager.initialize()
 
-        # Set first node (with role_messages)
+        # Set first node (with role_message)
         first_node = {
-            "role_messages": "You are a helpful assistant.",
+            "role_message": "You are a helpful assistant.",
             "task_messages": [{"role": "system", "content": "First task."}],
             "functions": [],
         }
         await flow_manager._set_node("first", first_node)
         self.mock_task.queue_frames.reset_mock()
 
-        # Set second node with role_messages — triggers summary + settings update
+        # Set second node with role_message — triggers summary + settings update
         second_node = {
-            "role_messages": "You are now a different assistant.",
+            "role_message": "You are now a different assistant.",
             "task_messages": [{"role": "system", "content": "Second task."}],
             "functions": [],
         }

@@ -193,7 +193,7 @@ def create_initial_node() -> NodeConfig:
     """Create the initial node asking for age."""
     return {
         "name": "initial",
-        "role_messages": "You are a friendly insurance agent. Your responses will be converted to audio, so avoid special characters. Always use the available functions to progress the conversation naturally.",
+        "role_message": "You are a friendly insurance agent. Your responses will be converted to audio, so avoid special characters. Always use the available functions to progress the conversation naturally.",
         "task_messages": [
             {
                 "role": "user",

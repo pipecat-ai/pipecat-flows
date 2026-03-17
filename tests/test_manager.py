@@ -1010,7 +1010,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             delattr(sys.modules["__main__"], "test_handler")
 
     async def test_role_message_inheritance(self):
-        """Test that role messages are sent as LLMUpdateSettingsFrame."""
+        """Test that role_message is sent as LLMUpdateSettingsFrame."""
         flow_manager = FlowManager(
             task=self.mock_task,
             llm=self.mock_llm,
@@ -1018,9 +1018,9 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         )
         await flow_manager.initialize()
 
-        # First node with role messages
+        # First node with role_message (singular)
         first_node: NodeConfig = {
-            "role_messages": [{"role": "system", "content": "You are a helpful assistant."}],
+            "role_message": "You are a helpful assistant.",
             "task_messages": [{"role": "system", "content": "First task."}],
             "functions": [],
         }
@@ -1536,8 +1536,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             transitions_executed, 1, "Should transition exactly once when all functions complete"
         )
 
-    async def test_role_messages_string_format(self):
-        """Test that plain string role_messages works correctly."""
+    async def test_role_message_singular(self):
+        """Test that plain string role_message (singular) works correctly."""
         flow_manager = FlowManager(
             task=self.mock_task,
             llm=self.mock_llm,
@@ -1546,7 +1546,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         await flow_manager.initialize()
 
         node: NodeConfig = {
-            "role_messages": "You are a helpful assistant.",
+            "role_message": "You are a helpful assistant.",
             "task_messages": [{"role": "system", "content": "Do the task."}],
             "functions": [],
         }
@@ -1568,7 +1568,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(update_frames[0].messages, node["task_messages"])
 
     async def test_role_messages_persist_across_reset(self):
-        """Test that system instruction persists when a RESET node omits role_messages."""
+        """Test that system instruction persists when a RESET node omits role_message."""
         from pipecat_flows.types import ContextStrategy, ContextStrategyConfig
 
         flow_manager = FlowManager(
@@ -1579,9 +1579,9 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         )
         await flow_manager.initialize()
 
-        # First node sets role_messages
+        # First node sets role_message
         first_node: NodeConfig = {
-            "role_messages": "You are a helpful assistant.",
+            "role_message": "You are a helpful assistant.",
             "task_messages": [{"role": "system", "content": "First task."}],
             "functions": [],
         }
@@ -1608,7 +1608,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         second_call = self.mock_task.queue_frames.call_args_list[0]
         second_frames = second_call[0][0]
 
-        # No LLMUpdateSettingsFrame since no role_messages — system instruction
+        # No LLMUpdateSettingsFrame since no role_message — system instruction
         # persists in LLM settings from the first node
         settings_frames = [f for f in second_frames if isinstance(f, LLMUpdateSettingsFrame)]
         self.assertEqual(len(settings_frames), 0)
@@ -1617,3 +1617,111 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         update_frames = [f for f in second_frames if isinstance(f, LLMMessagesUpdateFrame)]
         self.assertEqual(len(update_frames), 1)
         self.assertEqual(update_frames[0].messages, second_node["task_messages"])
+
+    async def test_role_messages_deprecated_warning(self):
+        """Test that using role_messages (plural) emits a DeprecationWarning."""
+        import warnings
+
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+        )
+        await flow_manager.initialize()
+
+        node: NodeConfig = {
+            "role_messages": [{"role": "system", "content": "You are a helpful assistant."}],
+            "task_messages": [{"role": "system", "content": "Do the task."}],
+            "functions": [],
+        }
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            await flow_manager.set_node_from_config(node)
+
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            self.assertEqual(len(deprecation_warnings), 1)
+            self.assertIn("role_messages", str(deprecation_warnings[0].message))
+            self.assertIn("role_message", str(deprecation_warnings[0].message))
+
+        # Verify the node still works correctly despite the warning
+        first_call = self.mock_task.queue_frames.call_args_list[0]
+        first_frames = first_call[0][0]
+        settings_frames = [f for f in first_frames if isinstance(f, LLMUpdateSettingsFrame)]
+        self.assertEqual(len(settings_frames), 1)
+        self.assertEqual(
+            settings_frames[0].delta.system_instruction, "You are a helpful assistant."
+        )
+
+        # Verify the warning is only emitted once
+        self.mock_task.queue_frames.reset_mock()
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            await flow_manager.set_node_from_config(node)
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            self.assertEqual(len(deprecation_warnings), 0)
+
+    async def test_role_message_and_role_messages_both_specified(self):
+        """Test that role_message takes precedence when both are specified."""
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+        )
+        await flow_manager.initialize()
+
+        node: NodeConfig = {
+            "role_message": "I am the preferred role.",
+            "role_messages": [{"role": "system", "content": "I am the deprecated role."}],
+            "task_messages": [{"role": "system", "content": "Do the task."}],
+            "functions": [],
+        }
+
+        with patch("pipecat_flows.manager.logger") as mock_logger:
+            await flow_manager.set_node_from_config(node)
+            mock_logger.warning.assert_any_call(
+                "Both 'role_message' and 'role_messages' specified; using 'role_message'"
+            )
+
+        first_call = self.mock_task.queue_frames.call_args_list[0]
+        first_frames = first_call[0][0]
+        settings_frames = [f for f in first_frames if isinstance(f, LLMUpdateSettingsFrame)]
+        self.assertEqual(len(settings_frames), 1)
+        self.assertEqual(settings_frames[0].delta.system_instruction, "I am the preferred role.")
+
+    async def test_role_messages_list_format_still_works(self):
+        """Test that legacy list-of-dicts role_messages still produces correct LLMUpdateSettingsFrame."""
+        import warnings
+
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+        )
+        await flow_manager.initialize()
+
+        node: NodeConfig = {
+            "role_messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "system", "content": "Be concise."},
+            ],
+            "task_messages": [{"role": "system", "content": "Do the task."}],
+            "functions": [],
+        }
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            await flow_manager.set_node_from_config(node)
+            # Should emit deprecation warning for role_messages
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            self.assertEqual(len(deprecation_warnings), 1)
+
+        first_call = self.mock_task.queue_frames.call_args_list[0]
+        first_frames = first_call[0][0]
+        settings_frames = [f for f in first_frames if isinstance(f, LLMUpdateSettingsFrame)]
+        self.assertEqual(len(settings_frames), 1)
+        # Legacy list-of-dicts should be joined with double newlines
+        self.assertEqual(
+            settings_frames[0].delta.system_instruction,
+            "You are a helpful assistant.\n\nBe concise.",
+        )
