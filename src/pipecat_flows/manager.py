@@ -38,12 +38,14 @@ from pipecat.frames.frames import (
     LLMMessagesUpdateFrame,
     LLMRunFrame,
     LLMSetToolsFrame,
+    LLMUpdateSettingsFrame,
 )
 from pipecat.pipeline.llm_switcher import LLMSwitcher
 from pipecat.pipeline.task import PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.services.settings import LLMSettings
 from pipecat.transports.base_transport import BaseTransport
 
 from pipecat_flows.actions import ActionError, ActionManager
@@ -67,6 +69,7 @@ from pipecat_flows.types import (
     FlowsFunctionSchema,
     FunctionHandler,
     NodeConfig,
+    extract_system_instruction,
     get_or_generate_node_name,
 )
 
@@ -910,15 +913,23 @@ In all of these cases, you can provide a `name` in your new node's config for de
 
     async def _update_llm_context(
         self,
-        role_messages: Optional[List[dict]],
+        role_messages: Optional[Union[str, List[dict]]],
         task_messages: List[dict],
         functions: List[dict],
         strategy: Optional[ContextStrategyConfig] = None,
     ) -> None:
         """Update LLM context with new messages and functions.
 
+        If ``role_messages`` is provided, the text is extracted via
+        :func:`extract_system_instruction` and sent as an
+        ``LLMUpdateSettingsFrame`` (system instruction on the LLM itself).
+        Only ``task_messages`` (and an optional summary) are placed into the
+        conversation context via ``LLMMessagesAppendFrame`` /
+        ``LLMMessagesUpdateFrame``.
+
         Args:
-            role_messages: Optional role messages to add to context.
+            role_messages: Optional role/personality for the bot, either as a
+                plain string or legacy list-of-dicts format.
             task_messages: Task messages to add to context.
             functions: New functions to make available.
             strategy: Optional context update configuration.
@@ -927,14 +938,16 @@ In all of these cases, you can provide a `name` in your new node's config for de
             FlowError: If context update fails.
         """
         try:
-            messages = []
+            frames = []
 
-            # Add role messages if provided.
-            # Note that these come before any possible summary message; some
-            # LLMs only support a single system instruction, and the first role
-            # message should take priority as that system instruction.
+            # Send role_messages as LLM system instruction (persists until changed)
             if role_messages:
-                messages.extend(role_messages)
+                instruction = extract_system_instruction(role_messages)
+                frames.append(
+                    LLMUpdateSettingsFrame(delta=LLMSettings(system_instruction=instruction))
+                )
+
+            messages = []
 
             update_config = strategy or self._context_strategy
 
@@ -982,9 +995,10 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 else LLMMessagesAppendFrame
             )
 
-            await self._task.queue_frames(
-                [frame_type(messages=messages), LLMSetToolsFrame(tools=functions)]
-            )
+            frames.append(frame_type(messages=messages))
+            frames.append(LLMSetToolsFrame(tools=functions))
+
+            await self._task.queue_frames(frames)
 
             logger.debug(
                 f"Updated LLM context using {frame_type.__name__} with strategy {update_config.strategy}"

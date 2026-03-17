@@ -268,15 +268,10 @@ def create_initial_customer_interaction_node() -> NodeConfig:
     """
     return NodeConfig(
         name="customer_interaction",
-        role_messages=[
-            {
-                "role": "system",
-                "content": "You are an assistant for ABC Widget Company. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
-            }
-        ],
+        role_messages="You are an assistant for ABC Widget Company. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": """Start off by greeting the customer. Then ask how you could help, offering two choices of what you could help with: you could provide store location and hours of operation, or begin placing an order. Be friendly and casual.
 
                 To help the customer:
@@ -322,7 +317,7 @@ def create_continued_customer_interaction_node() -> NodeConfig:
         name="continued_customer_interaction",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": """Ask the customer there's anything else you could help them with today, or if they'd like to end the conversation. If they need more help, re-offer the two choices you offered before: you could provide store location and hours of operation, or begin placing an order.
 
                 To help the customer:
@@ -367,7 +362,7 @@ def create_transferring_to_human_agent_node() -> NodeConfig:
         name="transferring_to_human_agent",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Start by apologizing to the customer that there was an issue fulfilling their last request, then inform them that they are being transferred to a human agent. Tell them to please hold while you connect them, and thank them for their patience.",
             }
         ],
@@ -391,7 +386,7 @@ def create_human_agent_interaction_node() -> NodeConfig:
         name="human_agent_interaction",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": """You're now talking to an agent who has just joined the call. Assume that the customer you were helping up until this point can no longer hear you. Your job is to be as helpful as you can and bring the agent up to speed so that they can assist the customer. Start by greeting the agent politely and explaining what the customer was trying to do that you were unable to help with, and any relevant error details. Ask the agent if they have any questions or whether they're ready to connect to the customer.
 
                 Once the agent tells you they're ready to connect to the customer, call the connect_human_agent_and_customer function.
@@ -425,7 +420,7 @@ def create_end_customer_conversation_node() -> NodeConfig:
         name="end_customer_conversation",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Thank the customer warmly and mention they can call back anytime if they need more help.",
             }
         ],
@@ -441,7 +436,7 @@ def create_end_human_agent_conversation_node() -> NodeConfig:
         name="end_human_agent_conversation",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Tell the agent that you're patching them through to the customer right now.",
             },
         ],

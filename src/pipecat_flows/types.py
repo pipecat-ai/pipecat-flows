@@ -409,7 +409,11 @@ class NodeConfig(NodeConfigRequired, total=False):
         task_messages: List of message dicts defining the current node's objectives.
         name: Name of the node, useful for debug logging when returning a next node
             from a "consolidated" function.
-        role_messages: List of message dicts defining the bot's role/personality.
+        role_messages: The bot's role/personality, sent as the LLM's system
+            instruction via ``LLMUpdateSettingsFrame``. Can be a plain string
+            or a list of message dicts (legacy format). When provided, the
+            system instruction persists across node transitions until a new
+            node explicitly sets ``role_messages`` again.
         functions: List of function definitions in provider-specific format,
             FunctionSchema, or FlowsFunctionSchema; or a "direct function" whose
             definition is automatically extracted.
@@ -422,12 +426,7 @@ class NodeConfig(NodeConfigRequired, total=False):
     Example::
 
         {
-            "role_messages": [
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant..."
-                }
-            ],
+            "role_messages": "You are a helpful assistant...",
             "task_messages": [
                 {
                     "role": "system",
@@ -443,12 +442,32 @@ class NodeConfig(NodeConfigRequired, total=False):
     """
 
     name: str
-    role_messages: List[Dict[str, Any]]
+    role_messages: Union[str, List[Dict[str, Any]]]
     functions: List[Union[Dict[str, Any], FlowsFunctionSchema, FlowsDirectFunction]]
     pre_actions: List[ActionConfig]
     post_actions: List[ActionConfig]
     context_strategy: ContextStrategyConfig
     respond_immediately: bool
+
+
+def extract_system_instruction(role_messages: Union[str, List[Dict[str, Any]]]) -> str:
+    """Extract a system instruction string from role_messages.
+
+    Supports both the new plain string format and the legacy list-of-dicts
+    format. For the legacy format, content fields from all messages are
+    joined with double newlines.
+
+    Args:
+        role_messages: Either a plain string or a list of message dicts
+            with ``"content"`` keys.
+
+    Returns:
+        The extracted system instruction text.
+    """
+    if isinstance(role_messages, str):
+        return role_messages
+    parts = [msg.get("content", "") for msg in role_messages if msg.get("content")]
+    return "\n\n".join(parts)
 
 
 def get_or_generate_node_name(node_config: NodeConfig) -> str:
