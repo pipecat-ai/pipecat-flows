@@ -827,7 +827,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(FlowError):
             await flow_manager._update_llm_context(
-                role_messages=[],
+                role_message=None,
+                role_messages=None,
                 task_messages=[{"role": "system", "content": "Test"}],
                 functions=[],
             )
@@ -1644,13 +1645,18 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             self.assertIn("role_messages", str(deprecation_warnings[0].message))
             self.assertIn("role_message", str(deprecation_warnings[0].message))
 
-        # Verify the node still works correctly despite the warning
+        # Verify the node still works correctly despite the warning —
+        # legacy role_messages go into context messages, not LLMUpdateSettingsFrame
         first_call = self.mock_task.queue_frames.call_args_list[0]
         first_frames = first_call[0][0]
         settings_frames = [f for f in first_frames if isinstance(f, LLMUpdateSettingsFrame)]
-        self.assertEqual(len(settings_frames), 1)
+        self.assertEqual(len(settings_frames), 0)
+
+        update_frames = [f for f in first_frames if isinstance(f, LLMMessagesUpdateFrame)]
+        self.assertEqual(len(update_frames), 1)
         self.assertEqual(
-            settings_frames[0].delta.system_instruction, "You are a helpful assistant."
+            update_frames[0].messages[0],
+            {"role": "system", "content": "You are a helpful assistant."},
         )
 
         # Verify the warning is only emitted once
@@ -1690,7 +1696,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(settings_frames[0].delta.system_instruction, "I am the preferred role.")
 
     async def test_role_messages_list_format_still_works(self):
-        """Test that legacy list-of-dicts role_messages still produces correct LLMUpdateSettingsFrame."""
+        """Test that legacy list-of-dicts role_messages are prepended to context messages."""
         import warnings
 
         flow_manager = FlowManager(
@@ -1718,10 +1724,15 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         first_call = self.mock_task.queue_frames.call_args_list[0]
         first_frames = first_call[0][0]
+
+        # Legacy role_messages should NOT produce LLMUpdateSettingsFrame
         settings_frames = [f for f in first_frames if isinstance(f, LLMUpdateSettingsFrame)]
-        self.assertEqual(len(settings_frames), 1)
-        # Legacy list-of-dicts should be joined with double newlines
-        self.assertEqual(
-            settings_frames[0].delta.system_instruction,
-            "You are a helpful assistant.\n\nBe concise.",
-        )
+        self.assertEqual(len(settings_frames), 0)
+
+        # Legacy role_messages should be prepended to context messages
+        update_frames = [f for f in first_frames if isinstance(f, LLMMessagesUpdateFrame)]
+        self.assertEqual(len(update_frames), 1)
+        messages = update_frames[0].messages
+        self.assertEqual(messages[0], {"role": "system", "content": "You are a helpful assistant."})
+        self.assertEqual(messages[1], {"role": "system", "content": "Be concise."})
+        self.assertEqual(messages[2], {"role": "system", "content": "Do the task."})

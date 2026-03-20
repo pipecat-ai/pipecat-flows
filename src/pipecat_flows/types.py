@@ -455,26 +455,6 @@ class NodeConfig(NodeConfigRequired, total=False):
     respond_immediately: bool
 
 
-def extract_system_instruction(role_messages: Union[str, List[Dict[str, Any]]]) -> str:
-    """Extract a system instruction string from role_messages.
-
-    Supports both the new plain string format and the legacy list-of-dicts
-    format. For the legacy format, content fields from all messages are
-    joined with double newlines.
-
-    Args:
-        role_messages: Either a plain string or a list of message dicts
-            with ``"content"`` keys.
-
-    Returns:
-        The extracted system instruction text.
-    """
-    if isinstance(role_messages, str):
-        return role_messages
-    parts = [msg.get("content", "") for msg in role_messages if msg.get("content")]
-    return "\n\n".join(parts)
-
-
 def get_or_generate_node_name(node_config: NodeConfig) -> str:
     """Get the node name from configuration or generate a UUID if not set.
 

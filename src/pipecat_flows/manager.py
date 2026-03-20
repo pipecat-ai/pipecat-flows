@@ -69,7 +69,6 @@ from pipecat_flows.types import (
     FlowsFunctionSchema,
     FunctionHandler,
     NodeConfig,
-    extract_system_instruction,
     get_or_generate_node_name,
 )
 
@@ -871,7 +870,6 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 standard_functions, original_configs=functions_list
             )
 
-            # Resolve role_message vs role_messages
             role_message = node_config.get("role_message")
             role_messages = node_config.get("role_messages")
 
@@ -890,11 +888,10 @@ In all of these cases, you can provide a `name` in your new node's config for de
                         stacklevel=2,
                     )
 
-            effective_role_messages = role_message or role_messages
-
             # Update LLM context
             await self._update_llm_context(
-                role_messages=effective_role_messages,
+                role_message=role_message,
+                role_messages=role_messages if not role_message else None,
                 task_messages=node_config["task_messages"],
                 functions=formatted_tools,
                 strategy=node_config.get("context_strategy"),
@@ -935,23 +932,25 @@ In all of these cases, you can provide a `name` in your new node's config for de
 
     async def _update_llm_context(
         self,
-        role_messages: Optional[Union[str, List[dict]]],
+        role_message: Optional[str],
+        role_messages: Optional[List[dict]],
         task_messages: List[dict],
         functions: List[dict],
         strategy: Optional[ContextStrategyConfig] = None,
     ) -> None:
         """Update LLM context with new messages and functions.
 
-        If ``role_messages`` is provided, the text is extracted via
-        :func:`extract_system_instruction` and sent as an
+        If ``role_message`` is provided, it is sent as an
         ``LLMUpdateSettingsFrame`` (system instruction on the LLM itself).
-        Only ``task_messages`` (and an optional summary) are placed into the
-        conversation context via ``LLMMessagesAppendFrame`` /
-        ``LLMMessagesUpdateFrame``.
+
+        If ``role_messages`` (deprecated) is provided, the messages are
+        prepended to the conversation context alongside ``task_messages``.
 
         Args:
-            role_messages: Optional role/personality for the bot, either as a
-                plain string or legacy list-of-dicts format.
+            role_message: Optional role/personality string sent as the LLM
+                system instruction via ``LLMUpdateSettingsFrame``.
+            role_messages: Deprecated list-of-dicts prepended to context
+                messages for backward compatibility.
             task_messages: Task messages to add to context.
             functions: New functions to make available.
             strategy: Optional context update configuration.
@@ -962,14 +961,17 @@ In all of these cases, you can provide a `name` in your new node's config for de
         try:
             frames = []
 
-            # Send role_messages as LLM system instruction (persists until changed)
-            if role_messages:
-                instruction = extract_system_instruction(role_messages)
+            # New path: role_message as LLM system instruction (persists until changed)
+            if role_message:
                 frames.append(
-                    LLMUpdateSettingsFrame(delta=LLMSettings(system_instruction=instruction))
+                    LLMUpdateSettingsFrame(delta=LLMSettings(system_instruction=role_message))
                 )
 
             messages = []
+
+            # Legacy path: role_messages prepended to context messages
+            if role_messages:
+                messages.extend(role_messages)
 
             update_config = strategy or self._context_strategy
 
