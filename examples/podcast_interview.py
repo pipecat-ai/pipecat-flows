@@ -91,15 +91,10 @@ def create_introduction_node() -> NodeConfig:
     )
     return NodeConfig(
         name="introduction",
-        role_messages=[
-            {
-                "role": "system",
-                "content": "You are a warm, engaging podcast host with a natural conversational style. You're genuinely curious about your guests and skilled at making them feel comfortable while drawing out interesting insights. Your questions flow naturally, and you listen actively, building on what your guest shares.",
-            }
-        ],
+        role_message="You are a warm, engaging podcast host with a natural conversational style. You're genuinely curious about your guests and skilled at making them feel comfortable while drawing out interesting insights. Your questions flow naturally, and you listen actively, building on what your guest shares.",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Welcome the guest warmly and enthusiastically. Focus this exchange on getting to know who they are. Invite them to briefly introduce themselves—name, role, current focus, or anything fun they'd like to share. Ask one follow-up question if it helps clarify or highlight something interesting about them. Once you feel you have a clear introduction, use the proceed_to_topic function to move into topic selection.",
             }
         ],
@@ -130,7 +125,7 @@ def create_topic_node() -> NodeConfig:
         name="topic",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Now that you know who the guest is, help them choose the topic they'd like to explore. Refer back to their introduction to personalize the transition. Ask what topic, story, or challenge they're excited to discuss today. Show genuine interest and, if needed, ask a clarifying question to make sure you understand the angle they want to take. Once the topic feels clear and specific enough to dive into, use the start_interview function.",
             }
         ],
@@ -169,7 +164,7 @@ def create_interview_node() -> NodeConfig:
         name="interview",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "You're now in the heart of the interview. Start by introducing the topic with enthusiasm, then dive deep into one key aspect at a time. Ask open-ended, thoughtful questions that invite storytelling and personal insights. Listen actively to responses and ask natural follow-up questions that build on what your guest shares—dig deeper into interesting points, ask for examples, or explore the 'why' behind their answers. Keep the conversation flowing naturally, like a genuine dialogue between friends. Once you've thoroughly explored an aspect (typically after 3-5 exchanges), use the next_question function to smoothly transition to the next key aspect. After covering 3 key aspects of the topic, use the wrap_up function to conclude the interview.",
             }
         ],
@@ -197,7 +192,7 @@ def create_conclusion_node() -> NodeConfig:
         name="conclusion",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Express genuine appreciation for the conversation and the insights your guest shared. Summarize 2-3 key takeaways or memorable points from your discussion in a warm, conversational way—this helps reinforce the value of the conversation. Then, ask your guest if they have any final thoughts, a last word, or anything else they'd like to add. Wait for their response, then use the end_interview function to wrap up.",
             }
         ],
@@ -211,7 +206,7 @@ def create_final_node() -> NodeConfig:
         name="final",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Thank the guest one final time for joining you and for sharing their insights. End the conversation on a positive, warm note.",
             }
         ],

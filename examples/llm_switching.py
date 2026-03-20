@@ -147,12 +147,7 @@ async def summarize_conversation(flow_manager: FlowManager) -> tuple[None, NodeC
 def create_main_node(summarize: bool = False) -> NodeConfig:
     return NodeConfig(
         name="main",
-        role_messages=[
-            {
-                "role": "system",
-                "content": "You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
-            }
-        ],
+        role_message="You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
         context_strategy=ContextStrategyConfig(
             strategy=ContextStrategy.RESET_WITH_SUMMARY,
             summary_prompt="Summarize the conversation so far in a concise way.",
@@ -161,7 +156,7 @@ def create_main_node(summarize: bool = False) -> NodeConfig:
         else ContextStrategyConfig(strategy=ContextStrategy.APPEND),
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Say the conversation summary, which was already retrieved (do not invoke the summarize_conversation function again)."
                 if summarize
                 else "Say a brief hello.",

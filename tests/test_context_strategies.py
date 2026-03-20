@@ -17,7 +17,11 @@ focusing on:
 import unittest
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-from pipecat.frames.frames import LLMMessagesAppendFrame, LLMMessagesUpdateFrame
+from pipecat.frames.frames import (
+    LLMMessagesAppendFrame,
+    LLMMessagesUpdateFrame,
+    LLMUpdateSettingsFrame,
+)
 from pipecat.services.anthropic.llm import AnthropicLLMService
 from pipecat.services.google.llm import GoogleLLMService
 from pipecat.services.openai.llm import OpenAILLMService
@@ -308,3 +312,58 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             messages_frame.messages[1]["content"], new_node["task_messages"][0]["content"]
         )
+
+    async def test_reset_with_summary_and_role_messages(self):
+        """Test that LLMUpdateSettingsFrame and summary coexist correctly."""
+        mock_summary = "Conversation summary"
+        self.mock_llm.run_inference.return_value = mock_summary
+
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+            context_strategy=ContextStrategyConfig(
+                strategy=ContextStrategy.RESET_WITH_SUMMARY,
+                summary_prompt="Summarize the conversation",
+            ),
+        )
+        await flow_manager.initialize()
+
+        # Set first node (with role_message)
+        first_node = {
+            "role_message": "You are a helpful assistant.",
+            "task_messages": [{"role": "system", "content": "First task."}],
+            "functions": [],
+        }
+        await flow_manager._set_node("first", first_node)
+        self.mock_task.queue_frames.reset_mock()
+
+        # Set second node with role_message — triggers summary + settings update
+        second_node = {
+            "role_message": "You are now a different assistant.",
+            "task_messages": [{"role": "system", "content": "Second task."}],
+            "functions": [],
+        }
+        await flow_manager._set_node("second", second_node)
+
+        second_call = self.mock_task.queue_frames.call_args_list[0]
+        second_frames = second_call[0][0]
+
+        # Verify LLMUpdateSettingsFrame is present with new system instruction
+        settings_frames = [f for f in second_frames if isinstance(f, LLMUpdateSettingsFrame)]
+        self.assertEqual(len(settings_frames), 1)
+        self.assertEqual(
+            settings_frames[0].delta.system_instruction, "You are now a different assistant."
+        )
+
+        # Verify UpdateFrame contains summary + task_messages (not role_messages)
+        update_frames = [f for f in second_frames if isinstance(f, LLMMessagesUpdateFrame)]
+        self.assertEqual(len(update_frames), 1)
+        messages = update_frames[0].messages
+        self.assertTrue(mock_summary in str(messages[0]))
+        self.assertEqual(messages[1]["content"], "Second task.")
+
+        # Verify frame ordering: LLMUpdateSettingsFrame before LLMMessagesUpdateFrame
+        settings_idx = second_frames.index(settings_frames[0])
+        update_idx = second_frames.index(update_frames[0])
+        self.assertLess(settings_idx, update_idx)

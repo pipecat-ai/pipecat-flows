@@ -26,9 +26,11 @@ from pipecat.frames.frames import (
     LLMMessagesAppendFrame,
     LLMMessagesUpdateFrame,
     LLMSetToolsFrame,
+    LLMUpdateSettingsFrame,
 )
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.settings import LLMSettings
 
 from pipecat_flows.exceptions import FlowError, FlowTransitionError
 from pipecat_flows.manager import FlowConfig, FlowManager, NodeConfig
@@ -825,7 +827,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(FlowError):
             await flow_manager._update_llm_context(
-                role_messages=[],
+                role_message=None,
+                role_messages=None,
                 task_messages=[{"role": "system", "content": "Test"}],
                 functions=[],
             )
@@ -1008,7 +1011,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             delattr(sys.modules["__main__"], "test_handler")
 
     async def test_role_message_inheritance(self):
-        """Test that role messages are properly handled between nodes."""
+        """Test that role_message is sent as LLMUpdateSettingsFrame."""
         flow_manager = FlowManager(
             task=self.mock_task,
             llm=self.mock_llm,
@@ -1016,9 +1019,9 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         )
         await flow_manager.initialize()
 
-        # First node with role messages
+        # First node with role_message (singular)
         first_node: NodeConfig = {
-            "role_messages": [{"role": "system", "content": "You are a helpful assistant."}],
+            "role_message": "You are a helpful assistant.",
             "task_messages": [{"role": "system", "content": "First task."}],
             "functions": [],
         }
@@ -1029,28 +1032,41 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             "functions": [],
         }
 
-        # Set first node and verify UpdateFrame
+        # Set first node
         await flow_manager.set_node_from_config(first_node)
-        first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
+        first_call = self.mock_task.queue_frames.call_args_list[0]
         first_frames = first_call[0][0]
+
+        # Verify LLMUpdateSettingsFrame with system_instruction
+        settings_frames = [f for f in first_frames if isinstance(f, LLMUpdateSettingsFrame)]
+        self.assertEqual(len(settings_frames), 1)
+        self.assertEqual(
+            settings_frames[0].delta.system_instruction, "You are a helpful assistant."
+        )
+
+        # Verify UpdateFrame contains only task_messages (not role_messages)
         update_frames = [f for f in first_frames if isinstance(f, LLMMessagesUpdateFrame)]
         self.assertEqual(len(update_frames), 1)
+        self.assertEqual(update_frames[0].messages, first_node["task_messages"])
 
-        # Verify combined messages in first node
-        expected_first_messages = first_node["role_messages"] + first_node["task_messages"]
-        self.assertEqual(update_frames[0].messages, expected_first_messages)
+        # Verify frame ordering: LLMUpdateSettingsFrame before LLMMessagesUpdateFrame
+        settings_idx = first_frames.index(settings_frames[0])
+        update_idx = first_frames.index(update_frames[0])
+        self.assertLess(settings_idx, update_idx)
 
         # Reset mock and set second node
         self.mock_task.queue_frames.reset_mock()
         await flow_manager.set_node_from_config(second_node)
 
-        # Verify AppendFrame for second node
-        first_call = self.mock_task.queue_frames.call_args_list[0]  # Get first call
-        second_frames = first_call[0][0]
+        # Verify no LLMUpdateSettingsFrame for second node (no role_messages)
+        second_call = self.mock_task.queue_frames.call_args_list[0]
+        second_frames = second_call[0][0]
+        settings_frames = [f for f in second_frames if isinstance(f, LLMUpdateSettingsFrame)]
+        self.assertEqual(len(settings_frames), 0)
+
+        # Verify AppendFrame with only task messages
         append_frames = [f for f in second_frames if isinstance(f, LLMMessagesAppendFrame)]
         self.assertEqual(len(append_frames), 1)
-
-        # Verify only task messages in second node
         self.assertEqual(append_frames[0].messages, second_node["task_messages"])
 
     async def test_frame_type_selection(self):
@@ -1520,3 +1536,203 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             transitions_executed, 1, "Should transition exactly once when all functions complete"
         )
+
+    async def test_role_message_singular(self):
+        """Test that plain string role_message (singular) works correctly."""
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+        )
+        await flow_manager.initialize()
+
+        node: NodeConfig = {
+            "role_message": "You are a helpful assistant.",
+            "task_messages": [{"role": "system", "content": "Do the task."}],
+            "functions": [],
+        }
+
+        await flow_manager.set_node_from_config(node)
+        first_call = self.mock_task.queue_frames.call_args_list[0]
+        first_frames = first_call[0][0]
+
+        # Verify LLMUpdateSettingsFrame with correct system_instruction
+        settings_frames = [f for f in first_frames if isinstance(f, LLMUpdateSettingsFrame)]
+        self.assertEqual(len(settings_frames), 1)
+        self.assertEqual(
+            settings_frames[0].delta.system_instruction, "You are a helpful assistant."
+        )
+
+        # Verify messages frame contains only task_messages
+        update_frames = [f for f in first_frames if isinstance(f, LLMMessagesUpdateFrame)]
+        self.assertEqual(len(update_frames), 1)
+        self.assertEqual(update_frames[0].messages, node["task_messages"])
+
+    async def test_role_messages_persist_across_reset(self):
+        """Test that system instruction persists when a RESET node omits role_message."""
+        from pipecat_flows.types import ContextStrategy, ContextStrategyConfig
+
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+            context_strategy=ContextStrategyConfig(strategy=ContextStrategy.RESET),
+        )
+        await flow_manager.initialize()
+
+        # First node sets role_message
+        first_node: NodeConfig = {
+            "role_message": "You are a helpful assistant.",
+            "task_messages": [{"role": "system", "content": "First task."}],
+            "functions": [],
+        }
+
+        await flow_manager.set_node_from_config(first_node)
+        first_call = self.mock_task.queue_frames.call_args_list[0]
+        first_frames = first_call[0][0]
+
+        # Verify first node sends LLMUpdateSettingsFrame
+        settings_frames = [f for f in first_frames if isinstance(f, LLMUpdateSettingsFrame)]
+        self.assertEqual(len(settings_frames), 1)
+        self.assertEqual(
+            settings_frames[0].delta.system_instruction, "You are a helpful assistant."
+        )
+
+        # Second node with RESET strategy but no role_messages
+        self.mock_task.queue_frames.reset_mock()
+        second_node: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Second task."}],
+            "functions": [],
+        }
+
+        await flow_manager.set_node_from_config(second_node)
+        second_call = self.mock_task.queue_frames.call_args_list[0]
+        second_frames = second_call[0][0]
+
+        # No LLMUpdateSettingsFrame since no role_message — system instruction
+        # persists in LLM settings from the first node
+        settings_frames = [f for f in second_frames if isinstance(f, LLMUpdateSettingsFrame)]
+        self.assertEqual(len(settings_frames), 0)
+
+        # Verify RESET still uses UpdateFrame for context messages
+        update_frames = [f for f in second_frames if isinstance(f, LLMMessagesUpdateFrame)]
+        self.assertEqual(len(update_frames), 1)
+        self.assertEqual(update_frames[0].messages, second_node["task_messages"])
+
+    async def test_role_messages_deprecated_warning(self):
+        """Test that using role_messages (plural) emits a DeprecationWarning."""
+        import warnings
+
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+        )
+        await flow_manager.initialize()
+
+        node: NodeConfig = {
+            "role_messages": [{"role": "system", "content": "You are a helpful assistant."}],
+            "task_messages": [{"role": "system", "content": "Do the task."}],
+            "functions": [],
+        }
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            await flow_manager.set_node_from_config(node)
+
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            self.assertEqual(len(deprecation_warnings), 1)
+            self.assertIn("role_messages", str(deprecation_warnings[0].message))
+            self.assertIn("role_message", str(deprecation_warnings[0].message))
+
+        # Verify the node still works correctly despite the warning —
+        # legacy role_messages go into context messages, not LLMUpdateSettingsFrame
+        first_call = self.mock_task.queue_frames.call_args_list[0]
+        first_frames = first_call[0][0]
+        settings_frames = [f for f in first_frames if isinstance(f, LLMUpdateSettingsFrame)]
+        self.assertEqual(len(settings_frames), 0)
+
+        update_frames = [f for f in first_frames if isinstance(f, LLMMessagesUpdateFrame)]
+        self.assertEqual(len(update_frames), 1)
+        self.assertEqual(
+            update_frames[0].messages[0],
+            {"role": "system", "content": "You are a helpful assistant."},
+        )
+
+        # Verify the warning is only emitted once
+        self.mock_task.queue_frames.reset_mock()
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            await flow_manager.set_node_from_config(node)
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            self.assertEqual(len(deprecation_warnings), 0)
+
+    async def test_role_message_and_role_messages_both_specified(self):
+        """Test that role_message takes precedence when both are specified."""
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+        )
+        await flow_manager.initialize()
+
+        node: NodeConfig = {
+            "role_message": "I am the preferred role.",
+            "role_messages": [{"role": "system", "content": "I am the deprecated role."}],
+            "task_messages": [{"role": "system", "content": "Do the task."}],
+            "functions": [],
+        }
+
+        with patch("pipecat_flows.manager.logger") as mock_logger:
+            await flow_manager.set_node_from_config(node)
+            mock_logger.warning.assert_any_call(
+                "Both 'role_message' and 'role_messages' specified; using 'role_message'"
+            )
+
+        first_call = self.mock_task.queue_frames.call_args_list[0]
+        first_frames = first_call[0][0]
+        settings_frames = [f for f in first_frames if isinstance(f, LLMUpdateSettingsFrame)]
+        self.assertEqual(len(settings_frames), 1)
+        self.assertEqual(settings_frames[0].delta.system_instruction, "I am the preferred role.")
+
+    async def test_role_messages_list_format_still_works(self):
+        """Test that legacy list-of-dicts role_messages are prepended to context messages."""
+        import warnings
+
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+        )
+        await flow_manager.initialize()
+
+        node: NodeConfig = {
+            "role_messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "system", "content": "Be concise."},
+            ],
+            "task_messages": [{"role": "system", "content": "Do the task."}],
+            "functions": [],
+        }
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            await flow_manager.set_node_from_config(node)
+            # Should emit deprecation warning for role_messages
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            self.assertEqual(len(deprecation_warnings), 1)
+
+        first_call = self.mock_task.queue_frames.call_args_list[0]
+        first_frames = first_call[0][0]
+
+        # Legacy role_messages should NOT produce LLMUpdateSettingsFrame
+        settings_frames = [f for f in first_frames if isinstance(f, LLMUpdateSettingsFrame)]
+        self.assertEqual(len(settings_frames), 0)
+
+        # Legacy role_messages should be prepended to context messages
+        update_frames = [f for f in first_frames if isinstance(f, LLMMessagesUpdateFrame)]
+        self.assertEqual(len(update_frames), 1)
+        messages = update_frames[0].messages
+        self.assertEqual(messages[0], {"role": "system", "content": "You are a helpful assistant."})
+        self.assertEqual(messages[1], {"role": "system", "content": "Be concise."})
+        self.assertEqual(messages[2], {"role": "system", "content": "Do the task."})

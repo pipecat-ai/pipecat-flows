@@ -218,15 +218,10 @@ def create_initial_node() -> NodeConfig:
 
     return NodeConfig(
         name="start",
-        role_messages=[
-            {
-                "role": "system",
-                "content": "You are Jessica, an agent for Tri-County Health Services. You must ALWAYS use one of the available functions to progress the conversation. Be professional but friendly.",
-            }
-        ],
+        role_message="You are Jessica, an agent for Tri-County Health Services. You must ALWAYS use one of the available functions to progress the conversation. Be professional but friendly.",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Start by introducing yourself to Chad Bailey, then ask for their date of birth, including the year. Once they provide their birthday, use verify_birthday to check it. If verified (1983-01-01), proceed to prescriptions.",
             }
         ],
@@ -264,15 +259,10 @@ def create_prescriptions_node() -> NodeConfig:
 
     return NodeConfig(
         name="get_prescriptions",
-        role_messages=[
-            {
-                "role": "system",
-                "content": "You are Jessica, an agent for Tri-County Health Services. You must ALWAYS use one of the available functions to progress the conversation. Be professional but friendly.",
-            }
-        ],
+        role_message="You are Jessica, an agent for Tri-County Health Services. You must ALWAYS use one of the available functions to progress the conversation. Be professional but friendly.",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "This step is for collecting prescriptions. Ask them what prescriptions they're taking, including the dosage. Get to the point by saying 'Thanks for confirming that. First up, what prescriptions are you currently taking, including the dosage for each medication?'. After recording prescriptions (or confirming none), proceed to allergies.",
             }
         ],
@@ -309,7 +299,7 @@ def create_allergies_node() -> NodeConfig:
         name="get_allergies",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Collect allergy information. Ask about any allergies they have. After recording allergies (or confirming none), proceed to medical conditions.",
             }
         ],
@@ -345,7 +335,7 @@ def create_conditions_node() -> NodeConfig:
         name="get_conditions",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Collect medical condition information. Ask about any medical conditions they have. After recording conditions (or confirming none), proceed to visit reasons.",
             }
         ],
@@ -381,7 +371,7 @@ def create_visit_reasons_node() -> NodeConfig:
         name="get_visit_reasons",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Collect information about the reason for their visit. Ask what brings them to the doctor today. After recording their reasons, proceed to verification.",
             }
         ],
@@ -411,7 +401,7 @@ def create_verification_node() -> NodeConfig:
         name="verify",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": """Review all collected information with the patient. Follow these steps:
 1. Summarize their prescriptions, allergies, conditions, and visit reasons
 2. Ask if everything is correct
@@ -446,7 +436,7 @@ def create_confirmation_node() -> NodeConfig:
         name="confirm",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Once confirmed, thank them, then use the complete_intake function to end the conversation.",
             }
         ],
@@ -460,7 +450,7 @@ def create_end_node() -> NodeConfig:
         name="end",
         task_messages=[
             {
-                "role": "system",
+                "role": "user",
                 "content": "Thank them for their time and end the conversation.",
             }
         ],

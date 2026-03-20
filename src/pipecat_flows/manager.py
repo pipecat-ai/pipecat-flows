@@ -38,12 +38,14 @@ from pipecat.frames.frames import (
     LLMMessagesUpdateFrame,
     LLMRunFrame,
     LLMSetToolsFrame,
+    LLMUpdateSettingsFrame,
 )
 from pipecat.pipeline.llm_switcher import LLMSwitcher
 from pipecat.pipeline.task import PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.services.settings import LLMSettings
 from pipecat.transports.base_transport import BaseTransport
 
 from pipecat_flows.actions import ActionError, ActionManager
@@ -175,6 +177,7 @@ class FlowManager:
 
         self._showed_deprecation_warning_for_transition_fields = False
         self._showed_deprecation_warning_for_set_node = False
+        self._showed_deprecation_warning_for_role_messages = False
 
     @property
     def state(self) -> Dict[str, Any]:
@@ -867,9 +870,28 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 standard_functions, original_configs=functions_list
             )
 
+            role_message = node_config.get("role_message")
+            role_messages = node_config.get("role_messages")
+
+            if role_message and role_messages:
+                logger.warning(
+                    "Both 'role_message' and 'role_messages' specified; using 'role_message'"
+                )
+
+            if role_messages and not role_message:
+                if not self._showed_deprecation_warning_for_role_messages:
+                    self._showed_deprecation_warning_for_role_messages = True
+                    warnings.warn(
+                        "'role_messages' is deprecated and will be removed in 1.0.0. "
+                        "Use 'role_message' (singular, str) instead.",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+
             # Update LLM context
             await self._update_llm_context(
-                role_messages=node_config.get("role_messages"),
+                role_message=role_message,
+                role_messages=role_messages if not role_message else None,
                 task_messages=node_config["task_messages"],
                 functions=formatted_tools,
                 strategy=node_config.get("context_strategy"),
@@ -910,6 +932,7 @@ In all of these cases, you can provide a `name` in your new node's config for de
 
     async def _update_llm_context(
         self,
+        role_message: Optional[str],
         role_messages: Optional[List[dict]],
         task_messages: List[dict],
         functions: List[dict],
@@ -917,8 +940,17 @@ In all of these cases, you can provide a `name` in your new node's config for de
     ) -> None:
         """Update LLM context with new messages and functions.
 
+        If ``role_message`` is provided, it is sent as an
+        ``LLMUpdateSettingsFrame`` (system instruction on the LLM itself).
+
+        If ``role_messages`` (deprecated) is provided, the messages are
+        prepended to the conversation context alongside ``task_messages``.
+
         Args:
-            role_messages: Optional role messages to add to context.
+            role_message: Optional role/personality string sent as the LLM
+                system instruction via ``LLMUpdateSettingsFrame``.
+            role_messages: Deprecated list-of-dicts prepended to context
+                messages for backward compatibility.
             task_messages: Task messages to add to context.
             functions: New functions to make available.
             strategy: Optional context update configuration.
@@ -927,12 +959,17 @@ In all of these cases, you can provide a `name` in your new node's config for de
             FlowError: If context update fails.
         """
         try:
+            frames = []
+
+            # New path: role_message as LLM system instruction (persists until changed)
+            if role_message:
+                frames.append(
+                    LLMUpdateSettingsFrame(delta=LLMSettings(system_instruction=role_message))
+                )
+
             messages = []
 
-            # Add role messages if provided.
-            # Note that these come before any possible summary message; some
-            # LLMs only support a single system instruction, and the first role
-            # message should take priority as that system instruction.
+            # Legacy path: role_messages prepended to context messages
             if role_messages:
                 messages.extend(role_messages)
 
@@ -982,9 +1019,10 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 else LLMMessagesAppendFrame
             )
 
-            await self._task.queue_frames(
-                [frame_type(messages=messages), LLMSetToolsFrame(tools=functions)]
-            )
+            frames.append(frame_type(messages=messages))
+            frames.append(LLMSetToolsFrame(tools=functions))
+
+            await self._task.queue_frames(frames)
 
             logger.debug(
                 f"Updated LLM context using {frame_type.__name__} with strategy {update_config.strategy}"

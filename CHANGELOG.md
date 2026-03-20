@@ -13,9 +13,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decorator for per-tool function call timeout control, overriding the global
   `function_call_timeout_secs`.
 
+- Added `role_message` (`str`) as the preferred field for
+  setting the bot's role/personality. The system instruction is sent via
+  `LLMUpdateSettingsFrame` instead of being included as system messages in the
+  conversation context.
+
 ### Changed
 
 - Updated the `pipecat-ai` minimum supported version to `0.0.105`.
+
+### Deprecated
+
+- `role_messages` is deprecated in favor of `role_message` (`str`). The old
+  `List[Dict]` format is still supported for backward compatibility but will be
+  removed in 1.0.0.
+
+### Fixed
+
+- Fixed a bug where the system instruction was lost during `RESET` and
+  `RESET_WITH_SUMMARY` context strategy transitions when the new node did not
+  re-specify it.
 
 ## [0.0.23] - 2026-02-27
 

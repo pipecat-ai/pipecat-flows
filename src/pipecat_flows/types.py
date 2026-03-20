@@ -409,7 +409,15 @@ class NodeConfig(NodeConfigRequired, total=False):
         task_messages: List of message dicts defining the current node's objectives.
         name: Name of the node, useful for debug logging when returning a next node
             from a "consolidated" function.
-        role_messages: List of message dicts defining the bot's role/personality.
+        role_message: The bot's role/personality as a plain string, sent as the
+            LLM's system instruction via ``LLMUpdateSettingsFrame``. When
+            provided, the system instruction persists across node transitions
+            until a new node explicitly sets ``role_message`` again.
+        role_messages: Deprecated list-of-dicts format for the bot's role/personality.
+
+            .. deprecated:: 0.0.24
+                Use ``role_message`` (str) instead. Will be removed in 1.0.0.
+
         functions: List of function definitions in provider-specific format,
             FunctionSchema, or FlowsFunctionSchema; or a "direct function" whose
             definition is automatically extracted.
@@ -422,12 +430,7 @@ class NodeConfig(NodeConfigRequired, total=False):
     Example::
 
         {
-            "role_messages": [
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant..."
-                }
-            ],
+            "role_message": "You are a helpful assistant...",
             "task_messages": [
                 {
                     "role": "system",
@@ -443,6 +446,7 @@ class NodeConfig(NodeConfigRequired, total=False):
     """
 
     name: str
+    role_message: str
     role_messages: List[Dict[str, Any]]
     functions: List[Union[Dict[str, Any], FlowsFunctionSchema, FlowsDirectFunction]]
     pre_actions: List[ActionConfig]
