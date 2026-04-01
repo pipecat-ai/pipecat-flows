@@ -156,7 +156,7 @@ def create_main_node(summarize: bool = False) -> NodeConfig:
         else ContextStrategyConfig(strategy=ContextStrategy.APPEND),
         task_messages=[
             {
-                "role": "user",
+                "role": "developer",
                 "content": "Say the conversation summary, which was already retrieved (do not invoke the summarize_conversation function again)."
                 if summarize
                 else "Say a brief hello.",

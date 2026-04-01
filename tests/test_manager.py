@@ -75,8 +75,10 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Sample node configurations
         self.sample_node: NodeConfig = {
-            "role_messages": [{"role": "system", "content": "You are a helpful test assistant."}],
-            "task_messages": [{"role": "system", "content": "Complete the test task."}],
+            "role_messages": [
+                {"role": "developer", "content": "You are a helpful test assistant."}
+            ],
+            "task_messages": [{"role": "developer", "content": "Complete the test task."}],
             "functions": [
                 {
                     "type": "function",
@@ -128,7 +130,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Create test node with transition callback
         test_node: NodeConfig = {
             "name": "test",
-            "task_messages": [{"role": "system", "content": "Test message"}],
+            "task_messages": [{"role": "developer", "content": "Test message"}],
             "functions": [
                 {
                     "type": "function",
@@ -223,7 +225,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Create and test old style node
         old_style_node: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Test"}],
+            "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [
                 {
                     "type": "function",
@@ -275,7 +277,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Reset and test new style node
         flow_manager._llm.register_function.reset_mock()
         new_style_node: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Test"}],
+            "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [
                 {
                     "type": "function",
@@ -450,7 +452,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Create node config with multiple functions
         node_config: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Test"}],
+            "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [
                 {
                     "type": "function",
@@ -655,7 +657,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Test function with missing name
         invalid_config = {
-            "task_messages": [{"role": "system", "content": "Test"}],
+            "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [{"type": "function"}],  # Missing name
         }
         with self.assertRaises(FlowError) as context:
@@ -665,7 +667,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Test node function without handler or transition_to
         invalid_config = {
             "name": "test",
-            "task_messages": [{"role": "system", "content": "Test"}],
+            "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [
                 {
                     "type": "function",
@@ -713,7 +715,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Create test node with failing transition callback
         test_node: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Test message"}],
+            "task_messages": [{"role": "developer", "content": "Test message"}],
             "functions": [
                 {
                     "type": "function",
@@ -796,7 +798,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Create node config with actions that will fail
         node_config: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Test"}],
+            "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [],
             "pre_actions": [{"type": "invalid_action"}],
             "post_actions": [{"type": "another_invalid_action"}],
@@ -829,7 +831,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             await flow_manager._update_llm_context(
                 role_message=None,
                 role_messages=None,
-                task_messages=[{"role": "system", "content": "Test"}],
+                task_messages=[{"role": "developer", "content": "Test"}],
                 functions=[],
             )
 
@@ -847,7 +849,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Create node config with OpenAI format for multiple functions
         node_config: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Test"}],
+            "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [
                 {
                     "type": "function",
@@ -897,7 +899,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         try:
             node_config: NodeConfig = {
-                "task_messages": [{"role": "system", "content": "Test"}],
+                "task_messages": [{"role": "developer", "content": "Test"}],
                 "functions": [
                     {
                         "type": "function",
@@ -928,7 +930,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         await flow_manager.initialize()
 
         node_config: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Test"}],
+            "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [
                 {
                     "type": "function",
@@ -970,7 +972,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         try:
             node_config: NodeConfig = {
-                "task_messages": [{"role": "system", "content": "Test"}],
+                "task_messages": [{"role": "developer", "content": "Test"}],
                 "functions": [
                     {
                         "type": "function",
@@ -1022,13 +1024,13 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # First node with role_message (singular)
         first_node: NodeConfig = {
             "role_message": "You are a helpful assistant.",
-            "task_messages": [{"role": "system", "content": "First task."}],
+            "task_messages": [{"role": "developer", "content": "First task."}],
             "functions": [],
         }
 
         # Second node without role messages
         second_node: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Second task."}],
+            "task_messages": [{"role": "developer", "content": "Second task."}],
             "functions": [],
         }
 
@@ -1079,7 +1081,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         await flow_manager.initialize()
 
         test_node: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Test task."}],
+            "task_messages": [{"role": "developer", "content": "Test task."}],
             "functions": [],
         }
 
@@ -1131,7 +1133,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Create node with both types of functions
         node_config: NodeConfig = {
             "name": "test",
-            "task_messages": [{"role": "system", "content": "Test"}],
+            "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [
                 {
                     "type": "function",
@@ -1265,7 +1267,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         await flow_manager.set_node_from_config(
             {
-                "task_messages": [{"role": "system", "content": "Test"}],
+                "task_messages": [{"role": "developer", "content": "Test"}],
                 "functions": [],
             },
         )
@@ -1279,7 +1281,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Add next node to flow manager's nodes
         next_node: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Next test"}],
+            "task_messages": [{"role": "developer", "content": "Next test"}],
             "functions": [],
         }
         flow_manager._nodes["next"] = next_node
@@ -1312,7 +1314,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Create test node with both transition types
         test_node: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Test message"}],
+            "task_messages": [{"role": "developer", "content": "Test message"}],
             "functions": [
                 {
                     "type": "function",
@@ -1344,7 +1346,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         await flow_manager.initialize()
 
         # Mock the context messages
-        mock_messages = [{"role": "system", "content": "Test message"}]
+        mock_messages = [{"role": "developer", "content": "Test message"}]
         self.mock_context_aggregator.user()._context.messages = mock_messages
 
         # Test getting context
@@ -1393,7 +1395,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Create node config without functions field
         node_config: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Test task without functions."}],
+            "task_messages": [{"role": "developer", "content": "Test task without functions."}],
         }
 
         # Set node and verify it works without error
@@ -1421,7 +1423,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Create node config with empty functions list
         node_config: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Test task with empty functions."}],
+            "task_messages": [{"role": "developer", "content": "Test task with empty functions."}],
             "functions": [],
         }
 
@@ -1463,7 +1465,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Create node with multiple edge functions pointing to same transition
         node_config: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Test"}],
+            "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [
                 {
                     "type": "function",
@@ -1548,7 +1550,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         node: NodeConfig = {
             "role_message": "You are a helpful assistant.",
-            "task_messages": [{"role": "system", "content": "Do the task."}],
+            "task_messages": [{"role": "developer", "content": "Do the task."}],
             "functions": [],
         }
 
@@ -1583,7 +1585,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # First node sets role_message
         first_node: NodeConfig = {
             "role_message": "You are a helpful assistant.",
-            "task_messages": [{"role": "system", "content": "First task."}],
+            "task_messages": [{"role": "developer", "content": "First task."}],
             "functions": [],
         }
 
@@ -1601,7 +1603,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Second node with RESET strategy but no role_messages
         self.mock_task.queue_frames.reset_mock()
         second_node: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Second task."}],
+            "task_messages": [{"role": "developer", "content": "Second task."}],
             "functions": [],
         }
 
@@ -1631,8 +1633,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         await flow_manager.initialize()
 
         node: NodeConfig = {
-            "role_messages": [{"role": "system", "content": "You are a helpful assistant."}],
-            "task_messages": [{"role": "system", "content": "Do the task."}],
+            "role_messages": [{"role": "developer", "content": "You are a helpful assistant."}],
+            "task_messages": [{"role": "developer", "content": "Do the task."}],
             "functions": [],
         }
 
@@ -1656,7 +1658,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(update_frames), 1)
         self.assertEqual(
             update_frames[0].messages[0],
-            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "developer", "content": "You are a helpful assistant."},
         )
 
         # Verify the warning is only emitted once
@@ -1678,8 +1680,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         node: NodeConfig = {
             "role_message": "I am the preferred role.",
-            "role_messages": [{"role": "system", "content": "I am the deprecated role."}],
-            "task_messages": [{"role": "system", "content": "Do the task."}],
+            "role_messages": [{"role": "developer", "content": "I am the deprecated role."}],
+            "task_messages": [{"role": "developer", "content": "Do the task."}],
             "functions": [],
         }
 
@@ -1708,10 +1710,10 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         node: NodeConfig = {
             "role_messages": [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "system", "content": "Be concise."},
+                {"role": "developer", "content": "You are a helpful assistant."},
+                {"role": "developer", "content": "Be concise."},
             ],
-            "task_messages": [{"role": "system", "content": "Do the task."}],
+            "task_messages": [{"role": "developer", "content": "Do the task."}],
             "functions": [],
         }
 
@@ -1733,6 +1735,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         update_frames = [f for f in first_frames if isinstance(f, LLMMessagesUpdateFrame)]
         self.assertEqual(len(update_frames), 1)
         messages = update_frames[0].messages
-        self.assertEqual(messages[0], {"role": "system", "content": "You are a helpful assistant."})
-        self.assertEqual(messages[1], {"role": "system", "content": "Be concise."})
-        self.assertEqual(messages[2], {"role": "system", "content": "Do the task."})
+        self.assertEqual(
+            messages[0], {"role": "developer", "content": "You are a helpful assistant."}
+        )
+        self.assertEqual(messages[1], {"role": "developer", "content": "Be concise."})
+        self.assertEqual(messages[2], {"role": "developer", "content": "Do the task."})
