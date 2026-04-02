@@ -186,7 +186,7 @@ def create_initial_node() -> NodeConfig:
         role_message="You are an order-taking assistant. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
         task_messages=[
             {
-                "role": "user",
+                "role": "developer",
                 "content": "For this step, ask the user if they want pizza or sushi, and wait for them to use a function to choose. Start off by greeting them. Be friendly and casual; you're taking an order for food over the phone.",
             }
         ],
@@ -206,7 +206,7 @@ def create_pizza_node() -> NodeConfig:
         name="choose_pizza",
         task_messages=[
             {
-                "role": "user",
+                "role": "developer",
                 "content": """You are handling a pizza order. Use the available functions:
 - Use select_pizza_order when the user specifies both size AND type
 
@@ -228,7 +228,7 @@ def create_sushi_node() -> NodeConfig:
         name="choose_sushi",
         task_messages=[
             {
-                "role": "user",
+                "role": "developer",
                 "content": """You are handling a sushi order. Use the available functions:
 - Use select_sushi_order when the user specifies both count AND type
 
@@ -248,7 +248,7 @@ def create_confirmation_node() -> NodeConfig:
         name="confirm",
         task_messages=[
             {
-                "role": "user",
+                "role": "developer",
                 "content": """Read back the complete order details to the user and ask if they want anything else or if they want to make changes. Use the available functions:
 - Use complete_order when the user confirms that the order is correct and no changes are needed
 - Use revise_order if they want to change something
@@ -266,7 +266,7 @@ def create_end_node() -> NodeConfig:
         name="end",
         task_messages=[
             {
-                "role": "user",
+                "role": "developer",
                 "content": "Thank the user for their order and end the conversation politely and concisely.",
             }
         ],

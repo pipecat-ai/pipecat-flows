@@ -81,7 +81,7 @@ def create_initial_node() -> NodeConfig:
         "role_message": "You are an inquisitive child. Use very simple language. Ask simple questions. You must ALWAYS use one of the available functions to progress the conversation. Your responses will be converted to audio. Avoid outputting special characters and emojis.",
         "task_messages": [
             {
-                "role": "user",
+                "role": "developer",
                 "content": "Say 'Hello world' and ask what is the user's favorite color.",
             }
         ],
@@ -112,7 +112,7 @@ def create_end_node() -> NodeConfig:
         name="create_end_node",
         task_messages=[
             {
-                "role": "user",
+                "role": "developer",
                 "content": "Thank the user for answering and end the conversation",
             }
         ],

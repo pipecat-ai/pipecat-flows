@@ -67,7 +67,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
 
         # Sample node configuration
         self.sample_node: NodeConfig = {
-            "task_messages": [{"role": "system", "content": "Test task."}],
+            "task_messages": [{"role": "developer", "content": "Test task."}],
             "functions": [],
         }
 
@@ -195,7 +195,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
             context_aggregator=self.mock_context_aggregator,
         )
         openai_message = flow_manager._adapter.format_summary_message(summary)
-        self.assertEqual(openai_message["role"], "system")
+        self.assertEqual(openai_message["role"], "developer")
 
         # Test Anthropic format
         flow_manager = FlowManager(
@@ -204,7 +204,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
             context_aggregator=self.mock_context_aggregator,
         )
         anthropic_message = flow_manager._adapter.format_summary_message(summary)
-        self.assertEqual(anthropic_message["role"], "user")
+        self.assertEqual(anthropic_message["role"], "developer")
 
         # Test Gemini format
         flow_manager = FlowManager(
@@ -213,7 +213,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
             context_aggregator=self.mock_context_aggregator,
         )
         gemini_message = flow_manager._adapter.format_summary_message(summary)
-        self.assertEqual(gemini_message["role"], "user")
+        self.assertEqual(gemini_message["role"], "developer")
 
     async def test_node_level_strategy_override(self):
         """Test that node-level strategy overrides global strategy."""
@@ -265,10 +265,13 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         # Verify summary generation call
         run_inference_call = self.mock_llm.run_inference.call_args
         run_inference_args = run_inference_call[0]
+        run_inference_kwargs = run_inference_call[1]
 
-        # Verify prompt and context were included
+        # Verify summary prompt was passed as system_instruction kwarg
+        self.assertEqual(run_inference_kwargs["system_instruction"], summary_prompt)
+
+        # Verify conversation history was included in context messages
         context = run_inference_args[0]
-        self.assertTrue(any(summary_prompt in str(m) for m in context.get_messages()))
         self.assertTrue(
             any(
                 str(self.mock_context.messages[0]["content"]) in str(m)
@@ -297,7 +300,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
 
         # Node with new task messages
         new_node = {
-            "task_messages": [{"role": "system", "content": "New task."}],
+            "task_messages": [{"role": "developer", "content": "New task."}],
             "functions": [],
         }
         await flow_manager._set_node("second", new_node)
@@ -332,7 +335,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         # Set first node (with role_message)
         first_node = {
             "role_message": "You are a helpful assistant.",
-            "task_messages": [{"role": "system", "content": "First task."}],
+            "task_messages": [{"role": "developer", "content": "First task."}],
             "functions": [],
         }
         await flow_manager._set_node("first", first_node)
@@ -341,7 +344,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         # Set second node with role_message — triggers summary + settings update
         second_node = {
             "role_message": "You are now a different assistant.",
-            "task_messages": [{"role": "system", "content": "Second task."}],
+            "task_messages": [{"role": "developer", "content": "Second task."}],
             "functions": [],
         }
         await flow_manager._set_node("second", second_node)

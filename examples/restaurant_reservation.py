@@ -190,7 +190,7 @@ def create_initial_node(wait_for_user: bool) -> NodeConfig:
         "role_message": "You are a restaurant reservation assistant for La Maison, an upscale French restaurant. Be casual and friendly. This is a voice conversation, so avoid special characters and emojis.",
         "task_messages": [
             {
-                "role": "user",
+                "role": "developer",
                 "content": "Warmly greet the customer and ask how many people are in their party. This is your only job for now; if the customer asks for something else, politely remind them you can't do it.",
             }
         ],
@@ -206,7 +206,7 @@ def create_time_selection_node() -> NodeConfig:
         "name": "get_time",
         "task_messages": [
             {
-                "role": "user",
+                "role": "developer",
                 "content": "Ask what time they'd like to dine. Restaurant is open 5 PM to 10 PM.",
             }
         ],
@@ -220,7 +220,7 @@ def create_confirmation_node() -> NodeConfig:
         "name": "confirm",
         "task_messages": [
             {
-                "role": "user",
+                "role": "developer",
                 "content": "Confirm the reservation details and ask if they need anything else.",
             }
         ],
@@ -235,7 +235,7 @@ def create_no_availability_node(alternative_times: list[str]) -> NodeConfig:
         "name": "no_availability",
         "task_messages": [
             {
-                "role": "user",
+                "role": "developer",
                 "content": (
                     f"Apologize that the requested time is not available. "
                     f"Suggest these alternative times: {times_list}. "
@@ -253,7 +253,7 @@ def create_end_node() -> NodeConfig:
         "name": "end",
         "task_messages": [
             {
-                "role": "user",
+                "role": "developer",
                 "content": "Thank them and end the conversation.",
             }
         ],

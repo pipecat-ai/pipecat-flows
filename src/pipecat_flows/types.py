@@ -433,7 +433,7 @@ class NodeConfig(NodeConfigRequired, total=False):
             "role_message": "You are a helpful assistant...",
             "task_messages": [
                 {
-                    "role": "system",
+                    "role": "developer",
                     "content": "Ask the user for their name..."
                 }
             ],

@@ -178,18 +178,14 @@ class LLMAdapter:
 
             prompt_messages = [
                 {
-                    "role": "system",
-                    "content": summary_prompt,
-                },
-                {
-                    "role": "user",
+                    "role": "developer",
                     "content": f"Conversation history: {messages}",
                 },
             ]
 
             summary_context = LLMContext(messages=prompt_messages)
 
-            return await llm.run_inference(summary_context)
+            return await llm.run_inference(summary_context, system_instruction=summary_prompt)
 
         except Exception as e:
             logger.error(f"Summary generation failed: {e}", exc_info=True)
@@ -244,17 +240,17 @@ class UniversalLLMAdapter(LLMAdapter):
         return formatted_functions
 
     def format_summary_message(self, summary: str) -> dict:
-        """Format summary as a system message for flows using universal LLMContext.
+        """Format summary as a developer message for flows using universal LLMContext.
 
         Args:
             summary: The generated summary text.
 
         Returns:
-            A system message containing the summary.
+            A developer message containing the summary.
         """
         # The standard format in flows using universal LLMContext is the
         # LLMContextMessage format, which is based on OpenAI
-        return {"role": "system", "content": f"Here's a summary of the conversation:\n{summary}"}
+        return {"role": "developer", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     def convert_to_function_schema(self, function_def):
         """Convert function definition to FlowsFunctionSchema.
@@ -286,15 +282,15 @@ class OpenAIAdapter(LLMAdapter):
         return function_def["function"]["name"]
 
     def format_summary_message(self, summary: str) -> dict:
-        """Format summary as a system message for OpenAI.
+        """Format summary as a developer message for OpenAI.
 
         Args:
             summary: The generated summary text.
 
         Returns:
-            OpenAI-formatted system message containing the summary.
+            OpenAI-formatted developer message containing the summary.
         """
-        return {"role": "system", "content": f"Here's a summary of the conversation:\n{summary}"}
+        return {"role": "developer", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert OpenAI function definition to FlowsFunctionSchema.
@@ -347,7 +343,7 @@ class AnthropicAdapter(LLMAdapter):
         return function_def["name"]
 
     def format_summary_message(self, summary: str) -> dict:
-        """Format summary as a user message for Anthropic.
+        """Format summary as a developer message for Anthropic.
 
         Note: summary messages are always expected in OpenAI format, because
         summarization triggers an LLMMessagesUpdateFrame, which expects
@@ -357,9 +353,9 @@ class AnthropicAdapter(LLMAdapter):
             summary: The generated summary text.
 
         Returns:
-            Anthropic-formatted user message containing the summary.
+            Anthropic-formatted developer message containing the summary.
         """
-        return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
+        return {"role": "developer", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert Anthropic function definition to FlowsFunctionSchema.
@@ -500,7 +496,7 @@ class GeminiAdapter(LLMAdapter):
         return [{"function_declarations": gemini_functions}]
 
     def format_summary_message(self, summary: str) -> dict:
-        """Format summary as a user message for Gemini.
+        """Format summary as a developer message for Gemini.
 
         Note: summary messages are always expected in OpenAI format, because
         summarization triggers an LLMMessagesUpdateFrame, which expects
@@ -510,9 +506,9 @@ class GeminiAdapter(LLMAdapter):
             summary: The generated summary text.
 
         Returns:
-            Gemini-formatted user message containing the summary.
+            Gemini-formatted developer message containing the summary.
         """
-        return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
+        return {"role": "developer", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert Gemini function definition to FlowsFunctionSchema.
@@ -574,7 +570,7 @@ class AWSBedrockAdapter(LLMAdapter):
         return function_def["name"]
 
     def format_summary_message(self, summary: str) -> dict:
-        """Format summary as a user message for Bedrock models.
+        """Format summary as a developer message for Bedrock models.
 
         Note: summary messages are always expected in OpenAI format, because
         summarization triggers an LLMMessagesUpdateFrame, which expects
@@ -584,9 +580,9 @@ class AWSBedrockAdapter(LLMAdapter):
             summary: The generated summary text.
 
         Returns:
-            Bedrock-formatted user message containing the summary.
+            Bedrock-formatted developer message containing the summary.
         """
-        return {"role": "user", "content": f"Here's a summary of the conversation:\n{summary}"}
+        return {"role": "developer", "content": f"Here's a summary of the conversation:\n{summary}"}
 
     def convert_to_function_schema(self, function_def: Dict[str, Any]) -> FlowsFunctionSchema:
         """Convert Bedrock function definition to FlowsFunctionSchema.
