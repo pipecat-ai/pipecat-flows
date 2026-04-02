@@ -213,7 +213,9 @@ class ContextStrategy(Enum):
         RESET_WITH_SUMMARY: Reset context but include an LLM-generated summary.
 
             .. deprecated:: 0.0.25
-                Use Pipecat's native context summarization instead. See
+                Use Pipecat's native context summarization instead. To trigger
+                on-demand summarization during a node transition, push an
+                ``LLMSummarizeContextFrame`` in a pre-action. See
                 https://docs.pipecat.ai/guides/fundamentals/context-summarization
                 Will be removed in a future version.
     """
@@ -232,7 +234,9 @@ class ContextStrategyConfig:
         summary_prompt: Required prompt text when using RESET_WITH_SUMMARY.
 
             .. deprecated:: 0.0.25
-                Deprecated along with RESET_WITH_SUMMARY. Will be removed in a future version.
+                Deprecated along with RESET_WITH_SUMMARY. Use
+                ``LLMContextSummaryConfig.summarization_prompt`` instead.
+                Will be removed in a future version.
     """
 
     strategy: ContextStrategy

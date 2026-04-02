@@ -23,9 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `RESET_WITH_SUMMARY` context strategy is deprecated in favor of Pipecat's
   native context summarization. A `DeprecationWarning` is now emitted at runtime
-  when the strategy is used. See
+  when the strategy is used. To trigger on-demand summarization during a node
+  transition, push an `LLMSummarizeContextFrame` in a pre-action. See
   https://docs.pipecat.ai/guides/fundamentals/context-summarization for the
-  recommended approach. Will be removed in a future version.
+  full guide. Will be removed in a future version.
 
 ## [0.0.24] - 2026-03-20
 
