@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped dependency versions for security updates: `loguru`, `docstring_parser`,
   `build`, `pip-tools`, `pre-commit`, `pyright`, `pytest-asyncio`, and `ruff`.
 
+### Deprecated
+
+- `RESET_WITH_SUMMARY` context strategy is deprecated in favor of Pipecat's
+  native context summarization. A `DeprecationWarning` is now emitted at runtime
+  when the strategy is used. See
+  https://docs.pipecat.ai/guides/fundamentals/context-summarization for the
+  recommended approach. Will be removed in a future version.
+
 ## [0.0.24] - 2026-03-20
 
 ### Added

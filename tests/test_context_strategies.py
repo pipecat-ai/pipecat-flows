@@ -15,6 +15,7 @@ focusing on:
 """
 
 import unittest
+import warnings
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from pipecat.frames.frames import (
@@ -83,6 +84,40 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
         # Invalid configuration - missing prompt
         with self.assertRaises(ValueError):
             ContextStrategyConfig(strategy=ContextStrategy.RESET_WITH_SUMMARY)
+
+    async def test_reset_with_summary_deprecation_warning(self):
+        """Test that RESET_WITH_SUMMARY emits a DeprecationWarning at runtime."""
+        mock_summary = "Conversation summary"
+        self.mock_llm.run_inference.return_value = mock_summary
+
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+            context_strategy=ContextStrategyConfig(
+                strategy=ContextStrategy.RESET_WITH_SUMMARY,
+                summary_prompt="Summarize the conversation",
+            ),
+        )
+        await flow_manager.initialize()
+
+        # First node using RESET_WITH_SUMMARY should trigger the deprecation warning
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            await flow_manager._set_node("first", self.sample_node)
+
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            self.assertTrue(len(deprecation_warnings) >= 1)
+            self.assertIn("RESET_WITH_SUMMARY is deprecated", str(deprecation_warnings[0].message))
+
+        # Second node should NOT trigger a second warning (once-only)
+        self.mock_task.queue_frames.reset_mock()
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            await flow_manager._set_node("second", self.sample_node)
+
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            self.assertEqual(len(deprecation_warnings), 0)
 
     async def test_default_strategy(self):
         """Test default context strategy (APPEND)."""
