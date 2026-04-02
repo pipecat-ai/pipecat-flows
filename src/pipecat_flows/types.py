@@ -211,6 +211,13 @@ class ContextStrategy(Enum):
         APPEND: Append new messages to existing context (default).
         RESET: Reset context with new messages only.
         RESET_WITH_SUMMARY: Reset context but include an LLM-generated summary.
+
+            .. deprecated:: 0.0.25
+                Use Pipecat's native context summarization instead. To trigger
+                on-demand summarization during a node transition, push an
+                ``LLMSummarizeContextFrame`` in a pre-action. See
+                https://docs.pipecat.ai/guides/fundamentals/context-summarization
+                Will be removed in a future version.
     """
 
     APPEND = "append"
@@ -225,6 +232,11 @@ class ContextStrategyConfig:
     Parameters:
         strategy: Strategy to use for context management.
         summary_prompt: Required prompt text when using RESET_WITH_SUMMARY.
+
+            .. deprecated:: 0.0.25
+                Deprecated along with RESET_WITH_SUMMARY. Use
+                ``LLMContextSummaryConfig.summarization_prompt`` instead.
+                Will be removed in a future version.
     """
 
     strategy: ContextStrategy

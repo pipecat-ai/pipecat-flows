@@ -5,6 +5,17 @@ All notable changes to **Pipecat Flows** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.25] - Unreleased
+
+### Deprecated
+
+- `RESET_WITH_SUMMARY` context strategy is deprecated in favor of Pipecat's
+  native context summarization. A `DeprecationWarning` is now emitted at runtime
+  when the strategy is used. To trigger on-demand summarization during a node
+  transition, push an `LLMSummarizeContextFrame` in a pre-action. See
+  https://docs.pipecat.ai/guides/fundamentals/context-summarization for the
+  full guide. Will be removed in a future version.
+
 ## [0.0.24] - 2026-03-20
 
 ### Added

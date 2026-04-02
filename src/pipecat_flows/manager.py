@@ -178,6 +178,7 @@ class FlowManager:
         self._showed_deprecation_warning_for_transition_fields = False
         self._showed_deprecation_warning_for_set_node = False
         self._showed_deprecation_warning_for_role_messages = False
+        self._showed_deprecation_warning_for_reset_with_summary = False
 
     @property
     def state(self) -> Dict[str, Any]:
@@ -974,6 +975,19 @@ In all of these cases, you can provide a `name` in your new node's config for de
                 messages.extend(role_messages)
 
             update_config = strategy or self._context_strategy
+
+            if update_config.strategy == ContextStrategy.RESET_WITH_SUMMARY:
+                if not self._showed_deprecation_warning_for_reset_with_summary:
+                    self._showed_deprecation_warning_for_reset_with_summary = True
+                    warnings.warn(
+                        "RESET_WITH_SUMMARY is deprecated and will be removed in a future version. "
+                        "Use Pipecat's native context summarization instead. To trigger "
+                        "on-demand summarization during a node transition, push an "
+                        "LLMSummarizeContextFrame in a pre-action. See "
+                        "https://docs.pipecat.ai/guides/fundamentals/context-summarization",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
 
             if (
                 update_config.strategy == ContextStrategy.RESET_WITH_SUMMARY
