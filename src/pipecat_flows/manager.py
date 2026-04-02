@@ -981,7 +981,9 @@ In all of these cases, you can provide a `name` in your new node's config for de
                     self._showed_deprecation_warning_for_reset_with_summary = True
                     warnings.warn(
                         "RESET_WITH_SUMMARY is deprecated and will be removed in a future version. "
-                        "Use Pipecat's native context summarization instead. See "
+                        "Use Pipecat's native context summarization instead. To trigger "
+                        "on-demand summarization during a node transition, push an "
+                        "LLMSummarizeContextFrame in a pre-action. See "
                         "https://docs.pipecat.ai/guides/fundamentals/context-summarization",
                         DeprecationWarning,
                         stacklevel=2,
