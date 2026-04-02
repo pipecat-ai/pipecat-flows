@@ -20,8 +20,8 @@ classifiers = [
 ]
 dependencies = [
     "pipecat-ai>=0.0.108",
-    "loguru~=0.7.2",
-    "docstring_parser~=0.16"
+    "loguru~=0.7.3",
+    "docstring_parser>=0.16,<1",
 ]
 
 [project.urls]
@@ -30,19 +30,19 @@ Website = "https://www.pipecat.ai"
 
 [dependency-groups]
 dev = [
-    "build~=1.2.2",
-    "pip-tools~=7.4.1",
-    "pre-commit~=4.2.0",
-    "pyright~=1.1.402",
+    "build~=1.4.0",
+    "pip-tools~=7.5.3",
+    "pre-commit~=4.5.1",
+    "pyright>=1.1.404,<1.2",
     "pytest~=8.4.1",
-    "pytest-asyncio~=1.0.0",
+    "pytest-asyncio~=1.3.0",
     "pytest-aiohttp==1.1.0",
     "pytest-cov~=4.1.0",
-    "ruff~=0.12.1",
+    "ruff>=0.12.11,<1",
     "setuptools~=78.1.1",
     "setuptools_scm~=8.3.1",
     "python-dotenv>=1.0.1,<2.0.0",
-    "pipecat-ai[webrtc,websocket,daily,silero,deepgram,cartesia,openai,anthropic,google,aws,runner]>=0.0.105",
+    "pipecat-ai[webrtc,websocket,daily,silero,deepgram,cartesia,openai,anthropic,google,aws,runner]>=0.0.108",
 ]
 
 docs = [
