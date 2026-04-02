@@ -5,6 +5,20 @@ All notable changes to **Pipecat Flows** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- ⚠️ All task messages and summary messages now use `"role": "developer"`
+  instead of `"role": "user"`. This correctly distinguishes application
+  instructions from actual user speech. The minimum `pipecat-ai` dependency has
+  been bumped to `>=0.0.108` to support the `"developer"` role. If you have
+  custom flows with `"role": "user"` in `task_messages`, consider updating them
+  to `"role": "developer"`.
+
+- Bumped dependency versions for security updates: `loguru`, `docstring_parser`,
+  `build`, `pip-tools`, `pre-commit`, `pyright`, `pytest-asyncio`, and `ruff`.
+
 ## [0.0.24] - 2026-03-20
 
 ### Added
