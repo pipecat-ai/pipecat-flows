@@ -557,9 +557,9 @@ class FlowManager:
                         on_context_updated=self._check_and_execute_transition,
                     )
                 else:
-                    # Node function - run LLM immediately
+                    # Node function - defer to pipecat's default LLM completion timing
                     properties = FunctionCallResultProperties(
-                        run_llm=True,
+                        run_llm=None,
                         on_context_updated=None,
                     )
 
