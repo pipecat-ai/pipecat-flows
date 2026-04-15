@@ -31,6 +31,101 @@ git push origin your-branch-name
 
 Our maintainers will review your PR, and once everything is good, your contributions will be merged!
 
+## Changelog Entries
+
+Every pull request that makes a user-facing change should include a changelog entry. We use a changelog fragment system to avoid merge conflicts.
+
+### Creating a Changelog Fragment
+
+1. Create a new file in the `changelog/` directory with this naming pattern:
+
+   ```
+   <PR_number>.<type>.md
+   ```
+
+2. Choose the appropriate type:
+   - `added.md` - New features
+   - `changed.md` - Changes in existing functionality
+   - `deprecated.md` - Soon-to-be removed features
+   - `removed.md` - Removed features
+   - `fixed.md` - Bug fixes
+   - `performance.md` - Performance improvements
+   - `security.md` - Security fixes
+   - `other.md` - Other changes (documentation, dependencies, etc.)
+
+3. Write your changelog entry as a Markdown bullet point. Include the `-` at the start:
+
+**Example files:**
+
+`changelog/1234.added.md`:
+
+```markdown
+- Added support for custom context strategies in node transitions.
+```
+
+`changelog/5678.fixed.md`:
+
+```markdown
+- Fixed an issue where interrupted transitions left the flow permanently stuck.
+```
+
+**For entries with nested bullets:**
+
+`changelog/1234.changed.md`:
+
+```markdown
+- Updated FlowManager initialization:
+  - Changed default timeout to 30 seconds
+  - Added retry logic for failed transitions
+```
+
+### Multiple Changes in One PR
+
+**Different types of changes:** Create separate fragment files for each type:
+
+```
+changelog/1234.added.md
+changelog/1234.fixed.md
+```
+
+**Multiple changes of the same type:** Create numbered fragment files:
+
+```
+changelog/1234.changed.md
+changelog/1234.changed.2.md
+```
+
+**Related changes:** Use nested bullets in a single fragment:
+
+```markdown
+- Updated node configuration:
+  - Changed default context strategy to APPEND
+  - Added validation for task messages
+```
+
+**Rule of thumb:** One logical change per fragment file. If changes are unrelated, use separate files.
+
+### Preview Your Changes
+
+To see what your changelog entry will look like:
+
+```bash
+towncrier build --draft --version Unreleased
+```
+
+This won't modify any files, just show you a preview.
+
+### When to Skip Changelog Entries
+
+You can skip adding a changelog entry for:
+
+- Documentation-only changes
+- Internal refactoring with no user-facing impact
+- Test-only changes
+- CI/build configuration changes
+
+If you're unsure whether your change needs a changelog entry, ask in your PR!
+
 ## Code Style and Documentation
 
 ### Python Code Style
