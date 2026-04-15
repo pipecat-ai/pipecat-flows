@@ -1042,7 +1042,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Mock the context messages
         mock_messages = [{"role": "developer", "content": "Test message"}]
-        self.mock_context_aggregator.user()._context.messages = mock_messages
+        self.mock_context_aggregator.user()._context.get_messages.return_value = mock_messages
 
         # Test getting context
         context = flow_manager.get_current_context()

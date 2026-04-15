@@ -60,6 +60,7 @@ class TestContextStrategies(unittest.IsolatedAsyncioTestCase):
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi there"},
         ]
+        self.mock_context.get_messages.return_value = self.mock_context.messages
 
         self.mock_context_aggregator = MagicMock()
         self.mock_context_aggregator.user = MagicMock()

@@ -26,7 +26,6 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.processors.aggregators.llm_context import NOT_GIVEN, LLMContext, NotGiven
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 
 from pipecat_flows.types import FlowsDirectFunctionWrapper, FlowsFunctionSchema
 
@@ -158,7 +157,7 @@ class LLMAdapter:
         raise NotImplementedError("Subclasses must implement this method")
 
     async def generate_summary(
-        self, llm: Any, summary_prompt: str, context: OpenAILLMContext | LLMContext
+        self, llm: Any, summary_prompt: str, context: LLMContext
     ) -> Optional[str]:
         """Generate a summary by running a direct one-shot, out-of-band inference with the LLM.
 
@@ -171,10 +170,7 @@ class LLMAdapter:
             Generated summary text, or None if generation fails.
         """
         try:
-            if isinstance(context, LLMContext):
-                messages = context.get_messages()
-            else:
-                messages = context.messages
+            messages = context.get_messages()
 
             prompt_messages = [
                 {

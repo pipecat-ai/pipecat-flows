@@ -42,7 +42,6 @@ from pipecat.frames.frames import (
 from pipecat.pipeline.llm_switcher import LLMSwitcher
 from pipecat.pipeline.task import PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.settings import LLMSettings
 from pipecat.transports.base_transport import BaseTransport
@@ -314,10 +313,7 @@ class FlowManager:
 
         context = self._context_aggregator.user()._context
 
-        if isinstance(context, LLMContext):
-            return context.get_messages()
-        else:
-            return context.messages
+        return context.get_messages()
 
     def register_action(self, action_type: str, handler: Callable) -> None:
         """Register a handler for a specific action type.
@@ -769,7 +765,7 @@ class FlowManager:
         self._action_manager.schedule_deferred_post_actions(post_actions=post_actions)
 
     async def _create_conversation_summary(
-        self, summary_prompt: str, context: OpenAILLMContext | LLMContext
+        self, summary_prompt: str, context: LLMContext
     ) -> Optional[str]:
         """Generate a conversation summary from a given context."""
         return await self._adapter.generate_summary(self._llm, summary_prompt, context)
