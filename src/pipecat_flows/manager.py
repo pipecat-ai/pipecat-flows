@@ -101,7 +101,6 @@ class FlowManager:
         task: PipelineTask,
         llm: LLMService | LLMSwitcher,
         context_aggregator: Any,
-        tts: Optional[Any] = None,
         flow_config: Optional[FlowConfig] = None,
         context_strategy: Optional[ContextStrategyConfig] = None,
         transport: Optional[BaseTransport] = None,
@@ -113,11 +112,6 @@ class FlowManager:
             task: PipelineTask instance for queueing frames.
             llm: LLM service or LLMSwitcher.
             context_aggregator: Context aggregator for updating user context.
-            tts: Text-to-speech service for voice actions.
-
-                .. deprecated:: 0.0.18
-                    The tts parameter is deprecated and will be removed in 1.0.0.
-
             flow_config: Static flow configuration. If provided, operates in static
                 mode with predefined nodes.
 
@@ -136,13 +130,6 @@ class FlowManager:
         Raises:
             ValueError: If any transition handler is not a valid async callable.
         """
-        if tts is not None:
-            warnings.warn(
-                "The 'tts' parameter is deprecated and will be removed in 1.0.0.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
         self._task = task
         self._llm = llm
         self._action_manager = ActionManager(task, flow_manager=self)
