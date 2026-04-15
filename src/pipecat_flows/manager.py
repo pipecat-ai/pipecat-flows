@@ -163,7 +163,6 @@ class FlowManager:
         self._current_node: Optional[str] = None
 
         self._showed_deprecation_warning_for_transition_fields = False
-        self._showed_deprecation_warning_for_set_node = False
         self._showed_deprecation_warning_for_role_messages = False
         self._showed_deprecation_warning_for_reset_with_summary = False
 
@@ -706,37 +705,6 @@ class FlowManager:
             FlowError: If node setup fails.
         """
         await self._set_node(get_or_generate_node_name(node_config), node_config)
-
-    async def set_node(self, node_id: str, node_config: NodeConfig) -> None:
-        """Set up a new conversation node and transition to it.
-
-        .. deprecated:: 0.0.18
-            This method is deprecated and will be removed in 1.0.0.
-            Use set_node_from_config() instead, or prefer "consolidated" functions
-            that return a tuple (result, next_node).
-
-        Args:
-            node_id: Identifier for the new node.
-            node_config: Configuration for the new node.
-
-        Raises:
-            FlowTransitionError: If manager not initialized.
-            FlowError: If node setup fails.
-        """
-        if not self._showed_deprecation_warning_for_set_node:
-            self._showed_deprecation_warning_for_set_node = True
-            with warnings.catch_warnings():
-                warnings.simplefilter("always")
-                warnings.warn(
-                    """`set_node()` is deprecated and will be removed in 1.0.0. Instead, do the following for dynamic flows: 
-- Prefer "consolidated" or "direct" functions that return a tuple (result, next_node) over deprecated `transition_callback`s
-- Pass your initial node to `FlowManager.initialize()`
-- If you really need to set a node explicitly, use `set_node_from_config()`
-In all of these cases, you can provide a `name` in your new node's config for debug logging purposes.""",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-        await self._set_node(node_id, node_config)
 
     async def _set_node(self, node_id: str, node_config: NodeConfig) -> None:
         """Set up a new conversation node and transition to it.
