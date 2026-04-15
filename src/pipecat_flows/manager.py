@@ -662,7 +662,7 @@ class FlowManager:
                 if not self._showed_deprecation_warning_for_role_messages:
                     self._showed_deprecation_warning_for_role_messages = True
                     warnings.warn(
-                        "'role_messages' is deprecated and will be removed in 1.0.0. "
+                        "'role_messages' is deprecated and will be removed in 2.0.0. "
                         "Use 'role_message' (singular, str) instead.",
                         DeprecationWarning,
                         stacklevel=2,
@@ -759,7 +759,7 @@ class FlowManager:
                 if not self._showed_deprecation_warning_for_reset_with_summary:
                     self._showed_deprecation_warning_for_reset_with_summary = True
                     warnings.warn(
-                        "RESET_WITH_SUMMARY is deprecated and will be removed in a future version. "
+                        "RESET_WITH_SUMMARY is deprecated and will be removed in 2.0.0. "
                         "Use Pipecat's native context summarization instead. To trigger "
                         "on-demand summarization during a node transition, push an "
                         "LLMSummarizeContextFrame in a pre-action. See "

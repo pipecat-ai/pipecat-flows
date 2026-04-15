@@ -196,12 +196,12 @@ class ContextStrategy(Enum):
         RESET: Reset context with new messages only.
         RESET_WITH_SUMMARY: Reset context but include an LLM-generated summary.
 
-            .. deprecated:: 0.0.25
+            .. deprecated:: 1.0.0
                 Use Pipecat's native context summarization instead. To trigger
                 on-demand summarization during a node transition, push an
                 ``LLMSummarizeContextFrame`` in a pre-action. See
                 https://docs.pipecat.ai/guides/fundamentals/context-summarization
-                Will be removed in a future version.
+                Will be removed in 2.0.0.
     """
 
     APPEND = "append"
@@ -217,10 +217,10 @@ class ContextStrategyConfig:
         strategy: Strategy to use for context management.
         summary_prompt: Required prompt text when using RESET_WITH_SUMMARY.
 
-            .. deprecated:: 0.0.25
+            .. deprecated:: 1.0.0
                 Deprecated along with RESET_WITH_SUMMARY. Use
                 ``LLMContextSummaryConfig.summarization_prompt`` instead.
-                Will be removed in a future version.
+                Will be removed in 2.0.0.
     """
 
     strategy: ContextStrategy
@@ -390,7 +390,7 @@ class NodeConfig(NodeConfigRequired, total=False):
         role_messages: Deprecated list-of-dicts format for the bot's role/personality.
 
             .. deprecated:: 0.0.24
-                Use ``role_message`` (str) instead. Will be removed in 1.0.0.
+                Use ``role_message`` (str) instead. Will be removed in 2.0.0.
 
         functions: List of FlowsFunctionSchema definitions or direct functions
             whose definitions are automatically extracted from their signatures.
