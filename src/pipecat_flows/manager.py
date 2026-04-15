@@ -339,8 +339,7 @@ class FlowManager:
             if handler and callable(handler):
                 self.register_action(action_type, handler)
                 logger.debug(f"Registered action handler from config: {action_type}")
-            # Raise error if no handler provided and not a built-in action
-            elif action_type not in ["tts_say", "end_conversation"]:
+            else:
                 raise ActionError(
                     f"Action '{action_type}' not registered. "
                     "Provide handler in action config or register manually."
@@ -637,7 +636,7 @@ class FlowManager:
                 elif isinstance(func_config, FlowsFunctionSchema):
                     await register_function_schema(func_config)
                 else:
-                    raise ValueError(
+                    raise InvalidFunctionError(
                         f"Invalid function format in node '{node_id}'. "
                         "Use FlowsFunctionSchema or direct functions."
                     )
@@ -848,7 +847,6 @@ class FlowManager:
         1. Required fields (task_messages) are present
         2. Functions have valid configurations based on their type:
         - FlowsFunctionSchema objects have proper handler/transition fields
-        - Dictionary format functions have valid handler/transition entries
         - Direct functions are valid according to the FlowsDirectFunctions validation
         3. Edge functions (matching node names) are allowed without handlers/transitions
 
@@ -857,11 +855,12 @@ class FlowManager:
             config: Complete node configuration to validate.
 
         Raises:
-            ValueError: If configuration is invalid or missing required fields.
+            FlowError: If required fields are missing.
+            InvalidFunctionError: If function format is invalid.
         """
         # Check required fields
         if "task_messages" not in config:
-            raise ValueError(f"Node '{node_id}' missing required 'task_messages' field")
+            raise FlowError(f"Node '{node_id}' missing required 'task_messages' field")
 
         # Get functions list with default empty list if not provided
         functions_list = config.get("functions", [])
@@ -874,7 +873,7 @@ class FlowManager:
                 if not func.handler:
                     logger.warning(f"Function '{func.name}' in node '{node_id}' has no handler")
             else:
-                raise ValueError(
+                raise InvalidFunctionError(
                     f"Invalid function format in node '{node_id}'. "
                     "Use FlowsFunctionSchema or direct functions."
                 )

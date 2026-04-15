@@ -30,9 +30,9 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
+    Required,
     Tuple,
     TypedDict,
-    Union,
 )
 
 from pipecat.adapters.schemas.direct_function import BaseDirectFunctionWrapper
@@ -108,7 +108,7 @@ Returns:
 """
 
 
-FunctionHandler = Union[LegacyFunctionHandler, FlowFunctionHandler]
+FunctionHandler = LegacyFunctionHandler | FlowFunctionHandler
 """Union type for function handlers supporting both legacy and modern patterns."""
 
 
@@ -162,17 +162,7 @@ Example::
 """
 
 
-class ActionConfigRequired(TypedDict):
-    """Required fields for action configuration.
-
-    Parameters:
-        type: Action type identifier.
-    """
-
-    type: str
-
-
-class ActionConfig(ActionConfigRequired, total=False):
+class ActionConfig(TypedDict, total=False):
     """Configuration for an action.
 
     Parameters:
@@ -184,7 +174,8 @@ class ActionConfig(ActionConfigRequired, total=False):
         Additional fields are allowed and passed to the handler.
     """
 
-    handler: Union[LegacyActionHandler, FlowActionHandler]
+    type: Required[str]
+    handler: LegacyActionHandler | FlowActionHandler
     text: str
 
 
@@ -250,7 +241,7 @@ class FlowsFunctionSchema:
         required: List of required parameter names.
         handler: Function handler to process the function call.
         cancel_on_interruption: Whether to cancel this function call when an
-            interruption occurs. Defaults to True.
+            interruption occurs. Defaults to False.
         timeout_secs: Optional per-tool timeout in seconds, overriding the global
             ``function_call_timeout_secs``. Defaults to None (use global timeout).
     """
@@ -287,7 +278,7 @@ def flows_direct_function(
 
     Args:
         cancel_on_interruption: Whether to cancel the function call when the user
-            interrupts. Defaults to True.
+            interrupts. Defaults to False.
         timeout_secs: Optional per-tool timeout in seconds, overriding the global
             ``function_call_timeout_secs``. Defaults to None (use global timeout).
 
@@ -350,7 +341,7 @@ class FlowsDirectFunctionWrapper(BaseDirectFunctionWrapper):
         super()._initialize_metadata()
         # Read Flows-specific metadata from decorator (falling back to fields'
         # defaults for backward compatibility)
-        self.cancel_on_interruption = getattr(self.function, "_flows_cancel_on_interruption", True)
+        self.cancel_on_interruption = getattr(self.function, "_flows_cancel_on_interruption", False)
         self.timeout_secs = getattr(self.function, "_flows_timeout_secs", None)
 
     async def invoke(self, args: Mapping[str, Any], flow_manager: "FlowManager"):
@@ -366,17 +357,7 @@ class FlowsDirectFunctionWrapper(BaseDirectFunctionWrapper):
         return await self.function(flow_manager=flow_manager, **args)
 
 
-class NodeConfigRequired(TypedDict):
-    """Required fields for node configuration.
-
-    Parameters:
-        task_messages: List of message dicts defining the current node's objectives.
-    """
-
-    task_messages: List[dict]
-
-
-class NodeConfig(NodeConfigRequired, total=False):
+class NodeConfig(TypedDict, total=False):
     """Configuration for a single node in the flow.
 
     Parameters:
@@ -418,10 +399,11 @@ class NodeConfig(NodeConfigRequired, total=False):
         }
     """
 
+    task_messages: Required[List[dict]]
     name: str
     role_message: str
     role_messages: List[Dict[str, Any]]
-    functions: List[Union[Dict[str, Any], FlowsFunctionSchema, FlowsDirectFunction]]
+    functions: list[FlowsFunctionSchema | FlowsDirectFunction]
     pre_actions: List[ActionConfig]
     post_actions: List[ActionConfig]
     context_strategy: ContextStrategyConfig

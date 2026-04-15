@@ -261,14 +261,14 @@ class TestFlowsDirectFunction(unittest.TestCase):
 
 
 class TestFlowsDirectFunctionDecorator(unittest.TestCase):
-    def test_cancel_on_interruption_defaults_to_true(self):
-        """Test that cancel_on_interruption defaults to True for non-decorated functions."""
+    def test_cancel_on_interruption_defaults_to_false(self):
+        """Test that cancel_on_interruption defaults to False for non-decorated functions."""
 
         async def my_function(flow_manager: FlowManager):
             return {"status": "success"}, None
 
         func = FlowsDirectFunctionWrapper(function=my_function)
-        self.assertTrue(func.cancel_on_interruption)
+        self.assertFalse(func.cancel_on_interruption)
 
     def test_cancel_on_interruption_can_be_set_to_false(self):
         """Test that cancel_on_interruption can be set to False via decorator."""
