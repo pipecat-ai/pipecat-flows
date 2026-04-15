@@ -26,7 +26,6 @@ The flow manager coordinates all aspects of a conversation, including:
 
 import asyncio
 import inspect
-import sys
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Set, cast
 
@@ -493,33 +492,6 @@ class FlowManager:
             logger.error(f"Error executing transition: {str(e)}")
             raise
 
-    def _lookup_function(self, func_name: str) -> Callable:
-        """Look up a function by name in the main module.
-
-        Args:
-            func_name: Name of the function to look up
-
-        Returns:
-            Callable: The found function
-
-        Raises:
-            FlowError: If function is not found
-        """
-        main_module = sys.modules["__main__"]
-        handler = getattr(main_module, func_name, None)
-
-        if handler is not None:
-            logger.debug(f"Found function '{func_name}' in main module")
-            return handler
-
-        error_message = (
-            f"Function '{func_name}' not found in main module.\n"
-            "Ensure the function is defined in your main script "
-            "or imported into it."
-        )
-
-        raise FlowError(error_message)
-
     async def _register_function(
         self,
         name: str,
@@ -533,8 +505,7 @@ class FlowManager:
 
         Args:
             name: Name of the function to register
-            handler: A callable function handler, a FlowsDirectFunction, or a string.
-                    If string starts with '__function__:', extracts the function name after the prefix.
+            handler: A callable function handler or a FlowsDirectFunction.
             new_functions: Set to track newly registered functions for this node
             cancel_on_interruption: Whether to cancel this function call when an
                 interruption occurs. Defaults to True.
@@ -546,11 +517,6 @@ class FlowManager:
         """
         if name not in self._current_functions:
             try:
-                # Handle special token format (e.g. "__function__:function_name")
-                if isinstance(handler, str) and handler.startswith("__function__:"):
-                    func_name = handler.split(":")[1]
-                    handler = self._lookup_function(func_name)
-
                 # Create transition function
                 transition_func = await self._create_transition_func(name, handler)
 
