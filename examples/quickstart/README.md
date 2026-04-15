@@ -4,7 +4,7 @@ This quickstart example will help you set up your first Flow and explain to you 
 
 ## Prerequisites
 
-- Python 3.10 or higher
+- Python 3.11 or higher
 - `uv` package manager
 
 ## Installation
@@ -16,7 +16,6 @@ This quickstart example will help you set up your first Flow and explain to you 
    ```
 
 2. Create an .env file with API keys for
-
    - [Cartesia](https://play.cartesia.ai/sign-up)
    - [Google Gemini](https://ai.google.dev/)
 

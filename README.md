@@ -13,7 +13,7 @@ The framework consists of:
 
 ## Dependencies
 
-- Python 3.10 or higher
+- Python 3.11 or higher
 - [Pipecat](https://github.com/pipecat-ai/pipecat?tab=readme-ov-file#-getting-started)
 
 ## Installation

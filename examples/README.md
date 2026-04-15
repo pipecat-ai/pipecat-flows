@@ -33,7 +33,7 @@ See [quickstart/README.md](./quickstart/README.md) for a beginner-friendly intro
 
 ### Prerequisites
 
-- Python 3.10 or higher
+- Python 3.11 or higher
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) package manager
 
 ### 1. Installation

@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Conversation Flow management for Pipecat AI applications"
 license = { text = "BSD 2-Clause License" }
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 keywords = ["pipecat", "conversation", "flows", "state machine", "ai", "llm"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Multimedia :: Sound/Audio",
 ]
 dependencies = [
-    "pipecat-ai>=0.0.108",
+    "pipecat-ai>=1.0.0,<2",
     "loguru~=0.7.3",
     "docstring_parser>=0.16,<1",
 ]
@@ -34,15 +34,15 @@ dev = [
     "pip-tools~=7.5.3",
     "pre-commit~=4.5.1",
     "pyright>=1.1.404,<1.2",
-    "pytest~=8.4.1",
-    "pytest-asyncio~=1.3.0",
-    "pytest-aiohttp==1.1.0",
+    "pytest>=9.0.0,<10",
+    "pytest-asyncio>=1.0.0,<2",
+    "pytest-aiohttp>=1.0.0,<2",
     "pytest-cov~=4.1.0",
     "ruff>=0.12.11,<1",
     "setuptools~=78.1.1",
     "setuptools_scm~=8.3.1",
     "python-dotenv>=1.0.1,<2.0.0",
-    "pipecat-ai[webrtc,websocket,daily,silero,deepgram,cartesia,openai,anthropic,google,aws,runner]>=0.0.108",
+    "pipecat-ai[webrtc,websocket,daily,silero,deepgram,cartesia,openai,anthropic,google,aws,runner]>=1.0.0,<2",
 ]
 
 docs = [
