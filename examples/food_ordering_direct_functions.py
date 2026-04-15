@@ -279,7 +279,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
+        settings=CartesiaTTSService.Settings(
+            voice="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
+        ),
     )
     # LLM service is created using the create_llm function from utils.py
     # Default is OpenAI; can be changed by setting LLM_PROVIDER environment variable

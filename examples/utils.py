@@ -62,7 +62,7 @@ def create_llm(provider: str = None, model: str = None) -> Any:
         "anthropic": {
             "service": "pipecat.services.anthropic.llm.AnthropicLLMService",
             "api_key_env": "ANTHROPIC_API_KEY",
-            "default_model": "claude-sonnet-4-5-20250929",
+            "default_model": "claude-sonnet-4-6",
         },
         "google": {
             "service": "pipecat.services.google.llm.GoogleLLMService",
@@ -72,7 +72,7 @@ def create_llm(provider: str = None, model: str = None) -> Any:
         "aws": {
             "service": "pipecat.services.aws.llm.AWSBedrockLLMService",
             "api_key_env": None,  # AWS uses default credential chain
-            "default_model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "default_model": "us.anthropic.claude-sonnet-4-6",
             "region": "us-west-2",
         },
     }
@@ -98,14 +98,17 @@ def create_llm(provider: str = None, model: str = None) -> Any:
     # Use provided model or default
     selected_model = model or config["default_model"]
 
-    # Build kwargs
-    kwargs = {"api_key": api_key, "model": selected_model}
+    # Build settings
+    settings_kwargs = {"model": selected_model}
+    if provider == "aws":
+        settings_kwargs["temperature"] = 0.8
+    settings = service_class.Settings(**settings_kwargs)
 
-    # Add AWS-specific parameters
+    # Build constructor kwargs
+    kwargs = {"settings": settings}
+    if api_key is not None:
+        kwargs["api_key"] = api_key
     if provider == "aws":
         kwargs["aws_region"] = os.getenv("AWS_REGION", config["region"])
-        kwargs["params"] = service_class.InputParams(temperature=0.8)
-        # Remove the generic api_key since AWS uses default credential chain
-        del kwargs["api_key"]
 
     return service_class(**kwargs)

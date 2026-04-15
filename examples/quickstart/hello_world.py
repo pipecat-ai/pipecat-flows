@@ -124,7 +124,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     stt = CartesiaSTTService(api_key=os.getenv("CARTESIA_API_KEY"))
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="32b3f3c5-7171-46aa-abe7-b598964aa793",
+        settings=CartesiaTTSService.Settings(
+            voice="32b3f3c5-7171-46aa-abe7-b598964aa793",
+        ),
     )
     llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
 

@@ -60,7 +60,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.runner.daily import configure
-from pipecat.services.cartesia.tts import CartesiaHttpTTSService
+from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 from pipecat.transports.daily.utils import (
@@ -626,9 +626,11 @@ async def main():
             ),
         )
         stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-        tts = CartesiaHttpTTSService(
+        tts = CartesiaTTSService(
             api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="d46abd1d-2d02-43e8-819f-51fb652c1c61",  # Newsman
+            settings=CartesiaTTSService.Settings(
+                voice="d46abd1d-2d02-43e8-819f-51fb652c1c61",  # Newsman
+            ),
         )
         llm = create_llm()
 
