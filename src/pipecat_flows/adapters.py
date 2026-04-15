@@ -15,7 +15,7 @@ the flow manager and Pipecat's universal LLMContext. It handles:
 - Summary generation via out-of-band LLM inference
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
@@ -87,7 +87,7 @@ class LLMAdapter:
 
     async def generate_summary(
         self, llm: Any, summary_prompt: str, context: LLMContext
-    ) -> Optional[str]:
+    ) -> str | None:
         """Generate a summary by running a direct one-shot, out-of-band inference with the LLM.
 
         Args:
