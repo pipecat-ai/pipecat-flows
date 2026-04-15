@@ -30,7 +30,7 @@ The bot joins with a token with the following properties:
 
 Multi-LLM Support:
 Set LLM_PROVIDER environment variable to choose your LLM provider.
-Supported: openai (default), anthropic, google, aws
+Supported: openai_responses (default), openai, anthropic, google, aws
 
 Requirements:
 - Daily room URL

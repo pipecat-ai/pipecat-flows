@@ -15,6 +15,10 @@ The flow handles:
 4. Conclusion and wrap-up
 5. Final thank you
 
+Multi-LLM Support:
+Set LLM_PROVIDER environment variable to choose your LLM provider.
+Supported: openai_responses (default), openai, anthropic, google, aws
+
 Requirements:
 - CARTESIA_API_KEY (for TTS)
 - DEEPGRAM_API_KEY (for STT)

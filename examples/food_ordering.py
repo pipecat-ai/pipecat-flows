@@ -16,7 +16,7 @@ conversation paths are determined at runtime. The flow handles:
 
 Multi-LLM Support:
 Set LLM_PROVIDER environment variable to choose your LLM provider.
-Supported: openai (default), anthropic, google, aws
+Supported: openai_responses (default), openai, anthropic, google, aws
 
 Requirements:
 - CARTESIA_API_KEY (for TTS)

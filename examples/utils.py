@@ -29,6 +29,7 @@ def create_llm(provider: str = None, model: str = None) -> Any:
 
     Supported Providers:
         - openai: Requires OPENAI_API_KEY
+        - openai_responses: Requires OPENAI_API_KEY
         - anthropic: Requires ANTHROPIC_API_KEY
         - google: Requires GOOGLE_API_KEY
         - aws: Uses AWS default credential chain (SSO, environment variables, or IAM roles)
@@ -48,7 +49,7 @@ def create_llm(provider: str = None, model: str = None) -> Any:
         llm = create_llm("aws")
     """
     if provider is None:
-        provider = os.getenv("LLM_PROVIDER", "openai").lower()
+        provider = os.getenv("LLM_PROVIDER", "openai_responses").lower()
     else:
         provider = provider.lower()
 
@@ -56,6 +57,11 @@ def create_llm(provider: str = None, model: str = None) -> Any:
     configs = {
         "openai": {
             "service": "pipecat.services.openai.llm.OpenAILLMService",
+            "api_key_env": "OPENAI_API_KEY",
+            "default_model": "gpt-4.1",
+        },
+        "openai_responses": {
+            "service": "pipecat.services.openai.responses.llm.OpenAIResponsesLLMService",
             "api_key_env": "OPENAI_API_KEY",
             "default_model": "gpt-4.1",
         },
