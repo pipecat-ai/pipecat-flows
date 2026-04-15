@@ -848,7 +848,6 @@ class FlowManager:
         1. Required fields (task_messages) are present
         2. Functions have valid configurations based on their type:
         - FlowsFunctionSchema objects have proper handler/transition fields
-        - Dictionary format functions have valid handler/transition entries
         - Direct functions are valid according to the FlowsDirectFunctions validation
         3. Edge functions (matching node names) are allowed without handlers/transitions
 
