@@ -5,7 +5,7 @@ All notable changes to **Pipecat Flows** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] - 2026-04-15
 
 ### Changed
 
@@ -27,6 +27,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transition, push an `LLMSummarizeContextFrame` in a pre-action. See
   https://docs.pipecat.ai/guides/fundamentals/context-summarization for the
   full guide. Will be removed in a future version.
+
+### Removed
+
+- **Breaking:** Removed the `tts` parameter from `FlowManager.__init__()`,
+  deprecated since v0.0.18. The `tts_say` action uses `TTSSpeakFrame` directly.
+
+- **Breaking:** Removed the `set_node()` method, deprecated since v0.0.18. Use
+  `set_node_from_config()` or consolidated/direct functions instead.
+
+- **Breaking:** Removed `transition_to` and `transition_callback` from
+  `FlowsFunctionSchema` and provider-specific function definitions, deprecated
+  since v0.0.18. Use a consolidated `handler` that returns a tuple
+  `(result, next_node)`, or use direct functions.
+
+- **Breaking:** Removed static flows (`FlowConfig` type and `flow_config`
+  parameter), deprecated since v0.0.19. Use dynamic flows instead.
 
 ## [0.0.24] - 2026-03-20
 
