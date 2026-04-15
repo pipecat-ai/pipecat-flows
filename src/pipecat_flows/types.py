@@ -30,6 +30,7 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
+    Required,
     Tuple,
     TypedDict,
 )
@@ -161,17 +162,7 @@ Example::
 """
 
 
-class ActionConfigRequired(TypedDict):
-    """Required fields for action configuration.
-
-    Parameters:
-        type: Action type identifier.
-    """
-
-    type: str
-
-
-class ActionConfig(ActionConfigRequired, total=False):
+class ActionConfig(TypedDict, total=False):
     """Configuration for an action.
 
     Parameters:
@@ -183,6 +174,7 @@ class ActionConfig(ActionConfigRequired, total=False):
         Additional fields are allowed and passed to the handler.
     """
 
+    type: Required[str]
     handler: LegacyActionHandler | FlowActionHandler
     text: str
 
@@ -365,17 +357,7 @@ class FlowsDirectFunctionWrapper(BaseDirectFunctionWrapper):
         return await self.function(flow_manager=flow_manager, **args)
 
 
-class NodeConfigRequired(TypedDict):
-    """Required fields for node configuration.
-
-    Parameters:
-        task_messages: List of message dicts defining the current node's objectives.
-    """
-
-    task_messages: List[dict]
-
-
-class NodeConfig(NodeConfigRequired, total=False):
+class NodeConfig(TypedDict, total=False):
     """Configuration for a single node in the flow.
 
     Parameters:
@@ -417,6 +399,7 @@ class NodeConfig(NodeConfigRequired, total=False):
         }
     """
 
+    task_messages: Required[List[dict]]
     name: str
     role_message: str
     role_messages: List[Dict[str, Any]]
