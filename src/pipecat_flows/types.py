@@ -25,13 +25,9 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Dict,
-    List,
     Mapping,
-    Optional,
     Protocol,
     Required,
-    Tuple,
     TypedDict,
 )
 
@@ -64,7 +60,7 @@ class FlowResult(TypedDict, total=False):
     error: str
 
 
-FlowArgs = Dict[str, Any]
+FlowArgs = dict[str, Any]
 """Type alias for function handler arguments.
 
 Example::
@@ -76,7 +72,7 @@ Example::
     }
 """
 
-ConsolidatedFunctionResult = Tuple[Optional[FlowResult], Optional["NodeConfig"]]
+ConsolidatedFunctionResult = tuple[FlowResult | None, "NodeConfig | None"]
 """Return type for "consolidated" functions.
 
 Return type for "consolidated" functions that do either or both of:
@@ -136,7 +132,7 @@ class FlowsDirectFunction(Protocol):
         ...
 
 
-LegacyActionHandler = Callable[[Dict[str, Any]], Awaitable[None]]
+LegacyActionHandler = Callable[[dict[str, Any]], Awaitable[None]]
 """Legacy action handler type that only receives the action dictionary.
 
 Args:
@@ -148,7 +144,7 @@ Example::
         await notify(action["text"])
 """
 
-FlowActionHandler = Callable[[Dict[str, Any], "FlowManager"], Awaitable[None]]
+FlowActionHandler = Callable[[dict[str, Any], "FlowManager"], Awaitable[None]]
 """Modern action handler type that receives both action and flow_manager.
 
 Args:
@@ -215,7 +211,7 @@ class ContextStrategyConfig:
     """
 
     strategy: ContextStrategy
-    summary_prompt: Optional[str] = None
+    summary_prompt: str | None = None
 
     def __post_init__(self):
         """Validate configuration.
@@ -248,11 +244,11 @@ class FlowsFunctionSchema:
 
     name: str
     description: str
-    properties: Dict[str, Any]
-    required: List[str]
-    handler: Optional[FunctionHandler] = None
+    properties: dict[str, Any]
+    required: list[str]
+    handler: FunctionHandler | None = None
     cancel_on_interruption: bool = False
-    timeout_secs: Optional[float] = None
+    timeout_secs: float | None = None
 
     def to_function_schema(self) -> FunctionSchema:
         """Convert to a standard FunctionSchema for use with LLMs.
@@ -269,7 +265,7 @@ class FlowsFunctionSchema:
 
 
 def flows_direct_function(
-    *, cancel_on_interruption: bool = False, timeout_secs: Optional[float] = None
+    *, cancel_on_interruption: bool = False, timeout_secs: float | None = None
 ) -> Callable[[Callable], Callable]:
     """Decorator to attach additional metadata to a Pipecat direct function.
 
@@ -399,13 +395,13 @@ class NodeConfig(TypedDict, total=False):
         }
     """
 
-    task_messages: Required[List[dict]]
+    task_messages: Required[list[dict]]
     name: str
     role_message: str
-    role_messages: List[Dict[str, Any]]
+    role_messages: list[dict[str, Any]]
     functions: list[FlowsFunctionSchema | FlowsDirectFunction]
-    pre_actions: List[ActionConfig]
-    post_actions: List[ActionConfig]
+    pre_actions: list[ActionConfig]
+    post_actions: list[ActionConfig]
     context_strategy: ContextStrategyConfig
     respond_immediately: bool
 

@@ -22,6 +22,7 @@ from .exceptions import (
 )
 from .manager import FlowManager
 from .types import (
+    ActionConfig,
     ConsolidatedFunctionResult,
     ContextStrategy,
     ContextStrategyConfig,
@@ -39,6 +40,7 @@ __all__ = [
     # Flow Manager
     "FlowManager",
     # Types
+    "ActionConfig",
     "ContextStrategy",
     "ContextStrategyConfig",
     "FlowArgs",

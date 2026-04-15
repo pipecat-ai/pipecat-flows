@@ -27,7 +27,7 @@ The flow manager coordinates all aspects of a conversation, including:
 import asyncio
 import inspect
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Set, cast
+from typing import Any, Callable, cast
 
 from loguru import logger
 from pipecat.frames.frames import (
@@ -86,9 +86,9 @@ class FlowManager:
         task: PipelineTask,
         llm: LLMService | LLMSwitcher,
         context_aggregator: Any,
-        context_strategy: Optional[ContextStrategyConfig] = None,
-        transport: Optional[BaseTransport] = None,
-        global_functions: Optional[List[FlowsFunctionSchema | FlowsDirectFunction]] = None,
+        context_strategy: ContextStrategyConfig | None = None,
+        transport: BaseTransport | None = None,
+        global_functions: list[FlowsFunctionSchema | FlowsDirectFunction] | None = None,
     ):
         """Initialize the flow manager.
 
@@ -110,22 +110,22 @@ class FlowManager:
         self._adapter = LLMAdapter()
         self._initialized = False
         self._context_aggregator = context_aggregator
-        self._pending_transition: Optional[Dict[str, Any]] = None
+        self._pending_transition: dict[str, Any] | None = None
         self._context_strategy = context_strategy or ContextStrategyConfig(
             strategy=ContextStrategy.APPEND
         )
         self._transport = transport
         self._global_functions = global_functions or []
 
-        self._state: Dict[str, Any] = {}  # Internal state storage
-        self._current_functions: Set[str] = set()  # Track registered functions
-        self._current_node: Optional[str] = None
+        self._state: dict[str, Any] = {}  # Internal state storage
+        self._current_functions: set[str] = set()  # Track registered functions
+        self._current_node: str | None = None
 
         self._showed_deprecation_warning_for_role_messages = False
         self._showed_deprecation_warning_for_reset_with_summary = False
 
     @property
-    def state(self) -> Dict[str, Any]:
+    def state(self) -> dict[str, Any]:
         """Access the shared state dictionary across nodes.
 
         This property provides access to a persistent dictionary that maintains
@@ -156,7 +156,7 @@ class FlowManager:
         return self._state
 
     @property
-    def transport(self) -> Optional[BaseTransport]:
+    def transport(self) -> BaseTransport | None:
         """Access the transport instance used for communication.
 
         This property provides access to the transport instance that handles
@@ -187,7 +187,7 @@ class FlowManager:
         return self._transport
 
     @property
-    def current_node(self) -> Optional[str]:
+    def current_node(self) -> str | None:
         """Access the identifier of the currently active conversation node.
 
         This property provides access to the current node name/identifier in the
@@ -243,7 +243,7 @@ class FlowManager:
         """
         return self._task
 
-    async def initialize(self, initial_node: Optional[NodeConfig] = None) -> None:
+    async def initialize(self, initial_node: NodeConfig | None = None) -> None:
         """Initialize the flow manager.
 
         Args:
@@ -287,7 +287,7 @@ class FlowManager:
             self._initialized = False
             raise FlowInitializationError(f"Failed to initialize flow: {str(e)}") from e
 
-    def get_current_context(self) -> List[dict]:
+    def get_current_context(self) -> list[dict]:
         """Get the current conversation context.
 
         Returns:
@@ -380,7 +380,7 @@ class FlowManager:
     async def _create_transition_func(
         self,
         name: str,
-        handler: Optional[Callable | FlowsDirectFunctionWrapper],
+        handler: Callable | FlowsDirectFunctionWrapper | None,
     ) -> Callable:
         """Create a transition function for the given name and handler.
 
@@ -477,7 +477,7 @@ class FlowManager:
 
             await self._execute_transition(transition_info)
 
-    async def _execute_transition(self, transition_info: Dict[str, Any]) -> None:
+    async def _execute_transition(self, transition_info: dict[str, Any]) -> None:
         """Execute the stored transition."""
         next_node = transition_info.get("next_node")
 
@@ -493,11 +493,11 @@ class FlowManager:
     async def _register_function(
         self,
         name: str,
-        new_functions: Set[str],
-        handler: Optional[Callable | FlowsDirectFunctionWrapper],
+        new_functions: set[str],
+        handler: Callable | FlowsDirectFunctionWrapper | None,
         *,
         cancel_on_interruption: bool = True,
-        timeout_secs: Optional[float] = None,
+        timeout_secs: float | None = None,
     ) -> None:
         """Register a function with the LLM if not already registered.
 
@@ -598,8 +598,8 @@ class FlowManager:
                 await self._execute_actions(pre_actions=pre_actions)
 
             # Register functions and prepare tools
-            tools: List[FlowsFunctionSchema | FlowsDirectFunctionWrapper] = []
-            new_functions: Set[str] = set()
+            tools: list[FlowsFunctionSchema | FlowsDirectFunctionWrapper] = []
+            new_functions: set[str] = set()
 
             # Get functions list with default empty list if not provided
             functions_list = node_config.get("functions", [])
@@ -700,22 +700,22 @@ class FlowManager:
             logger.error(f"Error setting node {node_id}: {str(e)}")
             raise FlowError(f"Failed to set node {node_id}: {str(e)}") from e
 
-    def _schedule_deferred_post_actions(self, post_actions: List[ActionConfig]) -> None:
+    def _schedule_deferred_post_actions(self, post_actions: list[ActionConfig]) -> None:
         self._action_manager.schedule_deferred_post_actions(post_actions=post_actions)
 
     async def _create_conversation_summary(
         self, summary_prompt: str, context: LLMContext
-    ) -> Optional[str]:
+    ) -> str | None:
         """Generate a conversation summary from a given context."""
         return await self._adapter.generate_summary(self._llm, summary_prompt, context)
 
     async def _update_llm_context(
         self,
-        role_message: Optional[str],
-        role_messages: Optional[List[dict]],
-        task_messages: List[dict],
-        functions: List[dict],
-        strategy: Optional[ContextStrategyConfig] = None,
+        role_message: str | None,
+        role_messages: list[dict] | None,
+        task_messages: list[dict],
+        functions: list[dict],
+        strategy: ContextStrategyConfig | None = None,
     ) -> None:
         """Update LLM context with new messages and functions.
 
@@ -826,8 +826,8 @@ class FlowManager:
 
     async def _execute_actions(
         self,
-        pre_actions: Optional[List[ActionConfig]] = None,
-        post_actions: Optional[List[ActionConfig]] = None,
+        pre_actions: list[ActionConfig] | None = None,
+        post_actions: list[ActionConfig] | None = None,
     ) -> None:
         """Execute pre and post actions.
 

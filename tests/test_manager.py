@@ -74,9 +74,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Sample node configurations
         self.sample_node: NodeConfig = {
-            "role_messages": [
-                {"role": "developer", "content": "You are a helpful test assistant."}
-            ],
+            "role_message": "You are a helpful test assistant.",
             "task_messages": [{"role": "developer", "content": "Complete the test task."}],
             "functions": [
                 FlowsFunctionSchema(
@@ -177,7 +175,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Create node config with actions
         node_with_actions: NodeConfig = {
-            "role_messages": self.sample_node["role_messages"],
+            "role_message": self.sample_node["role_message"],
             "task_messages": self.sample_node["task_messages"],
             "functions": self.sample_node["functions"],
             "pre_actions": [{"type": "tts_say", "text": "Pre action"}],
