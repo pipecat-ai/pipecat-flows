@@ -250,7 +250,7 @@ class FlowsFunctionSchema:
         required: List of required parameter names.
         handler: Function handler to process the function call.
         cancel_on_interruption: Whether to cancel this function call when an
-            interruption occurs. Defaults to True.
+            interruption occurs. Defaults to False.
         timeout_secs: Optional per-tool timeout in seconds, overriding the global
             ``function_call_timeout_secs``. Defaults to None (use global timeout).
     """
@@ -287,7 +287,7 @@ def flows_direct_function(
 
     Args:
         cancel_on_interruption: Whether to cancel the function call when the user
-            interrupts. Defaults to True.
+            interrupts. Defaults to False.
         timeout_secs: Optional per-tool timeout in seconds, overriding the global
             ``function_call_timeout_secs``. Defaults to None (use global timeout).
 
@@ -350,7 +350,7 @@ class FlowsDirectFunctionWrapper(BaseDirectFunctionWrapper):
         super()._initialize_metadata()
         # Read Flows-specific metadata from decorator (falling back to fields'
         # defaults for backward compatibility)
-        self.cancel_on_interruption = getattr(self.function, "_flows_cancel_on_interruption", True)
+        self.cancel_on_interruption = getattr(self.function, "_flows_cancel_on_interruption", False)
         self.timeout_secs = getattr(self.function, "_flows_timeout_secs", None)
 
     async def invoke(self, args: Mapping[str, Any], flow_manager: "FlowManager"):
