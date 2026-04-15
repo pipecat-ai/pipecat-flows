@@ -636,7 +636,7 @@ class FlowManager:
                 elif isinstance(func_config, FlowsFunctionSchema):
                     await register_function_schema(func_config)
                 else:
-                    raise ValueError(
+                    raise InvalidFunctionError(
                         f"Invalid function format in node '{node_id}'. "
                         "Use FlowsFunctionSchema or direct functions."
                     )
@@ -855,11 +855,12 @@ class FlowManager:
             config: Complete node configuration to validate.
 
         Raises:
-            ValueError: If configuration is invalid or missing required fields.
+            FlowError: If required fields are missing.
+            InvalidFunctionError: If function format is invalid.
         """
         # Check required fields
         if "task_messages" not in config:
-            raise ValueError(f"Node '{node_id}' missing required 'task_messages' field")
+            raise FlowError(f"Node '{node_id}' missing required 'task_messages' field")
 
         # Get functions list with default empty list if not provided
         functions_list = config.get("functions", [])
@@ -872,7 +873,7 @@ class FlowManager:
                 if not func.handler:
                     logger.warning(f"Function '{func.name}' in node '{node_id}' has no handler")
             else:
-                raise ValueError(
+                raise InvalidFunctionError(
                     f"Invalid function format in node '{node_id}'. "
                     "Use FlowsFunctionSchema or direct functions."
                 )
