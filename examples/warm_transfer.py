@@ -656,7 +656,14 @@ async def main():
                 context_aggregator.assistant(),
             ]
         )
-        task = PipelineTask(pipeline=pipeline, params=PipelineParams(allow_interruptions=True))
+
+        task = PipelineTask(
+            pipeline,
+            params=PipelineParams(
+                enable_metrics=True,
+                enable_usage_metrics=True,
+            ),
+        )
 
         # Initialize flow manager
         flow_manager = FlowManager(
