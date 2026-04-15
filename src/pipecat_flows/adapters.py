@@ -310,8 +310,6 @@ class OpenAIAdapter(LLMAdapter):
 
         # Extract Flows-specific fields
         handler = func_data.get("handler")
-        transition_to = func_data.get("transition_to")
-        transition_callback = func_data.get("transition_callback")
 
         return FlowsFunctionSchema(
             name=name,
@@ -319,8 +317,6 @@ class OpenAIAdapter(LLMAdapter):
             properties=properties,
             required=required,
             handler=handler,
-            transition_to=transition_to,
-            transition_callback=transition_callback,
         )
 
 
@@ -374,8 +370,6 @@ class AnthropicAdapter(LLMAdapter):
 
         # Extract Flows-specific fields
         handler = function_def.get("handler")
-        transition_to = function_def.get("transition_to")
-        transition_callback = function_def.get("transition_callback")
 
         return FlowsFunctionSchema(
             name=name,
@@ -383,8 +377,6 @@ class AnthropicAdapter(LLMAdapter):
             properties=properties,
             required=required,
             handler=handler,
-            transition_to=transition_to,
-            transition_callback=transition_callback,
         )
 
 
@@ -462,15 +454,11 @@ class GeminiAdapter(LLMAdapter):
                         }
                     )
                 elif "function_declarations" in func_config:
-                    # Already in Gemini format, use directly but remove handler/transition fields
+                    # Already in Gemini format, use directly but remove handler field
                     for decl in func_config["function_declarations"]:
                         decl_copy = decl.copy()
                         if "handler" in decl_copy:
                             del decl_copy["handler"]
-                        if "transition_to" in decl_copy:
-                            del decl_copy["transition_to"]
-                        if "transition_callback" in decl_copy:
-                            del decl_copy["transition_callback"]
                         gemini_functions.append(decl_copy)
         else:
             # If no original configs, use the converted schemas
@@ -524,14 +512,10 @@ class GeminiAdapter(LLMAdapter):
             decl = function_def["function_declarations"][0]
             # If we have function declarations, the handler might be in the declaration
             handler = decl.get("handler")
-            transition_to = decl.get("transition_to")
-            transition_callback = decl.get("transition_callback")
         else:
             decl = function_def
             # Otherwise, the handler might be at the top level
             handler = function_def.get("handler")
-            transition_to = function_def.get("transition_to")
-            transition_callback = function_def.get("transition_callback")
 
         name = decl["name"]
         description = decl.get("description", "")
@@ -545,8 +529,6 @@ class GeminiAdapter(LLMAdapter):
             properties=properties,
             required=required,
             handler=handler,
-            transition_to=transition_to,
-            transition_callback=transition_callback,
         )
 
 
@@ -630,8 +612,6 @@ class AWSBedrockAdapter(LLMAdapter):
 
         # Extract Flows-specific fields
         handler = function_def.get("handler")
-        transition_to = function_def.get("transition_to")
-        transition_callback = function_def.get("transition_callback")
 
         return FlowsFunctionSchema(
             name=name,
@@ -639,8 +619,6 @@ class AWSBedrockAdapter(LLMAdapter):
             properties=properties,
             required=required,
             handler=handler,
-            transition_to=transition_to,
-            transition_callback=transition_callback,
         )
 
 

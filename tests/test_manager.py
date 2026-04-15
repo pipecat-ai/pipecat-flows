@@ -19,7 +19,6 @@ include mocked dependencies for PipelineTask, LLM services, and TTS.
 """
 
 import unittest
-from typing import Dict
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from pipecat.frames.frames import (
@@ -189,138 +188,6 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         # Verify that LLM completion was triggered by checking LLMRunFrame instantiation
         mock_llm_run_frame.assert_called()
-
-    async def test_transition_callback_signatures(self):
-        """Test both two and three argument transition callback signatures.
-
-        Note that transition_callback is deprecated in favor of "consolidated" functions that return
-        a tuple of (result, next_node).
-        """
-        flow_manager = FlowManager(
-            task=self.mock_task,
-            llm=self.mock_llm,
-            context_aggregator=self.mock_context_aggregator,
-        )
-        await flow_manager.initialize()
-
-        # Track callback executions
-        old_style_called = False
-        new_style_called = False
-        received_result = None
-
-        # Old style callback (args, flow_manager)
-        async def old_style_callback(args: Dict, flow_manager: FlowManager):
-            nonlocal old_style_called
-            old_style_called = True
-
-        # New style callback (args, result, flow_manager)
-        async def new_style_callback(args: Dict, result: FlowResult, flow_manager: FlowManager):
-            nonlocal new_style_called, received_result
-            new_style_called = True
-            received_result = result
-
-        # Test handler that returns a known result
-        async def test_handler(args: FlowArgs) -> FlowResult:
-            return {"status": "success", "test_data": "test_value"}
-
-        # Create and test old style node
-        old_style_node: NodeConfig = {
-            "task_messages": [{"role": "developer", "content": "Test"}],
-            "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "old_style_function",
-                        "handler": test_handler,
-                        "description": "Test function",
-                        "parameters": {"type": "object", "properties": {}},
-                        "transition_callback": old_style_callback,
-                    },
-                }
-            ],
-        }
-
-        # Test old style callback
-        await flow_manager.set_node_from_config(old_style_node)
-        func = flow_manager._llm.register_function.call_args[0][1]
-
-        # Store the context_updated callback
-        context_updated_callback = None
-
-        async def result_callback(result, properties=None):
-            nonlocal context_updated_callback
-            if properties and properties.on_context_updated:
-                context_updated_callback = properties.on_context_updated
-
-        # Call function and get context_updated callback
-        params = FunctionCallParams(
-            function_name="old_style_function",
-            tool_call_id="id",
-            arguments={},
-            llm=None,
-            context=None,
-            result_callback=result_callback,
-        )
-
-        await func(params)
-
-        # Set up the property mock to return False (no functions in progress)
-        property_mock = PropertyMock(return_value=False)
-        type(self.mock_assistant_aggregator).has_function_calls_in_progress = property_mock
-
-        # Execute the context_updated callback
-        self.assertIsNotNone(context_updated_callback, "Context updated callback not set")
-        await context_updated_callback()
-
-        self.assertTrue(old_style_called, "Old style callback was not called")
-
-        # Reset and test new style node
-        flow_manager._llm.register_function.reset_mock()
-        new_style_node: NodeConfig = {
-            "task_messages": [{"role": "developer", "content": "Test"}],
-            "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "new_style_function",
-                        "handler": test_handler,
-                        "description": "Test function",
-                        "parameters": {"type": "object", "properties": {}},
-                        "transition_callback": new_style_callback,
-                    },
-                }
-            ],
-        }
-
-        # Test new style callback
-        await flow_manager.set_node_from_config(new_style_node)
-        func = flow_manager._llm.register_function.call_args[0][1]
-
-        # Reset context_updated callback
-        context_updated_callback = None
-
-        # Call function and get context_updated callback
-        params = FunctionCallParams(
-            function_name="new_style_function",
-            tool_call_id="id",
-            arguments={},
-            llm=None,
-            context=None,
-            result_callback=result_callback,
-        )
-        await func(params)
-
-        # Set up the property mock to return False (no functions in progress)
-        property_mock = PropertyMock(return_value=False)
-        type(self.mock_assistant_aggregator).has_function_calls_in_progress = property_mock
-
-        # Execute the context_updated callback
-        self.assertIsNotNone(context_updated_callback, "Context updated callback not set")
-        await context_updated_callback()
-
-        self.assertTrue(new_style_called, "New style callback was not called")
-        self.assertIsNotNone(received_result, "Result was not passed to callback")
-        self.assertEqual(received_result["test_data"], "test_value")
 
     async def test_node_validation(self):
         """Test node configuration validation."""
@@ -620,9 +487,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         async def error_handler(args):
             raise ValueError("Test error")
 
-        transition_func = await flow_manager._create_transition_func(
-            "test", error_handler, transition_to=None
-        )
+        transition_func = await flow_manager._create_transition_func("test", error_handler)
 
         # Mock result callback
         callback_called = False
@@ -691,85 +556,9 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             await flow_manager.set_node_from_config(invalid_config)
             self.assertIsNotNone(warning_message)
             self.assertIn(
-                "Function 'test_func' in node 'test' has neither handler, transition_to, nor transition_callback",
+                "Function 'test_func' in node 'test' has no handler",
                 warning_message,
             )
-
-    async def test_transition_callback_error_handling(self):
-        """Test error handling in transition callback.
-
-        Note that transition_callback is deprecated in favor of "consolidated" functions that return
-        a tuple of (result, next_node).
-        """
-
-        async def failing_handler(args, flow_manager):
-            raise ValueError("Transition error")
-
-        # Initialize flow manager
-        flow_manager = FlowManager(
-            task=self.mock_task,
-            llm=self.mock_llm,
-            context_aggregator=self.mock_context_aggregator,
-        )
-        await flow_manager.initialize()
-
-        # Create test node with failing transition callback
-        test_node: NodeConfig = {
-            "task_messages": [{"role": "developer", "content": "Test message"}],
-            "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "test_function",
-                        "description": "Test function",
-                        "parameters": {},
-                        "transition_callback": failing_handler,
-                    },
-                }
-            ],
-        }
-
-        # Set up node and get registered function
-        await flow_manager.set_node_from_config(test_node)
-        transition_func = flow_manager._llm.register_function.call_args[0][1]
-
-        # Track the result and context_updated callback
-        context_updated_callback = None
-        final_results = []
-
-        async def result_callback(result, properties=None):
-            nonlocal context_updated_callback
-            final_results.append(result)
-            if properties and properties.on_context_updated:
-                context_updated_callback = properties.on_context_updated
-
-        params = FunctionCallParams(
-            function_name="test_function",
-            tool_call_id="test_id",
-            arguments={},
-            llm=self.mock_llm,
-            context={},
-            result_callback=result_callback,
-        )
-
-        # Call function
-        await transition_func(params)
-
-        # Set up the property mock to return False (no functions in progress)
-        property_mock = PropertyMock(return_value=False)
-        type(self.mock_assistant_aggregator).has_function_calls_in_progress = property_mock
-
-        # Execute the context updated callback which should trigger the error
-        self.assertIsNotNone(context_updated_callback, "Context updated callback not set")
-        try:
-            await context_updated_callback()
-        except ValueError:
-            pass  # Expected error
-
-        # Verify error handling - should have only one result (the initial acknowledged status)
-        # The error handling in our new implementation doesn't call result_callback again
-        self.assertEqual(len(final_results), 1)
-        self.assertEqual(final_results[0]["status"], "acknowledged")
 
     async def test_register_function_error_handling(self):
         """Test error handling in function registration."""
@@ -1127,8 +916,19 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         async def test_handler(args):
             return {"status": "success"}
 
-        async def consolidated_test_handler(args):
-            return {"status": "success"}, "next_node"
+        async def consolidated_test_handler_1(args):
+            next_node = {
+                "task_messages": [{"role": "developer", "content": "Next"}],
+                "functions": [],
+            }
+            return {"status": "success"}, next_node
+
+        async def consolidated_test_handler_2(args):
+            next_node = {
+                "task_messages": [{"role": "developer", "content": "Next"}],
+                "functions": [],
+            }
+            return {"status": "success"}, next_node
 
         # Create node with both types of functions
         node_config: NodeConfig = {
@@ -1148,17 +948,16 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
                     "type": "function",
                     "function": {
                         "name": "edge_function_1",
-                        "handler": test_handler,
+                        "handler": consolidated_test_handler_1,
                         "description": "Edge function",
                         "parameters": {"type": "object", "properties": {}},
-                        "transition_to": "next_node",  # Deprecated way to specify transition
                     },
                 },
                 {
                     "type": "function",
                     "function": {
                         "name": "edge_function_2",
-                        "handler": consolidated_test_handler,  # Modern way to specify transition
+                        "handler": consolidated_test_handler_2,
                         "description": "Edge function",
                         "parameters": {"type": "object", "properties": {}},
                     },
@@ -1296,46 +1095,6 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.mock_task.queue_frames.called)
         mock_llm_run_frame.assert_called_once()
 
-    async def test_transition_configuration_exclusivity(self):
-        """Test that transition_to and transition_callback cannot be used together.
-
-        Note that transition_to and transition_callback are deprecated in favor of "consolidated"
-        functions that return a tuple of (result, next_node).
-        """
-        flow_manager = FlowManager(
-            task=self.mock_task,
-            llm=self.mock_llm,
-            context_aggregator=self.mock_context_aggregator,
-        )
-        await flow_manager.initialize()
-
-        # Create mock transition callback
-        mock_transition_handler = AsyncMock()
-
-        # Create test node with both transition types
-        test_node: NodeConfig = {
-            "task_messages": [{"role": "developer", "content": "Test message"}],
-            "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "test_function",
-                        "description": "Test function",
-                        "parameters": {},
-                        "transition_to": "next_node",
-                        "transition_callback": mock_transition_handler,
-                    },
-                }
-            ],
-        }
-
-        # Should raise error when trying to use both
-        with self.assertRaises(FlowError) as context:
-            await flow_manager.set_node_from_config(test_node)
-        self.assertIn(
-            "Cannot specify both transition_to and transition_callback", str(context.exception)
-        )
-
     async def test_get_current_context(self):
         """Test getting current conversation context."""
         flow_manager = FlowManager(
@@ -1440,104 +1199,6 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             if any(isinstance(frame, LLMSetToolsFrame) for frame in call[0][0])
         ]
         self.assertTrue(len(tools_frames_call) > 0, "Should have called LLMSetToolsFrame")
-
-    async def test_multiple_edge_functions_single_transition(self):
-        """Test that multiple edge functions coordinate properly and only transition once."""
-        flow_manager = FlowManager(
-            task=self.mock_task,
-            llm=self.mock_llm,
-            context_aggregator=self.mock_context_aggregator,
-        )
-        await flow_manager.initialize()
-
-        transitions_executed = 0
-
-        async def transition_callback(args, flow_manager):
-            nonlocal transitions_executed
-            transitions_executed += 1
-
-        # Create real async handler functions instead of AsyncMock
-        async def edge_handler_1(args):
-            return {"status": "success", "function": "edge_func_1"}
-
-        async def edge_handler_2(args):
-            return {"status": "success", "function": "edge_func_2"}
-
-        # Create node with multiple edge functions pointing to same transition
-        node_config: NodeConfig = {
-            "task_messages": [{"role": "developer", "content": "Test"}],
-            "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "edge_func_1",
-                        "handler": edge_handler_1,
-                        "description": "Edge function 1",
-                        "parameters": {},
-                        "transition_callback": transition_callback,
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "edge_func_2",
-                        "handler": edge_handler_2,
-                        "description": "Edge function 2",
-                        "parameters": {},
-                        "transition_callback": transition_callback,
-                    },
-                },
-            ],
-        }
-
-        await flow_manager.set_node_from_config(node_config)
-
-        # Get both registered functions
-        func1 = None
-        func2 = None
-        for call_args in self.mock_llm.register_function.call_args_list:
-            name, func = call_args[0]
-            if name == "edge_func_1":
-                func1 = func
-            elif name == "edge_func_2":
-                func2 = func
-
-        self.assertIsNotNone(func1, "edge_func_1 should be registered")
-        self.assertIsNotNone(func2, "edge_func_2 should be registered")
-
-        # Simulate both functions being called
-        context_callbacks = []
-
-        async def result_callback(result, properties=None):
-            if properties and properties.on_context_updated:
-                context_callbacks.append(properties.on_context_updated)
-
-        # Call both functions
-        await func1(FunctionCallParams("edge_func_1", "id1", {}, None, None, result_callback))
-        await func2(FunctionCallParams("edge_func_2", "id2", {}, None, None, result_callback))
-
-        # Verify both functions created context callbacks
-        self.assertEqual(
-            len(context_callbacks), 2, "Both functions should create context callbacks"
-        )
-
-        # Create a mock property that we can control dynamically
-        property_mock = PropertyMock()
-        type(self.mock_assistant_aggregator).has_function_calls_in_progress = property_mock
-
-        # First function completes - should not transition yet (functions still in progress)
-        property_mock.return_value = True
-        await context_callbacks[0]()
-        self.assertEqual(
-            transitions_executed, 0, "Should not transition while functions still pending"
-        )
-
-        # Second function completes - should transition now (no functions in progress)
-        property_mock.return_value = False
-        await context_callbacks[1]()
-        self.assertEqual(
-            transitions_executed, 1, "Should transition exactly once when all functions complete"
-        )
 
     async def test_role_message_singular(self):
         """Test that plain string role_message (singular) works correctly."""

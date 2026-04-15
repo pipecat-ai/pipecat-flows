@@ -162,7 +162,6 @@ class FlowManager:
         self._current_functions: Set[str] = set()  # Track registered functions
         self._current_node: Optional[str] = None
 
-        self._showed_deprecation_warning_for_transition_fields = False
         self._showed_deprecation_warning_for_role_messages = False
         self._showed_deprecation_warning_for_reset_with_summary = False
 
@@ -284,21 +283,6 @@ class FlowManager:
                     )
         """
         return self._task
-
-    def _validate_transition_callback(self, name: str, callback: Any) -> None:
-        """Validate a transition callback.
-
-        Args:
-            name: Name of the function the callback is for
-            callback: The callback to validate
-
-        Raises:
-            ValueError: If callback is not a valid async callable
-        """
-        if not callable(callback):
-            raise ValueError(f"Transition callback for {name} must be callable")
-        if not inspect.iscoroutinefunction(callback):
-            raise ValueError(f"Transition callback for {name} must be async")
 
     async def initialize(self, initial_node: Optional[NodeConfig] = None) -> None:
         """Initialize the flow manager.
@@ -457,31 +441,16 @@ class FlowManager:
         self,
         name: str,
         handler: Optional[Callable | FlowsDirectFunctionWrapper],
-        transition_to: Optional[str],
-        transition_callback: Optional[Callable] = None,
     ) -> Callable:
         """Create a transition function for the given name and handler.
 
         Args:
             name: Name of the function being registered.
             handler: Optional function to process data.
-            transition_to: Optional node to transition to (static flows).
-            transition_callback: Optional callback for dynamic transitions.
 
         Returns:
             Async function that handles the tool invocation.
-
-        Raises:
-            ValueError: If both transition_to and transition_callback are specified.
         """
-        if transition_to and transition_callback:
-            raise ValueError(
-                f"Function {name} cannot have both transition_to and transition_callback"
-            )
-
-        # Validate transition callback if provided
-        if transition_callback:
-            self._validate_transition_callback(name, transition_callback)
 
         async def transition_func(params: FunctionCallParams) -> None:
             """Inner function that handles the actual tool invocation."""
@@ -522,16 +491,12 @@ class FlowManager:
                 )
 
                 # Determine if this is an edge function
-                is_edge_function = (
-                    bool(next_node) or bool(transition_to) or bool(transition_callback)
-                )
+                is_edge_function = bool(next_node)
 
                 if is_edge_function:
                     # Store transition info for coordinated execution
                     transition_info = {
                         "next_node": next_node,
-                        "transition_to": transition_to,
-                        "transition_callback": transition_callback,
                         "function_name": name,
                         "arguments": params.arguments,
                         "result": result,
@@ -575,14 +540,9 @@ class FlowManager:
     async def _execute_transition(self, transition_info: Dict[str, Any]) -> None:
         """Execute the stored transition."""
         next_node = transition_info.get("next_node")
-        transition_to = transition_info.get("transition_to")
-        transition_callback = transition_info.get("transition_callback")
-        function_name = transition_info.get("function_name")
-        arguments = transition_info.get("arguments")
-        result = transition_info.get("result")
 
         try:
-            if next_node:  # Function-returned next node (consolidated function)
+            if next_node:
                 if isinstance(next_node, str):  # Static flow
                     node_name = next_node
                     node = self._nodes[next_node]
@@ -591,19 +551,6 @@ class FlowManager:
                     node = next_node
                 logger.debug(f"Transition to function-returned node: {node_name}")
                 await self._set_node(node_name, node)
-            elif transition_to:  # Static flow (deprecated)
-                logger.debug(f"Static transition to: {transition_to}")
-                await self._set_node(transition_to, self._nodes[transition_to])
-            elif transition_callback:  # Dynamic flow (deprecated)
-                logger.debug(f"Dynamic transition for: {function_name}")
-                # Check callback signature
-                sig = inspect.signature(transition_callback)
-                if len(sig.parameters) == 2:
-                    # Old style: (args, flow_manager)
-                    await transition_callback(arguments, self)
-                else:
-                    # New style: (args, result, flow_manager)
-                    await transition_callback(arguments, result, self)
         except Exception as e:
             logger.error(f"Error executing transition: {str(e)}")
             raise
@@ -640,8 +587,6 @@ class FlowManager:
         name: str,
         new_functions: Set[str],
         handler: Optional[Callable | FlowsDirectFunctionWrapper],
-        transition_to: Optional[str] = None,
-        transition_callback: Optional[Callable] = None,
         *,
         cancel_on_interruption: bool = True,
         timeout_secs: Optional[float] = None,
@@ -652,8 +597,6 @@ class FlowManager:
             name: Name of the function to register
             handler: A callable function handler, a FlowsDirectFunction, or a string.
                     If string starts with '__function__:', extracts the function name after the prefix.
-            transition_to: Optional node to transition to (static flows)
-            transition_callback: Optional transition callback (dynamic flows)
             new_functions: Set to track newly registered functions for this node
             cancel_on_interruption: Whether to cancel this function call when an
                 interruption occurs. Defaults to True.
@@ -671,9 +614,7 @@ class FlowManager:
                     handler = self._lookup_function(func_name)
 
                 # Create transition function
-                transition_func = await self._create_transition_func(
-                    name, handler, transition_to, transition_callback
-                )
+                transition_func = await self._create_transition_func(name, handler)
 
                 # Register function with LLM (or LLMSwitcher)
                 kwargs = {}
@@ -771,8 +712,6 @@ class FlowManager:
                     name=schema.name,
                     new_functions=new_functions,
                     handler=schema.handler,
-                    transition_to=schema.transition_to,
-                    transition_callback=schema.transition_callback,
                     cancel_on_interruption=schema.cancel_on_interruption,
                     timeout_secs=schema.timeout_secs,
                 )
@@ -785,8 +724,6 @@ class FlowManager:
                     name=direct_function.name,
                     new_functions=new_functions,
                     handler=direct_function,
-                    transition_to=None,
-                    transition_callback=None,
                     cancel_on_interruption=direct_function.cancel_on_interruption,
                     timeout_secs=direct_function.timeout_secs,
                 )
@@ -1059,51 +996,27 @@ class FlowManager:
             if name in self._nodes:
                 continue
 
-            # Check for handler, transition_to, and transition_callback depending on format
+            # Check for handler depending on format
             if isinstance(func, FlowsFunctionSchema):
-                # For FlowsFunctionSchema, we can access the fields directly
                 has_handler = func.handler is not None
-                has_transition_to = func.transition_to is not None
-                has_transition_callback = func.transition_callback is not None
             else:
                 # For dictionary formats, use the provider-specific format checks
                 # OpenAI format
                 if "function" in func:
                     has_handler = "handler" in func["function"]
-                    has_transition_to = "transition_to" in func["function"]
-                    has_transition_callback = "transition_callback" in func["function"]
                 # Anthropic format
                 elif "name" in func and "input_schema" in func:
                     has_handler = "handler" in func
-                    has_transition_to = "transition_to" in func
-                    has_transition_callback = "transition_callback" in func
                 # Gemini format
                 elif "function_declarations" in func and func["function_declarations"]:
                     decl = func["function_declarations"][0]
                     has_handler = "handler" in decl
-                    has_transition_to = "transition_to" in decl
-                    has_transition_callback = "transition_callback" in decl
                 else:
                     # Unknown format, report error
                     raise ValueError(
                         f"Unknown function format for function '{name}' in node '{node_id}'"
                     )
 
-            # Warn if the function has no handler or transitions
-            if not has_handler and not has_transition_to and not has_transition_callback:
-                logger.warning(
-                    f"Function '{name}' in node '{node_id}' has neither handler, transition_to, nor transition_callback"
-                )
-
-            # Warn about usage of deprecated transition_to and transition_callback
-            if (
-                has_transition_to or has_transition_callback
-            ) and not self._showed_deprecation_warning_for_transition_fields:
-                self._showed_deprecation_warning_for_transition_fields = True
-                with warnings.catch_warnings():
-                    warnings.simplefilter("always")
-                    warnings.warn(
-                        '`transition_to` and `transition_callback` are deprecated and will be removed in 1.0.0. Use a "consolidated" `handler` that returns a tuple (result, next_node) instead.',
-                        DeprecationWarning,
-                        stacklevel=2,
-                    )
+            # Warn if the function has no handler
+            if not has_handler:
+                logger.warning(f"Function '{name}' in node '{node_id}' has no handler")

@@ -33,7 +33,6 @@ from typing import (
     Protocol,
     Tuple,
     TypedDict,
-    TypeVar,
     Union,
 )
 
@@ -44,18 +43,6 @@ from pipecat_flows.exceptions import InvalidFunctionError
 
 if TYPE_CHECKING:
     from pipecat_flows.manager import FlowManager
-
-T = TypeVar("T")
-TransitionHandler = Callable[[Dict[str, T], "FlowManager"], Awaitable[None]]
-"""Type for transition handler functions.
-
-Args:
-    args: Dictionary of arguments from the function call
-    flow_manager: Reference to the FlowManager instance
-
-Returns:
-    None: Handlers are expected to update state and set next node
-"""
 
 
 class FlowResult(TypedDict, total=False):
@@ -269,17 +256,6 @@ class FlowsFunctionSchema:
             interruption occurs. Defaults to True.
         timeout_secs: Optional per-tool timeout in seconds, overriding the global
             ``function_call_timeout_secs``. Defaults to None (use global timeout).
-        transition_to: Target node to transition to after function execution.
-
-            .. deprecated:: 0.0.18
-                Use a "consolidated" handler that returns a tuple (result, next_node) instead.
-                This field is deprecated and will be removed in 1.0.0.
-
-        transition_callback: Callback function for dynamic transitions.
-
-            .. deprecated:: 0.0.18
-                Use a "consolidated" handler that returns a tuple (result, next_node) instead.
-                This field is deprecated and will be removed in 1.0.0.
     """
 
     name: str
@@ -289,17 +265,6 @@ class FlowsFunctionSchema:
     handler: Optional[FunctionHandler] = None
     cancel_on_interruption: bool = False
     timeout_secs: Optional[float] = None
-    transition_to: Optional[str] = None
-    transition_callback: Optional[Callable] = None
-
-    def __post_init__(self):
-        """Validate the schema configuration.
-
-        Raises:
-            ValueError: If both transition_to and transition_callback are specified.
-        """
-        if self.transition_to and self.transition_callback:
-            raise ValueError("Cannot specify both transition_to and transition_callback")
 
     def to_function_schema(self) -> FunctionSchema:
         """Convert to a standard FunctionSchema for use with LLMs.

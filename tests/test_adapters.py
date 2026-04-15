@@ -73,7 +73,6 @@ def test_openai_adapter_native_format(openai_adapter):
                 "required": ["location"],
             },
             "handler": lambda x: x,
-            "transition_to": "next_step",
         },
     }
 
@@ -90,8 +89,6 @@ def test_openai_adapter_native_format(openai_adapter):
     assert "unit" in schema.properties
     assert schema.required == ["location"]
     assert schema.handler is not None
-    assert schema.transition_to == "next_step"
-    assert schema.transition_callback is None
 
     # Format function for OpenAI (ToolsSchema expected)
     formatted = openai_adapter.format_functions([openai_function])
@@ -119,7 +116,6 @@ def test_openai_adapter_function_schema(openai_adapter):
         },
         required=["location"],
         handler=lambda x: x,
-        transition_to="next_step",
     )
 
     # Get function name from schema
@@ -185,7 +181,6 @@ def test_anthropic_adapter_native_format(anthropic_adapter):
             "required": ["location"],
         },
         "handler": lambda x: x,
-        "transition_callback": lambda x, y: None,
     }
 
     # Get function name from dictionary
@@ -201,8 +196,6 @@ def test_anthropic_adapter_native_format(anthropic_adapter):
     assert "unit" in schema.properties
     assert schema.required == ["location"]
     assert schema.handler is not None
-    assert schema.transition_to is None
-    assert schema.transition_callback is not None
 
     # Format function for Anthropic (ToolsSchema expected)
     formatted = anthropic_adapter.format_functions([anthropic_function])
@@ -234,7 +227,6 @@ def test_anthropic_adapter_function_schema(anthropic_adapter):
         },
         required=["location"],
         handler=lambda x: x,
-        transition_callback=lambda x, y: None,
     )
 
     # Get function name from schema
@@ -303,7 +295,6 @@ def test_gemini_adapter_native_format(gemini_adapter):
                     "required": ["location"],
                 },
                 "handler": lambda x: x,
-                "transition_to": "next_step",
             }
         ]
     }
@@ -321,8 +312,6 @@ def test_gemini_adapter_native_format(gemini_adapter):
     assert "unit" in schema.properties
     assert schema.required == ["location"]
     assert schema.handler is not None
-    assert schema.transition_to == "next_step"
-    assert schema.transition_callback is None
 
     # Format function for Gemini - using the specific format_functions implementation
     formatted = gemini_adapter.format_functions([gemini_function], [gemini_function])
@@ -333,7 +322,6 @@ def test_gemini_adapter_native_format(gemini_adapter):
 
     # Verify flow-specific fields not in formatted output
     assert "handler" not in formatted[0]["function_declarations"][0]
-    assert "transition_to" not in formatted[0]["function_declarations"][0]
 
 
 def test_gemini_adapter_function_schema(gemini_adapter):
@@ -355,7 +343,6 @@ def test_gemini_adapter_function_schema(gemini_adapter):
         },
         required=["location"],
         handler=lambda x: x,
-        transition_to="next_step",
     )
 
     # Get function name from schema
@@ -375,7 +362,6 @@ def test_gemini_adapter_function_schema(gemini_adapter):
 
     # Verify flow-specific fields not in formatted output
     assert "handler" not in formatted[0]["function_declarations"][0]
-    assert "transition_to" not in formatted[0]["function_declarations"][0]
 
 
 # Mock AWS Bedrock adapter to avoid actual network calls
@@ -430,7 +416,6 @@ def test_bedrock_adapter_native_format(bedrock_adapter):
             }
         },
         "handler": lambda x: x,
-        "transition_to": "next_step",
     }
 
     # Get function name from dictionary
@@ -446,8 +431,6 @@ def test_bedrock_adapter_native_format(bedrock_adapter):
     assert "unit" in schema.properties
     assert schema.required == ["location"]
     assert schema.handler is not None
-    assert schema.transition_to == "next_step"
-    assert schema.transition_callback is None
 
     # Format function for Bedrock (ToolsSchema expected)
     formatted = bedrock_adapter.format_functions([bedrock_function])
@@ -477,7 +460,6 @@ def test_bedrock_adapter_function_schema(bedrock_adapter):
         },
         required=["location"],
         handler=lambda x: x,
-        transition_callback=lambda x, y: None,
     )
 
     # Get function name from schema
@@ -521,7 +503,6 @@ def test_bedrock_adapter_toolspec_format(bedrock_adapter):
             },
         },
         "handler": lambda x: x,
-        "transition_to": "next_step",
     }
 
     # Convert to FlowsFunctionSchema
@@ -533,8 +514,6 @@ def test_bedrock_adapter_toolspec_format(bedrock_adapter):
     assert "unit" in schema.properties
     assert schema.required == ["location"]
     assert schema.handler is not None
-    assert schema.transition_to == "next_step"
-    assert schema.transition_callback is None
 
 
 def test_openai_adapter_empty_functions(openai_adapter):
