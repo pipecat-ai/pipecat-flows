@@ -175,14 +175,9 @@ class ActionManager:
                 # Determine if handler can accept flow_manager argument by inspecting its signature
                 # Handlers can either take (action) or (action, flow_manager)
                 try:
-                    handler_positional_arg_count = handler.__code__.co_argcount
-                    if inspect.ismethod(handler) and handler_positional_arg_count > 0:
-                        # adjust for `self` being the first arg
-                        handler_positional_arg_count -= 1
-                    can_handle_flow_manager_arg = (
-                        handler_positional_arg_count > 1 or handler.__code__.co_flags & 0x04
-                    )
-                except AttributeError:
+                    sig = inspect.signature(handler)
+                    can_handle_flow_manager_arg = len(sig.parameters) > 1
+                except (ValueError, TypeError):
                     logger.warning(
                         f"Unable to determine handler signature for action type '{action_type}', "
                         "falling back to legacy single-parameter call"
