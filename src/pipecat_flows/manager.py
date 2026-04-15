@@ -47,7 +47,7 @@ from pipecat.services.settings import LLMSettings
 from pipecat.transports.base_transport import BaseTransport
 
 from pipecat_flows.actions import ActionError, ActionManager
-from pipecat_flows.adapters import create_adapter
+from pipecat_flows.adapters import LLMAdapter
 from pipecat_flows.exceptions import (
     FlowError,
     FlowInitializationError,
@@ -118,7 +118,7 @@ class FlowManager:
         self._task = task
         self._llm = llm
         self._action_manager = ActionManager(task, flow_manager=self)
-        self._adapter = create_adapter(llm, context_aggregator)
+        self._adapter = LLMAdapter()
         self._initialized = False
         self._context_aggregator = context_aggregator
         self._pending_transition: Optional[Dict[str, Any]] = None
@@ -676,28 +676,15 @@ class FlowManager:
                 )
 
             for func_config in functions_list:
-                # Handle direct functions
                 if callable(func_config):
                     await register_direct_function(func_config)
-                # Handle Gemini's nested function declarations as a special case
-                elif (
-                    not isinstance(func_config, FlowsFunctionSchema)
-                    and "function_declarations" in func_config
-                ):
-                    for declaration in func_config["function_declarations"]:
-                        # Convert each declaration to FlowsFunctionSchema and process it
-                        schema = self._adapter.convert_to_function_schema(
-                            {"function_declarations": [declaration]}
-                        )
-                        await register_function_schema(schema)
-                # Convert to FlowsFunctionSchema if needed and process it
+                elif isinstance(func_config, FlowsFunctionSchema):
+                    await register_function_schema(func_config)
                 else:
-                    schema = (
-                        func_config
-                        if isinstance(func_config, FlowsFunctionSchema)
-                        else self._adapter.convert_to_function_schema(func_config)
+                    raise ValueError(
+                        f"Invalid function format in node '{node_id}'. "
+                        "Use FlowsFunctionSchema or direct functions."
                     )
-                    await register_function_schema(schema)
 
             # Create ToolsSchema with standard function schemas
             standard_functions = []
@@ -705,10 +692,7 @@ class FlowManager:
                 # Convert FlowsFunctionSchema to standard FunctionSchema for the LLM
                 standard_functions.append(tool.to_function_schema())
 
-            # Use provider adapter to format tools, passing original configs for Gemini adapter
-            formatted_tools = self._adapter.format_functions(
-                standard_functions, original_configs=functions_list
-            )
+            formatted_tools = self._adapter.format_functions(standard_functions)
 
             role_message = node_config.get("role_message")
             role_messages = node_config.get("role_messages")
@@ -928,38 +912,13 @@ class FlowManager:
 
         # Validate each function configuration if there are any
         for func in functions_list:
-            # If the function is callable, validate using FlowsDirectFunction
             if callable(func):
                 FlowsDirectFunctionWrapper.validate_function(func)
-                continue
-
-            # Extract function name using adapter (handles all formats)
-            try:
-                name = self._adapter.get_function_name(func)
-            except Exception as e:
-                raise ValueError(f"Function in node '{node_id}' has invalid format: {str(e)}")
-
-            # Check for handler depending on format
-            if isinstance(func, FlowsFunctionSchema):
-                has_handler = func.handler is not None
+            elif isinstance(func, FlowsFunctionSchema):
+                if not func.handler:
+                    logger.warning(f"Function '{func.name}' in node '{node_id}' has no handler")
             else:
-                # For dictionary formats, use the provider-specific format checks
-                # OpenAI format
-                if "function" in func:
-                    has_handler = "handler" in func["function"]
-                # Anthropic format
-                elif "name" in func and "input_schema" in func:
-                    has_handler = "handler" in func
-                # Gemini format
-                elif "function_declarations" in func and func["function_declarations"]:
-                    decl = func["function_declarations"][0]
-                    has_handler = "handler" in decl
-                else:
-                    # Unknown format, report error
-                    raise ValueError(
-                        f"Unknown function format for function '{name}' in node '{node_id}'"
-                    )
-
-            # Warn if the function has no handler
-            if not has_handler:
-                logger.warning(f"Function '{name}' in node '{node_id}' has no handler")
+                raise ValueError(
+                    f"Invalid function format in node '{node_id}'. "
+                    "Use FlowsFunctionSchema or direct functions."
+                )

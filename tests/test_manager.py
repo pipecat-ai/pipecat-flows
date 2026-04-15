@@ -79,15 +79,13 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             ],
             "task_messages": [{"role": "developer", "content": "Complete the test task."}],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "test_function",
-                        "handler": AsyncMock(return_value={"status": "success"}),
-                        "description": "Test function",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                }
+                FlowsFunctionSchema(
+                    name="test_function",
+                    description="Test function",
+                    properties={},
+                    required=[],
+                    handler=AsyncMock(return_value={"status": "success"}),
+                ),
             ],
         }
 
@@ -103,20 +101,18 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             context_aggregator=self.mock_context_aggregator,
         )
 
-        # Create test node with transition callback
+        # Create test node
         test_node: NodeConfig = {
             "name": "test",
             "task_messages": [{"role": "developer", "content": "Test message"}],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "test_function",
-                        "description": "Test function",
-                        "parameters": {},
-                        "handler": mock_function,
-                    },
-                }
+                FlowsFunctionSchema(
+                    name="test_function",
+                    description="Test function",
+                    properties={},
+                    required=[],
+                    handler=mock_function,
+                ),
             ],
         }
 
@@ -259,14 +255,13 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         node_config: NodeConfig = {
             "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": f"func_{i}",
-                        "handler": AsyncMock(return_value={"status": "success"}),
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                }
+                FlowsFunctionSchema(
+                    name=f"func_{i}",
+                    description=f"Function {i}",
+                    properties={},
+                    required=[],
+                    handler=AsyncMock(return_value={"status": "success"}),
+                )
                 for i in range(3)
             ],
         }
@@ -458,28 +453,26 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         )
         await flow_manager.initialize()
 
-        # Test function with missing name
+        # Test invalid function format (dict instead of FlowsFunctionSchema)
         invalid_config = {
             "task_messages": [{"role": "developer", "content": "Test"}],
-            "functions": [{"type": "function"}],  # Missing name
+            "functions": [{"type": "function"}],
         }
         with self.assertRaises(FlowError) as context:
             await flow_manager.set_node_from_config(invalid_config)
-        self.assertIn("invalid format", str(context.exception))
+        self.assertIn("Invalid function format", str(context.exception))
 
-        # Test node function without handler or transition_to
+        # Test function without handler
         invalid_config = {
             "name": "test",
             "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "test_func",
-                        "description": "Test",
-                        "parameters": {},
-                    },
-                }
+                FlowsFunctionSchema(
+                    name="test_func",
+                    description="Test",
+                    properties={},
+                    required=[],
+                ),
             ],
         }
 
@@ -574,28 +567,24 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         async def test_handler(args):
             return {"status": "success"}
 
-        # Create node config with OpenAI format for multiple functions
+        # Create node config with multiple FlowsFunctionSchema functions
         node_config: NodeConfig = {
             "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "test1",
-                        "handler": test_handler,
-                        "description": "Test function 1",
-                        "parameters": {},
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "test2",
-                        "handler": test_handler,
-                        "description": "Test function 2",
-                        "parameters": {},
-                    },
-                },
+                FlowsFunctionSchema(
+                    name="test1",
+                    description="Test function 1",
+                    properties={},
+                    required=[],
+                    handler=test_handler,
+                ),
+                FlowsFunctionSchema(
+                    name="test2",
+                    description="Test function 2",
+                    properties={},
+                    required=[],
+                    handler=test_handler,
+                ),
             ],
         }
 
@@ -628,15 +617,13 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             node_config: NodeConfig = {
                 "task_messages": [{"role": "developer", "content": "Test"}],
                 "functions": [
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "test_function",
-                            "handler": "__function__:test_handler_main",
-                            "description": "Test function",
-                            "parameters": {"type": "object", "properties": {}},
-                        },
-                    }
+                    FlowsFunctionSchema(
+                        name="test_function",
+                        description="Test function",
+                        properties={},
+                        required=[],
+                        handler="__function__:test_handler_main",
+                    ),
                 ],
             }
 
@@ -659,15 +646,13 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         node_config: NodeConfig = {
             "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "test_function",
-                        "handler": "__function__:nonexistent_handler",
-                        "description": "Test function",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                }
+                FlowsFunctionSchema(
+                    name="test_function",
+                    description="Test function",
+                    properties={},
+                    required=[],
+                    handler="__function__:nonexistent_handler",
+                ),
             ],
         }
 
@@ -701,15 +686,13 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             node_config: NodeConfig = {
                 "task_messages": [{"role": "developer", "content": "Test"}],
                 "functions": [
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "test_function",
-                            "handler": "__function__:test_handler",
-                            "description": "Test function",
-                            "parameters": {"type": "object", "properties": {}},
-                        },
-                    }
+                    FlowsFunctionSchema(
+                        name="test_function",
+                        description="Test function",
+                        properties={},
+                        required=[],
+                        handler="__function__:test_handler",
+                    ),
                 ],
             }
 
@@ -873,33 +856,27 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             "name": "test",
             "task_messages": [{"role": "developer", "content": "Test"}],
             "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "node_function",
-                        "handler": test_handler,
-                        "description": "Node function",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "edge_function_1",
-                        "handler": consolidated_test_handler_1,
-                        "description": "Edge function",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "edge_function_2",
-                        "handler": consolidated_test_handler_2,
-                        "description": "Edge function",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                },
+                FlowsFunctionSchema(
+                    name="node_function",
+                    description="Node function",
+                    properties={},
+                    required=[],
+                    handler=test_handler,
+                ),
+                FlowsFunctionSchema(
+                    name="edge_function_1",
+                    description="Edge function",
+                    properties={},
+                    required=[],
+                    handler=consolidated_test_handler_1,
+                ),
+                FlowsFunctionSchema(
+                    name="edge_function_2",
+                    description="Edge function",
+                    properties={},
+                    required=[],
+                    handler=consolidated_test_handler_2,
+                ),
             ],
         }
 
