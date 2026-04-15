@@ -77,8 +77,7 @@ class FlowManager:
     with comprehensive action handling and error management.
 
     The manager coordinates all aspects of a conversation including LLM context
-    management, function registration, state transitions, action execution, and
-    provider-specific format handling.
+    management, function registration, state transitions, and action execution.
     """
 
     def __init__(

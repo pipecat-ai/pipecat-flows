@@ -392,9 +392,8 @@ class NodeConfig(NodeConfigRequired, total=False):
             .. deprecated:: 0.0.24
                 Use ``role_message`` (str) instead. Will be removed in 1.0.0.
 
-        functions: List of function definitions in provider-specific format,
-            FunctionSchema, or FlowsFunctionSchema; or a "direct function" whose
-            definition is automatically extracted.
+        functions: List of FlowsFunctionSchema definitions or direct functions
+            whose definitions are automatically extracted from their signatures.
         pre_actions: Actions to execute before LLM inference.
         post_actions: Actions to execute after LLM inference.
         context_strategy: Strategy for updating context during transitions.
