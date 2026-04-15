@@ -15,7 +15,7 @@ the flow manager and Pipecat's universal LLMContext. It handles:
 - Summary generation via out-of-band LLM inference
 """
 
-from typing import Any, List, Optional, Union
+from typing import Any, Optional
 
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
@@ -35,7 +35,7 @@ class LLMAdapter:
 
     def format_functions(
         self,
-        functions: List[Union[FunctionSchema, FlowsFunctionSchema]],
+        functions: list[FunctionSchema | FlowsFunctionSchema],
     ) -> ToolsSchema | NotGiven:
         """Format functions into a ToolsSchema for use in LLMSetToolsFrame.
 

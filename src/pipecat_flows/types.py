@@ -32,7 +32,6 @@ from typing import (
     Protocol,
     Tuple,
     TypedDict,
-    Union,
 )
 
 from pipecat.adapters.schemas.direct_function import BaseDirectFunctionWrapper
@@ -108,7 +107,7 @@ Returns:
 """
 
 
-FunctionHandler = Union[LegacyFunctionHandler, FlowFunctionHandler]
+FunctionHandler = LegacyFunctionHandler | FlowFunctionHandler
 """Union type for function handlers supporting both legacy and modern patterns."""
 
 
@@ -184,7 +183,7 @@ class ActionConfig(ActionConfigRequired, total=False):
         Additional fields are allowed and passed to the handler.
     """
 
-    handler: Union[LegacyActionHandler, FlowActionHandler]
+    handler: LegacyActionHandler | FlowActionHandler
     text: str
 
 
@@ -421,7 +420,7 @@ class NodeConfig(NodeConfigRequired, total=False):
     name: str
     role_message: str
     role_messages: List[Dict[str, Any]]
-    functions: List[Union[Dict[str, Any], FlowsFunctionSchema, FlowsDirectFunction]]
+    functions: list[FlowsFunctionSchema | FlowsDirectFunction]
     pre_actions: List[ActionConfig]
     post_actions: List[ActionConfig]
     context_strategy: ContextStrategyConfig
