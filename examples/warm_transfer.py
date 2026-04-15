@@ -640,6 +640,7 @@ async def main():
             context,
             user_params=LLMUserAggregatorParams(
                 vad_analyzer=SileroVADAnalyzer(),
+                filter_incomplete_user_turns=True,
             ),
         )
 
