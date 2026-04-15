@@ -339,8 +339,7 @@ class FlowManager:
             if handler and callable(handler):
                 self.register_action(action_type, handler)
                 logger.debug(f"Registered action handler from config: {action_type}")
-            # Raise error if no handler provided and not a built-in action
-            elif action_type not in ["tts_say", "end_conversation"]:
+            else:
                 raise ActionError(
                     f"Action '{action_type}' not registered. "
                     "Provide handler in action config or register manually."
