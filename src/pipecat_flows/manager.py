@@ -28,7 +28,7 @@ import asyncio
 import inspect
 import sys
 import warnings
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Set, cast
 
 from loguru import logger
 from pipecat.frames.frames import (
@@ -42,7 +42,7 @@ from pipecat.frames.frames import (
 from pipecat.pipeline.llm_switcher import LLMSwitcher
 from pipecat.pipeline.task import PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.services.llm_service import FunctionCallParams
+from pipecat.services.llm_service import FunctionCallParams, LLMService
 from pipecat.services.settings import LLMSettings
 from pipecat.transports.base_transport import BaseTransport
 
@@ -68,15 +68,6 @@ from pipecat_flows.types import (
     NodeConfig,
     get_or_generate_node_name,
 )
-
-if TYPE_CHECKING:
-    from pipecat.services.anthropic.llm import AnthropicLLMService
-    from pipecat.services.google.llm import GoogleLLMService
-    from pipecat.services.openai.llm import OpenAILLMService
-
-    LLMService = Union[OpenAILLMService, AnthropicLLMService, GoogleLLMService]
-else:
-    LLMService = Any
 
 
 class FlowManager:
