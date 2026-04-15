@@ -9,17 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2026-04-15
 
+Migration guide: https://docs.pipecat.ai/pipecat-flows/migration/migration-1.0
+
+### Added
+
+- `ActionConfig` is now exported from the top-level `pipecat_flows` package.
+
 ### Changed
+
+- **Breaking:** Requires Python >= 3.11 and `pipecat-ai>=1.0.0`.
 
 - ⚠️ All task messages and summary messages now use `"role": "developer"`
   instead of `"role": "user"`. This correctly distinguishes application
-  instructions from actual user speech. The minimum `pipecat-ai` dependency has
-  been bumped to `>=0.0.108` to support the `"developer"` role. If you have
-  custom flows with `"role": "user"` in `task_messages`, consider updating them
-  to `"role": "developer"`.
+  instructions from actual user speech. If you have custom flows with
+  `"role": "user"` in `task_messages`, consider updating them to
+  `"role": "developer"`.
+
+- Validation errors in node configuration now raise `FlowError` or
+  `InvalidFunctionError` instead of `ValueError`.
 
 - Bumped dependency versions for security updates: `loguru`, `docstring_parser`,
   `build`, `pip-tools`, `pre-commit`, `pyright`, `pytest-asyncio`, and `ruff`.
+
+- Examples updated for Pipecat 1.0 patterns and `OpenAIResponsesLLMService`
+  support (set `LLM_PROVIDER=openai_responses`).
 
 ### Deprecated
 
@@ -28,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the strategy is used. To trigger on-demand summarization during a node
   transition, push an `LLMSummarizeContextFrame` in a pre-action. See
   https://docs.pipecat.ai/guides/fundamentals/context-summarization for the
-  full guide. Will be removed in a future version.
+  full guide. Will be removed in 2.0.0.
 
 ### Removed
 
@@ -45,6 +58,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking:** Removed static flows (`FlowConfig` type and `flow_config`
   parameter), deprecated since v0.0.19. Use dynamic flows instead.
+
+- **Breaking:** Removed provider-specific LLM adapters (`OpenAIAdapter`,
+  `AnthropicAdapter`, `GeminiAdapter`, `AWSBedrockAdapter`). A single unified
+  `LLMAdapter` now handles all providers via Pipecat's universal `LLMContext`.
+
+- **Breaking:** Removed `OpenAILLMContext` support. Use Pipecat's universal
+  `LLMContext` exclusively.
+
+- **Breaking:** Removed provider-specific dict format for function definitions.
+  Use `FlowsFunctionSchema` or direct functions.
+
+- Removed `__function__:` token handler lookup pattern (was for static flows).
 
 ## [0.0.24] - 2026-03-20
 
@@ -67,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `role_messages` is deprecated in favor of `role_message` (`str`). The old
   `List[Dict]` format is still supported for backward compatibility but will be
-  removed in 1.0.0.
+  removed in 2.0.0.
 
 ### Fixed
 
