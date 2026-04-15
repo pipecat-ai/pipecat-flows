@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""A dynamic food ordering flow example for Pipecat Flows.
+"""A food ordering flow example for Pipecat Flows.
 
-This example demonstrates a food ordering system using dynamic flows where
+This example demonstrates a food ordering system using flows where
 conversation paths are determined at runtime. The flow handles:
 
 1. Initial greeting and food type selection (pizza or sushi)

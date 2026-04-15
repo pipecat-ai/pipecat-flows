@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""A dynamic restaurant reservation flow example for Pipecat Flows.
+"""A restaurant reservation flow example for Pipecat Flows.
 
-This example demonstrates a restaurant reservation system using dynamic flows where
+This example demonstrates a restaurant reservation system using flows where
 conversation paths are determined at runtime. The flow handles:
 
 1. Greeting and party size collection
@@ -295,7 +295,7 @@ async def run_bot(
 
     task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
 
-    # Initialize flow manager in dynamic mode
+    # Initialize flow manager
     flow_manager = FlowManager(
         task=task,
         llm=llm,

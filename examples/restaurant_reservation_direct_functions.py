@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""A dynamic restaurant reservation flow example using Direct Functions.
+"""A restaurant reservation flow example using Direct Functions.
 
-This example demonstrates a restaurant reservation system using dynamic flows with
+This example demonstrates a restaurant reservation system using flows with
 direct functions where conversation paths are determined at runtime.
 Direct functions combine the function definition and handler in a single function.
 
@@ -279,7 +279,7 @@ async def run_bot(
 
     task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
 
-    # Initialize flow manager in dynamic mode
+    # Initialize flow manager
     flow_manager = FlowManager(
         task=task,
         llm=llm,

@@ -11,7 +11,6 @@ This module defines the core types used throughout the flow system:
 - FlowResult: Function return type
 - FlowArgs: Function argument type
 - NodeConfig: Node configuration type
-- FlowConfig: Complete flow configuration type
 - FlowsFunctionSchema: A uniform schema for function calls in flows
 
 These types provide structure and validation for flow configurations
@@ -77,14 +76,12 @@ Example::
     }
 """
 
-ConsolidatedFunctionResult = Tuple[Optional[FlowResult], Optional[Union["NodeConfig", str]]]
+ConsolidatedFunctionResult = Tuple[Optional[FlowResult], Optional["NodeConfig"]]
 """Return type for "consolidated" functions.
 
 Return type for "consolidated" functions that do either or both of:
 - doing some work
-- specifying the next node to transition to after the work is done, specified as either:
-    - a NodeConfig (for dynamic flows)
-    - a node name (for static flows)
+- specifying the next node to transition to after the work is done
 """
 
 LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult | ConsolidatedFunctionResult]]
@@ -442,41 +439,3 @@ def get_or_generate_node_name(node_config: NodeConfig) -> str:
         Node name from config or generated UUID string.
     """
     return node_config.get("name", str(uuid.uuid4()))
-
-
-class FlowConfig(TypedDict):
-    """Configuration for the entire conversation flow.
-
-    Note:
-        FlowConfig applies to static flows only.
-
-        .. deprecated:: 0.0.19
-            Static flows are deprecated and will be removed in 1.0.0.
-            Use dynamic flows instead.
-
-    Parameters:
-        initial_node: Name of the starting node.
-        nodes: Dictionary mapping node names to their configurations.
-
-    Example::
-
-        {
-            "initial_node": "greeting",
-            "nodes": {
-                "greeting": {
-                    "role_messages": [...],
-                    "task_messages": [...],
-                    "functions": [...],
-                    "pre_actions": [...]
-                },
-                "process_order": {
-                    "task_messages": [...],
-                    "functions": [...],
-                    "post_actions": [...]
-                }
-            }
-        }
-    """
-
-    initial_node: str
-    nodes: Dict[str, NodeConfig]

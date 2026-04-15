@@ -6,11 +6,10 @@
 
 """Core conversation flow management system.
 
-This module provides the FlowManager class which orchestrates conversations
-across different LLM providers. It supports:
+This module provides the FlowManager class which orchestrates
+conversations across different LLM providers. It supports:
 
-- Static flows with predefined paths
-- Dynamic flows with runtime-determined transitions
+- Flows with runtime-determined transitions
 - State management and transitions
 - Function registration and execution
 - Action handling
@@ -62,7 +61,6 @@ from pipecat_flows.types import (
     ContextStrategy,
     ContextStrategyConfig,
     FlowArgs,
-    FlowConfig,
     FlowResult,
     FlowsDirectFunction,
     FlowsDirectFunctionWrapper,
@@ -83,11 +81,10 @@ else:
 
 
 class FlowManager:
-    """Manages conversation flows supporting both static and dynamic configurations.
+    """Manages conversation flows.
 
     The FlowManager orchestrates conversation flows by managing state transitions,
-    function registration, and message handling across different LLM providers.
-    It supports both predefined static flows and runtime-determined dynamic flows
+    function registration, and message handling across different LLM providers,
     with comprehensive action handling and error management.
 
     The manager coordinates all aspects of a conversation including LLM context
@@ -101,7 +98,6 @@ class FlowManager:
         task: PipelineTask,
         llm: LLMService | LLMSwitcher,
         context_aggregator: Any,
-        flow_config: Optional[FlowConfig] = None,
         context_strategy: Optional[ContextStrategyConfig] = None,
         transport: Optional[BaseTransport] = None,
         global_functions: Optional[List[FlowsFunctionSchema | FlowsDirectFunction]] = None,
@@ -112,13 +108,6 @@ class FlowManager:
             task: PipelineTask instance for queueing frames.
             llm: LLM service or LLMSwitcher.
             context_aggregator: Context aggregator for updating user context.
-            flow_config: Static flow configuration. If provided, operates in static
-                mode with predefined nodes.
-
-                .. deprecated:: 0.0.19
-                    Static flows are deprecated and will be removed in 1.0.0.
-                    Use dynamic flows instead.
-
             context_strategy: Context strategy configuration for managing conversation
                 context during transitions.
             transport: Transport instance for communication.
@@ -126,9 +115,6 @@ class FlowManager:
                 that will be available at every node. These functions are registered once
                 during initialization and automatically included alongside node-specific
                 functions.
-
-        Raises:
-            ValueError: If any transition handler is not a valid async callable.
         """
         self._task = task
         self._llm = llm
@@ -142,21 +128,6 @@ class FlowManager:
         )
         self._transport = transport
         self._global_functions = global_functions or []
-
-        # Set up static or dynamic mode
-        if flow_config:
-            warnings.warn(
-                "Static flows are deprecated as of 0.0.19 and will be removed in 1.0.0.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            self._nodes = flow_config["nodes"]
-            self._initial_node = flow_config["initial_node"]
-            logger.debug("Initialized in static mode")
-        else:
-            self._nodes = {}
-            self._initial_node = None
-            logger.debug("Initialized in dynamic mode")
 
         self._state: Dict[str, Any] = {}  # Internal state storage
         self._current_functions: Set[str] = set()  # Track registered functions
@@ -288,27 +259,26 @@ class FlowManager:
         """Initialize the flow manager.
 
         Args:
-            initial_node: Optional initial node configuration for dynamic flows.
+            initial_node: Optional initial node configuration. If provided,
+                the flow will start at this node immediately.
 
         Raises:
             FlowInitializationError: If initialization fails.
 
         Examples:
-            Static flow::
+            Initialize with an initial node::
 
                 flow_manager = FlowManager(
                     ... # Initialization parameters
                 )
-                # Static flow: no initialization args required
-                flow_manager.initialize()
+                await flow_manager.initialize(create_initial_node())
 
-            Dynamic flow::
+            Initialize without an initial node (set later via set_node_from_config)::
 
                 flow_manager = FlowManager(
                     ... # Initialization parameters
                 )
-                # Dynamic flow: Initialize with the initial node configuration
-                flow_manager.initialize(create_initial_node())
+                await flow_manager.initialize()
         """
         if self._initialized:
             logger.warning(f"{self.__class__.__name__} already initialized")
@@ -318,26 +288,12 @@ class FlowManager:
             self._initialized = True
             logger.debug(f"Initialized {self.__class__.__name__}")
 
-            # Set initial node
-            node_name = None
-            node = None
-            if self._initial_node:
-                # Static flow: self._initial_node is expected to be there
-                node_name = self._initial_node
-                node = self._nodes[self._initial_node]
-                if not node:
-                    raise ValueError(
-                        f"Initial node '{self._initial_node}' not found in static flow configuration"
-                    )
-            else:
-                # Dynamic flow: initial_node argument may have been provided (otherwise initial node
-                # will be set later via set_node())
-                if initial_node:
-                    node_name = get_or_generate_node_name(initial_node)
-                    node = initial_node
-            if node_name:
+            # Set initial node if provided (otherwise initial node
+            # will be set later via set_node_from_config())
+            if initial_node:
+                node_name = get_or_generate_node_name(initial_node)
                 logger.debug(f"Setting initial node: {node_name}")
-                await self._set_node(node_name, node)
+                await self._set_node(node_name, initial_node)
 
         except Exception as e:
             self._initialized = False
@@ -543,14 +499,9 @@ class FlowManager:
 
         try:
             if next_node:
-                if isinstance(next_node, str):  # Static flow
-                    node_name = next_node
-                    node = self._nodes[next_node]
-                else:  # Dynamic flow
-                    node_name = get_or_generate_node_name(next_node)
-                    node = next_node
+                node_name = get_or_generate_node_name(next_node)
                 logger.debug(f"Transition to function-returned node: {node_name}")
-                await self._set_node(node_name, node)
+                await self._set_node(node_name, next_node)
         except Exception as e:
             logger.error(f"Error executing transition: {str(e)}")
             raise
@@ -636,7 +587,7 @@ class FlowManager:
     async def set_node_from_config(self, node_config: NodeConfig) -> None:
         """Set up a new conversation node and transition to it.
 
-        Used to manually transition between nodes in a dynamic flow.
+        Used to manually transition between nodes in a flow.
 
         Args:
             node_config: Configuration for the new node.
@@ -991,10 +942,6 @@ class FlowManager:
                 name = self._adapter.get_function_name(func)
             except Exception as e:
                 raise ValueError(f"Function in node '{node_id}' has invalid format: {str(e)}")
-
-            # Skip validation for edge functions (matching node names)
-            if name in self._nodes:
-                continue
 
             # Check for handler depending on format
             if isinstance(func, FlowsFunctionSchema):

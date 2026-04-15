@@ -4,12 +4,12 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""'Warm Handoff' Example using Pipecat Dynamic Flows.
+"""'Warm Handoff' Example using Pipecat Flows.
 
 This example demonstrates how to create a bot that transfers a customer to a human agent when the bot is unable to fulfill the customers's request.
 This example uses:
 - Pipecat Flows for conversation management
-- Dynamic LLM selection (OpenAI, Anthropic, Google, AWS Bedrock)
+- LLM selection (OpenAI, Anthropic, Google, AWS Bedrock)
 - Daily as the transport service
 
 The bot asks how they could be of assistance, and offers to provide information about store location and hours of operation, or begin placing an order.

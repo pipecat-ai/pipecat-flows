@@ -8,14 +8,14 @@
 
 This module contains tests for the FlowManager class, which handles conversation
 flow management across different LLM providers. Tests cover:
-- Static and dynamic flow initialization
+- Flow initialization
 - State transitions and validation
 - Function registration and execution
 - Action handling
 - Error cases
 
 The tests use unittest.IsolatedAsyncioTestCase for async support and
-include mocked dependencies for PipelineTask, LLM services, and TTS.
+include mocked dependencies for PipelineTask and LLM services.
 """
 
 import unittest
@@ -32,7 +32,7 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.settings import LLMSettings
 
 from pipecat_flows.exceptions import FlowError, FlowTransitionError
-from pipecat_flows.manager import FlowConfig, FlowManager, NodeConfig
+from pipecat_flows.manager import FlowManager, NodeConfig
 from pipecat_flows.types import FlowArgs, FlowResult, FlowsFunctionSchema
 from tests.test_helpers import assert_tts_speak_frames_queued, make_mock_task
 
@@ -41,7 +41,7 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
     """Test suite for FlowManager class.
 
     Tests functionality of FlowManager including:
-    - Static and dynamic flow initialization
+    - Flow initialization
     - State transitions
     - Function registration
     - Action execution
@@ -91,31 +91,8 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
             ],
         }
 
-        # Sample static flow configuration
-        self.static_flow_config = {
-            "initial_node": "start",
-            "nodes": {
-                "start": {"name": "start", **self.sample_node},
-                "next_node": {"name": "next_node", **self.sample_node},
-            },
-        }
-
-    async def test_static_flow_initialization(self):
-        """Test initialization of a static flow configuration."""
-        flow_manager = FlowManager(
-            task=self.mock_task,
-            llm=self.mock_llm,
-            context_aggregator=self.mock_context_aggregator,
-            flow_config=FlowConfig(**self.static_flow_config),
-        )
-
-        # Verify static mode setup
-        self.assertEqual(flow_manager._initial_node, "start")
-        self.assertEqual(flow_manager._nodes, self.static_flow_config["nodes"])
-        # No need to check transition_callbacks anymore as they're now inline
-
-    async def test_dynamic_flow_initialization(self):
-        """Test initialization of dynamic flow."""
+    async def test_flow_initialization(self):
+        """Test initialization of flow."""
         # Create mock transition callback
         mock_function = AsyncMock()
 
@@ -149,45 +126,6 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(mock_function.called)  # Shouldn't be called until function is used
         self.assertEqual(flow_manager._current_node, "test")
-
-    @patch("pipecat_flows.manager.LLMRunFrame")
-    async def test_static_flow_transitions(self, mock_llm_run_frame):
-        """Test transitions in static flows."""
-        flow_manager = FlowManager(
-            task=self.mock_task,
-            llm=self.mock_llm,
-            context_aggregator=self.mock_context_aggregator,
-            flow_config=FlowConfig(**self.static_flow_config),
-        )
-
-        # Initialize and transition to first node
-        await flow_manager.initialize()
-        self.assertEqual(flow_manager._current_node, "start")
-
-        # Clear mock call history to focus on transition
-        self.mock_task.queue_frames.reset_mock()
-
-        # In static flows, transitions happen through set_node with a
-        # predefined node configuration from the flow_config
-        await flow_manager.set_node_from_config(flow_manager._nodes["next_node"])
-
-        # Verify node transition occurred
-        self.assertEqual(flow_manager._current_node, "next_node")
-
-        # Verify frame handling
-        # The first call should be for the context update
-        self.assertTrue(self.mock_task.queue_frames.called)
-
-        # Get the first call (context update)
-        first_call = self.mock_task.queue_frames.call_args_list[0]
-        first_frames = first_call[0][0]
-
-        # For subsequent nodes, should use AppendFrame by default
-        append_frames = [f for f in first_frames if isinstance(f, LLMMessagesAppendFrame)]
-        self.assertTrue(len(append_frames) > 0, "Should have at least one AppendFrame")
-
-        # Verify that LLM completion was triggered by checking LLMRunFrame instantiation
-        mock_llm_run_frame.assert_called()
 
     async def test_node_validation(self):
         """Test node configuration validation."""
@@ -1078,14 +1016,12 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Verify that LLM completion was triggered by checking LLMRunFrame instantiation
         mock_llm_run_frame.assert_called_once()
 
-        # Add next node to flow manager's nodes
+        # Test node transition by directly setting next node
         next_node: NodeConfig = {
             "task_messages": [{"role": "developer", "content": "Next test"}],
             "functions": [],
         }
-        flow_manager._nodes["next"] = next_node
 
-        # Test node transition by directly setting next node
         self.mock_task.queue_frames.reset_mock()
         mock_llm_run_frame.reset_mock()
 

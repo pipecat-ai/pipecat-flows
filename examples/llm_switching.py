@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""A dynamic LLM switching flow example for Pipecat Flows.
+"""A LLM switching flow example for Pipecat Flows.
 
 This example demonstrates how to dynamically switch between different LLM providers
 during a conversation using Pipecat's LLMSwitcher.

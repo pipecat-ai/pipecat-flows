@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""A dynamic food ordering flow example using Direct Functions.
+"""A food ordering flow example using Direct Functions.
 
-This example demonstrates a food ordering system using dynamic flows with
+This example demonstrates a food ordering system using flows with
 direct functions where conversation paths are determined at runtime.
 Direct functions combine the function definition and handler in a single function.
 

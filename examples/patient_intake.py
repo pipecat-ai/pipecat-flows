@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""A dynamic patient intake flow example for Pipecat Flows.
+"""A patient intake flow example for Pipecat Flows.
 
-This example demonstrates a medical intake system using dynamic flows where
+This example demonstrates a medical intake system using flows where
 conversation paths are determined at runtime. The flow handles:
 
 1. Patient identity verification through birthday
@@ -489,7 +489,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
 
-    # Initialize flow manager in dynamic mode
+    # Initialize flow manager
     flow_manager = FlowManager(
         task=task,
         llm=llm,
