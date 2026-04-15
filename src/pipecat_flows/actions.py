@@ -26,7 +26,7 @@ Actions are used to perform side effects during conversations, such as:
 import asyncio
 import inspect
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 from pipecat.frames.frames import (
@@ -90,12 +90,12 @@ class ActionManager:
             task: PipelineTask instance used to queue frames.
             flow_manager: FlowManager instance that this ActionManager is part of.
         """
-        self._action_handlers: Dict[str, Callable] = {}
+        self._action_handlers: dict[str, Callable] = {}
         self._task = task
         self._flow_manager = flow_manager
         self._ongoing_actions_count = 0
         self._ongoing_actions_finished_event = asyncio.Event()
-        self._deferred_post_actions: List[ActionConfig] = []
+        self._deferred_post_actions: list[ActionConfig] = []
 
         # Register built-in actions
         self._register_action("tts_say", self._handle_tts_action)
@@ -138,7 +138,7 @@ class ActionManager:
         self._action_handlers[action_type] = handler
         logger.debug(f"Registered handler for action type: {action_type}")
 
-    async def execute_actions(self, actions: Optional[List[ActionConfig]]) -> None:
+    async def execute_actions(self, actions: list[ActionConfig] | None) -> None:
         """Execute a list of actions.
 
         Args:
@@ -175,14 +175,9 @@ class ActionManager:
                 # Determine if handler can accept flow_manager argument by inspecting its signature
                 # Handlers can either take (action) or (action, flow_manager)
                 try:
-                    handler_positional_arg_count = handler.__code__.co_argcount
-                    if inspect.ismethod(handler) and handler_positional_arg_count > 0:
-                        # adjust for `self` being the first arg
-                        handler_positional_arg_count -= 1
-                    can_handle_flow_manager_arg = (
-                        handler_positional_arg_count > 1 or handler.__code__.co_flags & 0x04
-                    )
-                except AttributeError:
+                    sig = inspect.signature(handler)
+                    can_handle_flow_manager_arg = len(sig.parameters) > 1
+                except (ValueError, TypeError):
                     logger.warning(
                         f"Unable to determine handler signature for action type '{action_type}', "
                         "falling back to legacy single-parameter call"
@@ -220,7 +215,7 @@ class ActionManager:
         # before considering this set of actions complete.
         await self._maybe_wait_for_ongoing_actions_to_finish(previous_action_type, None)
 
-    def schedule_deferred_post_actions(self, post_actions: List[ActionConfig]) -> None:
+    def schedule_deferred_post_actions(self, post_actions: list[ActionConfig]) -> None:
         """Schedule "deferred" post-actions to be executed after next LLM completion.
 
         Args:
@@ -240,7 +235,7 @@ class ActionManager:
             await self.execute_actions(actions)
 
     async def _maybe_wait_for_ongoing_actions_to_finish(
-        self, previous_action_type: str, upcoming_action_type: Optional[str]
+        self, previous_action_type: str, upcoming_action_type: str | None
     ) -> None:
         """Wait for ongoing actions to finish before executing the next action if needed.
 

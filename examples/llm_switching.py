@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""A dynamic LLM switching flow example for Pipecat Flows.
+"""A LLM switching flow example for Pipecat Flows.
 
 This example demonstrates how to dynamically switch between different LLM providers
 during a conversation using Pipecat's LLMSwitcher.
@@ -173,7 +173,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        settings=CartesiaTTSService.Settings(
+            voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        ),
     )
 
     # Shared context and aggregators for LLM services
@@ -181,7 +183,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     global context_aggregator
     context_aggregator = LLMContextAggregatorPair(
         context,
-        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(),
+            filter_incomplete_user_turns=True,
+        ),
     )
 
     # LLM services
@@ -211,7 +216,14 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ]
     )
 
-    task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
+    task = PipelineTask(
+        pipeline,
+        params=PipelineParams(
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
+    )
 
     # Initialize flow manager
     flow_manager = FlowManager(

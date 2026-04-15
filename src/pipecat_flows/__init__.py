@@ -6,11 +6,10 @@
 """Pipecat Flows - Structured conversation framework for Pipecat.
 
 This package provides a framework for building structured conversations in Pipecat.
-The FlowManager can handle both static and dynamic conversation flows with support
-for state management, function calling, and cross-provider compatibility.
+The FlowManager handles conversation flows with support for state management,
+function calling, and cross-provider compatibility.
 
-Static flows use predefined conversation paths configured upfront, while dynamic
-flows determine conversation structure at runtime. Both approaches support function
+Pipecat Flows determines conversation structure at runtime, supporting function
 calling, action execution, and seamless transitions between conversation states.
 """
 
@@ -23,11 +22,11 @@ from .exceptions import (
 )
 from .manager import FlowManager
 from .types import (
+    ActionConfig,
     ConsolidatedFunctionResult,
     ContextStrategy,
     ContextStrategyConfig,
     FlowArgs,
-    FlowConfig,
     FlowFunctionHandler,
     FlowResult,
     FlowsDirectFunction,
@@ -41,10 +40,10 @@ __all__ = [
     # Flow Manager
     "FlowManager",
     # Types
+    "ActionConfig",
     "ContextStrategy",
     "ContextStrategyConfig",
     "FlowArgs",
-    "FlowConfig",
     "FlowFunctionHandler",
     "FlowResult",
     "ConsolidatedFunctionResult",

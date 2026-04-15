@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""A dynamic food ordering flow example for Pipecat Flows.
+"""A food ordering flow example for Pipecat Flows.
 
-This example demonstrates a food ordering system using dynamic flows where
+This example demonstrates a food ordering system using flows where
 conversation paths are determined at runtime. The flow handles:
 
 1. Initial greeting and food type selection (pizza or sushi)
@@ -334,7 +334,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
+        settings=CartesiaTTSService.Settings(
+            voice="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
+        ),
     )
     # LLM service is created using the create_llm function from utils.py
     # Default is OpenAI; can be changed by setting LLM_PROVIDER environment variable
@@ -344,7 +346,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     context_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
-            vad_analyzer=SileroVADAnalyzer(), filter_incomplete_user_turns=True
+            vad_analyzer=SileroVADAnalyzer(),
+            filter_incomplete_user_turns=True,
         ),
     )
 
@@ -360,7 +363,14 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ]
     )
 
-    task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
+    task = PipelineTask(
+        pipeline,
+        params=PipelineParams(
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
+    )
 
     # Define "global" functions available at every node
     async def get_delivery_estimate(

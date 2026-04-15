@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""A dynamic patient intake flow example for Pipecat Flows.
+"""A patient intake flow example for Pipecat Flows.
 
-This example demonstrates a medical intake system using dynamic flows where
+This example demonstrates a medical intake system using flows where
 conversation paths are determined at runtime. The flow handles:
 
 1. Patient identity verification through birthday
@@ -463,7 +463,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        settings=CartesiaTTSService.Settings(
+            voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        ),
     )
     # LLM service is created using the create_llm function from utils.py
     # Default is OpenAI; can be changed by setting LLM_PROVIDER environment variable
@@ -472,7 +474,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     context = LLMContext()
     context_aggregator = LLMContextAggregatorPair(
         context,
-        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(),
+            filter_incomplete_user_turns=True,
+        ),
     )
 
     pipeline = Pipeline(
@@ -487,9 +492,16 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ]
     )
 
-    task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
+    task = PipelineTask(
+        pipeline,
+        params=PipelineParams(
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
+    )
 
-    # Initialize flow manager in dynamic mode
+    # Initialize flow manager
     flow_manager = FlowManager(
         task=task,
         llm=llm,

@@ -4,12 +4,12 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""'Warm Handoff' Example using Pipecat Dynamic Flows.
+"""'Warm Handoff' Example using Pipecat Flows.
 
 This example demonstrates how to create a bot that transfers a customer to a human agent when the bot is unable to fulfill the customers's request.
 This example uses:
 - Pipecat Flows for conversation management
-- Dynamic LLM selection (OpenAI, Anthropic, Google, AWS Bedrock)
+- LLM selection (OpenAI, Anthropic, Google, AWS Bedrock)
 - Daily as the transport service
 
 The bot asks how they could be of assistance, and offers to provide information about store location and hours of operation, or begin placing an order.
@@ -60,7 +60,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.runner.daily import configure
-from pipecat.services.cartesia.tts import CartesiaHttpTTSService
+from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 from pipecat.transports.daily.utils import (
@@ -626,9 +626,11 @@ async def main():
             ),
         )
         stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-        tts = CartesiaHttpTTSService(
+        tts = CartesiaTTSService(
             api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="d46abd1d-2d02-43e8-819f-51fb652c1c61",  # Newsman
+            settings=CartesiaTTSService.Settings(
+                voice="d46abd1d-2d02-43e8-819f-51fb652c1c61",  # Newsman
+            ),
         )
         llm = create_llm()
 
@@ -638,6 +640,7 @@ async def main():
             context,
             user_params=LLMUserAggregatorParams(
                 vad_analyzer=SileroVADAnalyzer(),
+                filter_incomplete_user_turns=True,
             ),
         )
 
@@ -653,7 +656,14 @@ async def main():
                 context_aggregator.assistant(),
             ]
         )
-        task = PipelineTask(pipeline=pipeline, params=PipelineParams(allow_interruptions=True))
+
+        task = PipelineTask(
+            pipeline,
+            params=PipelineParams(
+                enable_metrics=True,
+                enable_usage_metrics=True,
+            ),
+        )
 
         # Initialize flow manager
         flow_manager = FlowManager(

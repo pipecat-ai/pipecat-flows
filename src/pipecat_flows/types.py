@@ -11,7 +11,6 @@ This module defines the core types used throughout the flow system:
 - FlowResult: Function return type
 - FlowArgs: Function argument type
 - NodeConfig: Node configuration type
-- FlowConfig: Complete flow configuration type
 - FlowsFunctionSchema: A uniform schema for function calls in flows
 
 These types provide structure and validation for flow configurations
@@ -26,15 +25,10 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Dict,
-    List,
     Mapping,
-    Optional,
     Protocol,
-    Tuple,
+    Required,
     TypedDict,
-    TypeVar,
-    Union,
 )
 
 from pipecat.adapters.schemas.direct_function import BaseDirectFunctionWrapper
@@ -44,18 +38,6 @@ from pipecat_flows.exceptions import InvalidFunctionError
 
 if TYPE_CHECKING:
     from pipecat_flows.manager import FlowManager
-
-T = TypeVar("T")
-TransitionHandler = Callable[[Dict[str, T], "FlowManager"], Awaitable[None]]
-"""Type for transition handler functions.
-
-Args:
-    args: Dictionary of arguments from the function call
-    flow_manager: Reference to the FlowManager instance
-
-Returns:
-    None: Handlers are expected to update state and set next node
-"""
 
 
 class FlowResult(TypedDict, total=False):
@@ -78,7 +60,7 @@ class FlowResult(TypedDict, total=False):
     error: str
 
 
-FlowArgs = Dict[str, Any]
+FlowArgs = dict[str, Any]
 """Type alias for function handler arguments.
 
 Example::
@@ -90,14 +72,12 @@ Example::
     }
 """
 
-ConsolidatedFunctionResult = Tuple[Optional[FlowResult], Optional[Union["NodeConfig", str]]]
+ConsolidatedFunctionResult = tuple[FlowResult | None, "NodeConfig | None"]
 """Return type for "consolidated" functions.
 
 Return type for "consolidated" functions that do either or both of:
 - doing some work
-- specifying the next node to transition to after the work is done, specified as either:
-    - a NodeConfig (for dynamic flows)
-    - a node name (for static flows)
+- specifying the next node to transition to after the work is done
 """
 
 LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult | ConsolidatedFunctionResult]]
@@ -124,7 +104,7 @@ Returns:
 """
 
 
-FunctionHandler = Union[LegacyFunctionHandler, FlowFunctionHandler]
+FunctionHandler = LegacyFunctionHandler | FlowFunctionHandler
 """Union type for function handlers supporting both legacy and modern patterns."""
 
 
@@ -152,7 +132,7 @@ class FlowsDirectFunction(Protocol):
         ...
 
 
-LegacyActionHandler = Callable[[Dict[str, Any]], Awaitable[None]]
+LegacyActionHandler = Callable[[dict[str, Any]], Awaitable[None]]
 """Legacy action handler type that only receives the action dictionary.
 
 Args:
@@ -164,7 +144,7 @@ Example::
         await notify(action["text"])
 """
 
-FlowActionHandler = Callable[[Dict[str, Any], "FlowManager"], Awaitable[None]]
+FlowActionHandler = Callable[[dict[str, Any], "FlowManager"], Awaitable[None]]
 """Modern action handler type that receives both action and flow_manager.
 
 Args:
@@ -178,17 +158,7 @@ Example::
 """
 
 
-class ActionConfigRequired(TypedDict):
-    """Required fields for action configuration.
-
-    Parameters:
-        type: Action type identifier.
-    """
-
-    type: str
-
-
-class ActionConfig(ActionConfigRequired, total=False):
+class ActionConfig(TypedDict, total=False):
     """Configuration for an action.
 
     Parameters:
@@ -200,7 +170,8 @@ class ActionConfig(ActionConfigRequired, total=False):
         Additional fields are allowed and passed to the handler.
     """
 
-    handler: Union[LegacyActionHandler, FlowActionHandler]
+    type: Required[str]
+    handler: LegacyActionHandler | FlowActionHandler
     text: str
 
 
@@ -212,12 +183,12 @@ class ContextStrategy(Enum):
         RESET: Reset context with new messages only.
         RESET_WITH_SUMMARY: Reset context but include an LLM-generated summary.
 
-            .. deprecated:: 0.0.25
+            .. deprecated:: 1.0.0
                 Use Pipecat's native context summarization instead. To trigger
                 on-demand summarization during a node transition, push an
                 ``LLMSummarizeContextFrame`` in a pre-action. See
                 https://docs.pipecat.ai/guides/fundamentals/context-summarization
-                Will be removed in a future version.
+                Will be removed in 2.0.0.
     """
 
     APPEND = "append"
@@ -233,14 +204,14 @@ class ContextStrategyConfig:
         strategy: Strategy to use for context management.
         summary_prompt: Required prompt text when using RESET_WITH_SUMMARY.
 
-            .. deprecated:: 0.0.25
+            .. deprecated:: 1.0.0
                 Deprecated along with RESET_WITH_SUMMARY. Use
                 ``LLMContextSummaryConfig.summarization_prompt`` instead.
-                Will be removed in a future version.
+                Will be removed in 2.0.0.
     """
 
     strategy: ContextStrategy
-    summary_prompt: Optional[str] = None
+    summary_prompt: str | None = None
 
     def __post_init__(self):
         """Validate configuration.
@@ -266,40 +237,18 @@ class FlowsFunctionSchema:
         required: List of required parameter names.
         handler: Function handler to process the function call.
         cancel_on_interruption: Whether to cancel this function call when an
-            interruption occurs. Defaults to True.
+            interruption occurs. Defaults to False.
         timeout_secs: Optional per-tool timeout in seconds, overriding the global
             ``function_call_timeout_secs``. Defaults to None (use global timeout).
-        transition_to: Target node to transition to after function execution.
-
-            .. deprecated:: 0.0.18
-                Use a "consolidated" handler that returns a tuple (result, next_node) instead.
-                This field is deprecated and will be removed in 1.0.0.
-
-        transition_callback: Callback function for dynamic transitions.
-
-            .. deprecated:: 0.0.18
-                Use a "consolidated" handler that returns a tuple (result, next_node) instead.
-                This field is deprecated and will be removed in 1.0.0.
     """
 
     name: str
     description: str
-    properties: Dict[str, Any]
-    required: List[str]
-    handler: Optional[FunctionHandler] = None
+    properties: dict[str, Any]
+    required: list[str]
+    handler: FunctionHandler | None = None
     cancel_on_interruption: bool = False
-    timeout_secs: Optional[float] = None
-    transition_to: Optional[str] = None
-    transition_callback: Optional[Callable] = None
-
-    def __post_init__(self):
-        """Validate the schema configuration.
-
-        Raises:
-            ValueError: If both transition_to and transition_callback are specified.
-        """
-        if self.transition_to and self.transition_callback:
-            raise ValueError("Cannot specify both transition_to and transition_callback")
+    timeout_secs: float | None = None
 
     def to_function_schema(self) -> FunctionSchema:
         """Convert to a standard FunctionSchema for use with LLMs.
@@ -316,7 +265,7 @@ class FlowsFunctionSchema:
 
 
 def flows_direct_function(
-    *, cancel_on_interruption: bool = False, timeout_secs: Optional[float] = None
+    *, cancel_on_interruption: bool = False, timeout_secs: float | None = None
 ) -> Callable[[Callable], Callable]:
     """Decorator to attach additional metadata to a Pipecat direct function.
 
@@ -325,7 +274,7 @@ def flows_direct_function(
 
     Args:
         cancel_on_interruption: Whether to cancel the function call when the user
-            interrupts. Defaults to True.
+            interrupts. Defaults to False.
         timeout_secs: Optional per-tool timeout in seconds, overriding the global
             ``function_call_timeout_secs``. Defaults to None (use global timeout).
 
@@ -388,7 +337,7 @@ class FlowsDirectFunctionWrapper(BaseDirectFunctionWrapper):
         super()._initialize_metadata()
         # Read Flows-specific metadata from decorator (falling back to fields'
         # defaults for backward compatibility)
-        self.cancel_on_interruption = getattr(self.function, "_flows_cancel_on_interruption", True)
+        self.cancel_on_interruption = getattr(self.function, "_flows_cancel_on_interruption", False)
         self.timeout_secs = getattr(self.function, "_flows_timeout_secs", None)
 
     async def invoke(self, args: Mapping[str, Any], flow_manager: "FlowManager"):
@@ -404,17 +353,7 @@ class FlowsDirectFunctionWrapper(BaseDirectFunctionWrapper):
         return await self.function(flow_manager=flow_manager, **args)
 
 
-class NodeConfigRequired(TypedDict):
-    """Required fields for node configuration.
-
-    Parameters:
-        task_messages: List of message dicts defining the current node's objectives.
-    """
-
-    task_messages: List[dict]
-
-
-class NodeConfig(NodeConfigRequired, total=False):
+class NodeConfig(TypedDict, total=False):
     """Configuration for a single node in the flow.
 
     Parameters:
@@ -428,11 +367,10 @@ class NodeConfig(NodeConfigRequired, total=False):
         role_messages: Deprecated list-of-dicts format for the bot's role/personality.
 
             .. deprecated:: 0.0.24
-                Use ``role_message`` (str) instead. Will be removed in 1.0.0.
+                Use ``role_message`` (str) instead. Will be removed in 2.0.0.
 
-        functions: List of function definitions in provider-specific format,
-            FunctionSchema, or FlowsFunctionSchema; or a "direct function" whose
-            definition is automatically extracted.
+        functions: List of FlowsFunctionSchema definitions or direct functions
+            whose definitions are automatically extracted from their signatures.
         pre_actions: Actions to execute before LLM inference.
         post_actions: Actions to execute after LLM inference.
         context_strategy: Strategy for updating context during transitions.
@@ -457,12 +395,13 @@ class NodeConfig(NodeConfigRequired, total=False):
         }
     """
 
+    task_messages: Required[list[dict]]
     name: str
     role_message: str
-    role_messages: List[Dict[str, Any]]
-    functions: List[Union[Dict[str, Any], FlowsFunctionSchema, FlowsDirectFunction]]
-    pre_actions: List[ActionConfig]
-    post_actions: List[ActionConfig]
+    role_messages: list[dict[str, Any]]
+    functions: list[FlowsFunctionSchema | FlowsDirectFunction]
+    pre_actions: list[ActionConfig]
+    post_actions: list[ActionConfig]
     context_strategy: ContextStrategyConfig
     respond_immediately: bool
 
@@ -477,41 +416,3 @@ def get_or_generate_node_name(node_config: NodeConfig) -> str:
         Node name from config or generated UUID string.
     """
     return node_config.get("name", str(uuid.uuid4()))
-
-
-class FlowConfig(TypedDict):
-    """Configuration for the entire conversation flow.
-
-    Note:
-        FlowConfig applies to static flows only.
-
-        .. deprecated:: 0.0.19
-            Static flows are deprecated and will be removed in 1.0.0.
-            Use dynamic flows instead.
-
-    Parameters:
-        initial_node: Name of the starting node.
-        nodes: Dictionary mapping node names to their configurations.
-
-    Example::
-
-        {
-            "initial_node": "greeting",
-            "nodes": {
-                "greeting": {
-                    "role_messages": [...],
-                    "task_messages": [...],
-                    "functions": [...],
-                    "pre_actions": [...]
-                },
-                "process_order": {
-                    "task_messages": [...],
-                    "functions": [...],
-                    "post_actions": [...]
-                }
-            }
-        }
-    """
-
-    initial_node: str
-    nodes: Dict[str, NodeConfig]
