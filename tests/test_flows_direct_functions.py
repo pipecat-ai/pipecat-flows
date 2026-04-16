@@ -69,7 +69,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
         self.assertEqual(func.properties, {})
 
         async def my_function_simple_params(
-            flow_manager: FlowManager, name: str, age: int, height: Union[float, None]
+            flow_manager: FlowManager, name: str, age: int, height: float | None
         ):
             return {"status": "success"}, None
 
@@ -88,7 +88,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
             flow_manager: FlowManager,
             address_lines: list[str],
             nickname: str | int | float,
-            extra: Optional[dict[str, str]],
+            extra: dict[str, str] | None,
         ):
             return {"status": "success"}, None
 
@@ -159,7 +159,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
         self.assertEqual(func.required, [])
 
         async def my_function_simple_params(
-            flow_manager: FlowManager, name: str, age: int, height: Union[float, None] = None
+            flow_manager: FlowManager, name: str, age: int, height: float | None = None
         ):
             return {"status": "success"}, None
 
@@ -169,9 +169,9 @@ class TestFlowsDirectFunction(unittest.TestCase):
 
         async def my_function_complex_params(
             flow_manager: FlowManager,
-            address_lines: Optional[list[str]],
+            address_lines: list[str] | None,
             nickname: str | int = "Bud",
-            extra: Optional[dict[str, str]] = None,
+            extra: dict[str, str] | None = None,
         ):
             return {"status": "success"}, None
 
@@ -182,9 +182,7 @@ class TestFlowsDirectFunction(unittest.TestCase):
     def test_property_descriptions_are_set_from_function(self):
         """Test that FlowsDirectFunction extracts the property descriptions from the function."""
 
-        async def my_function(
-            flow_manager: FlowManager, name: str, age: int, height: Union[float, None]
-        ):
+        async def my_function(flow_manager: FlowManager, name: str, age: int, height: float | None):
             """
             This is a test function.
 

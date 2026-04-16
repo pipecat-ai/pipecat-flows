@@ -18,14 +18,12 @@ and function interactions.
 """
 
 import uuid
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
-    Mapping,
     Protocol,
     Required,
     TypedDict,

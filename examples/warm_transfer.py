@@ -45,7 +45,7 @@ import atexit
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import aiohttp
 from dotenv import load_dotenv
@@ -676,7 +676,7 @@ async def main():
         # Set up event handlers
         @transport.event_handler("on_first_participant_joined")
         async def on_first_participant_joined(
-            transport: DailyTransport, participant: Dict[str, Any]
+            transport: DailyTransport, participant: dict[str, Any]
         ):
             """Start the flow.
             We're assuming the first participant is the customer and not the human agent.
@@ -686,7 +686,7 @@ async def main():
             await flow_manager.initialize(create_initial_customer_interaction_node())
 
         @transport.event_handler("on_participant_joined")
-        async def on_participant_joined(transport: DailyTransport, participant: Dict[str, Any]):
+        async def on_participant_joined(transport: DailyTransport, participant: dict[str, Any]):
             """Handle the human agent maybe having joined the call:
             - If the participant who joined is the human agent and we're currently in the "transferring_to_human_agent" node, go to the "human_agent_interaction" node.
             - Otherwise...nothing, for the purposes of this demo. We're assuming the human agent won't join while the conversation flow is any other node.
@@ -697,7 +697,7 @@ async def main():
 
         @transport.event_handler("on_participant_left")
         async def on_participant_left(
-            transport: DailyTransport, participant: Dict[str, Any], reason: str
+            transport: DailyTransport, participant: dict[str, Any], reason: str
         ):
             # NOTE: an opportunity for refinement here is to handle the customer leaving while on
             # hold, informing the human agent if needed

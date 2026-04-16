@@ -264,7 +264,7 @@ def create_quote_calculation_node(age: int, marital_status: str) -> NodeConfig:
 
 
 def create_quote_results_node(
-    quote: Union[QuoteCalculationResult, CoverageUpdateResult],
+    quote: QuoteCalculationResult | CoverageUpdateResult,
 ) -> NodeConfig:
     """Create node for showing quote and adjustment options."""
     return {

@@ -27,7 +27,8 @@ The flow manager coordinates all aspects of a conversation, including:
 import asyncio
 import inspect
 import warnings
-from typing import Any, Callable, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 from loguru import logger
 from pipecat.frames.frames import (
@@ -795,7 +796,7 @@ class FlowManager:
                         )
                         update_config.strategy = ContextStrategy.APPEND
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning("Summary generation timed out, falling back to APPEND strategy")
                     update_config.strategy = ContextStrategy.APPEND
 

@@ -25,8 +25,9 @@ Actions are used to perform side effects during conversations, such as:
 
 import asyncio
 import inspect
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from loguru import logger
 from pipecat.frames.frames import (
