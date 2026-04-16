@@ -836,6 +836,79 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         # Edge functions should set run_llm=False
         self.assertTrue(edge_properties_2 is not None and edge_properties_2.run_llm is False)
 
+    async def test_parallel_node_functions_defer_run_llm(self):
+        """Test that parallel node functions defer run_llm to pipecat's default."""
+        flow_manager = FlowManager(
+            task=self.mock_task,
+            llm=self.mock_llm,
+            context_aggregator=self.mock_context_aggregator,
+        )
+        await flow_manager.initialize()
+
+        async def handler_1(args):
+            return {"status": "success", "function": "func_1"}
+
+        async def handler_2(args):
+            return {"status": "success", "function": "func_2"}
+
+        node_config: NodeConfig = {
+            "task_messages": [{"role": "system", "content": "Test"}],
+            "functions": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "node_func_1",
+                        "handler": handler_1,
+                        "description": "Node function 1",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "node_func_2",
+                        "handler": handler_2,
+                        "description": "Node function 2",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                },
+            ],
+        }
+
+        await flow_manager.set_node_from_config(node_config)
+
+        func1 = None
+        func2 = None
+        for call_args in self.mock_llm.register_function.call_args_list:
+            name, func = call_args[0]
+            if name == "node_func_1":
+                func1 = func
+            elif name == "node_func_2":
+                func2 = func
+
+        self.assertIsNotNone(func1)
+        self.assertIsNotNone(func2)
+
+        properties_1 = None
+        properties_2 = None
+
+        async def callback_1(result, *, properties=None):
+            nonlocal properties_1
+            properties_1 = properties
+
+        async def callback_2(result, *, properties=None):
+            nonlocal properties_2
+            properties_2 = properties
+
+        await func1(FunctionCallParams("node_func_1", "id1", {}, None, None, callback_1))
+        await func2(FunctionCallParams("node_func_2", "id2", {}, None, None, callback_2))
+
+        # Node functions should not override pipecat's default run_llm behavior
+        self.assertIsNotNone(properties_1)
+        self.assertIsNone(properties_1.run_llm)
+        self.assertIsNotNone(properties_2)
+        self.assertIsNone(properties_2.run_llm)
+
     @patch("pipecat_flows.manager.LLMRunFrame")
     async def test_completion_timing(self, mock_llm_run_frame):
         """Test that completions occur at the right time."""
