@@ -18,7 +18,7 @@ main, maps changed source files to their corresponding doc pages, and makes targ
 ### Step 1: Resolve docs path
 
 - If `DOCS_PATH` is provided as an argument, use it. Otherwise ask the user.
-- Verify the path exists and contains a `server/frameworks/flows/` subdirectory.
+- Verify the path exists and contains an `api-reference/pipecat-flows/` subdirectory.
 - If verification fails, stop and report the error.
 
 ### Step 2: Create docs branch
@@ -40,7 +40,7 @@ main, maps changed source files to their corresponding doc pages, and makes targ
 ### Step 4: Map source files to doc pages
 
 - Read `.claude/skills/update-docs/SOURCE_DOC_MAPPING.md`.
-- For each changed source file, look up its doc page(s) in the Direct Mapping table.
+- For each changed source file, look up its doc page(s) in the API Reference Pages and Guide Pages tables.
 - Collect the unique set of doc pages to update.
 
 ### Step 5: Analyze each source-doc pair
@@ -51,11 +51,11 @@ For each changed source file and its mapped doc page(s):
 2. Read the diff: `git diff main..HEAD -- src/pipecat_flows/<file>`
 3. Read the current doc page in full.
 4. Compare based on file type:
-   - **types.py** — Class fields, type signatures, type aliases vs. `<ParamField>` entries and type sections in `types.mdx`.
-   - **manager.py** — `FlowManager.__init__` parameters and methods vs. `<ParamField>` entries in `flow-manager.mdx`.
-   - **actions.py** — `register_action` signature, built-in action types vs. action sections in `flow-manager.mdx` and `types.mdx`.
-   - **adapters.py** — Supported LLM providers vs. LLM Provider Support table in `pipecat-flows.mdx`.
-   - **exceptions.py** — Exception class hierarchy and docstrings vs. `exceptions.mdx`.
+   - **types.py** — Class fields, type signatures, type aliases vs. `<ParamField>` entries and type sections in `api-reference/pipecat-flows/types.mdx`. Also check guide pages: `nodes-and-messages.mdx`, `functions.mdx`, `context-strategies.mdx`.
+   - **manager.py** — `FlowManager.__init__` parameters and methods vs. `<ParamField>` entries in `api-reference/pipecat-flows/flow-manager.mdx`. Also check `state-management.mdx`.
+   - **actions.py** — `register_action` signature, built-in action types vs. action sections in `api-reference/pipecat-flows/flow-manager.mdx` and `api-reference/pipecat-flows/types.mdx`. Also check `actions.mdx`.
+   - **adapters.py** — Supported LLM providers vs. LLM Provider Support table in `api-reference/pipecat-flows/overview.mdx`. Also check Cross-Provider Compatibility in `nodes-and-messages.mdx`.
+   - **exceptions.py** — Exception class hierarchy and docstrings vs. `api-reference/pipecat-flows/exceptions.mdx`.
 5. Also check: class names, imports, default values, and behavioral changes noted in docstrings.
 
 ### Step 6: Make targeted edits
@@ -69,13 +69,13 @@ Apply these conservative rules:
 - **Preserve CardGroup, links, and examples** — do not restructure page layout.
 - **Don't touch frontmatter** unless a class or module was renamed.
 
-### Step 7: Update guide
+### Step 7: Check guide pages
 
-- Check only one guide: `DOCS_PATH/guides/features/pipecat-flows.mdx`.
 - For each changed source file, collect class names, renamed parameters, and changed imports from the diff.
-- Search the guide for references to these identifiers.
-- If the guide references a changed API: read the full guide, update the specific references.
+- Check each mapped guide page (see SOURCE_DOC_MAPPING.md Guide Pages table) for references to these identifiers.
+- If a guide references a changed API: read the full guide, update the specific references.
 - If the guide only references concepts generally (not the specific changed APIs): leave it alone.
+- Also check `quickstart.mdx` if FlowManager init, FlowsFunctionSchema, or handler return types changed.
 
 ### Step 8: Output summary
 
@@ -85,16 +85,16 @@ Print a summary in this format:
 ## Documentation Updates
 
 ### Updated reference pages
-- `server/frameworks/flows/types.mdx` — <brief description of changes>
+- `api-reference/pipecat-flows/types.mdx` — <brief description of changes>
 
-### Updated guide
-- `guides/features/pipecat-flows.mdx` — <brief description of changes>
+### Updated guide pages
+- `pipecat-flows/guides/functions.mdx` — <brief description of changes>
 
 ### Skipped files
 - `src/pipecat_flows/__init__.py` — re-exports only
 
 ### No changes needed
-- `server/frameworks/flows/exceptions.mdx` — already up to date
+- `api-reference/pipecat-flows/exceptions.mdx` — already up to date
 ```
 
 ## Guidelines
@@ -114,4 +114,4 @@ Before finishing, verify:
 - [ ] No content removed unless corresponding source was removed
 - [ ] New parameters have accurate types and defaults from source
 - [ ] Formatting matches existing page style
-- [ ] Guide checked and updated if it references changed APIs
+- [ ] Guide pages checked and updated if they reference changed APIs
