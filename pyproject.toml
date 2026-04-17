@@ -59,12 +59,6 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 
-[tool.pyright]
-include = ["src"]
-pythonVersion = "3.11"
-typeCheckingMode = "basic"
-reportMissingImports = "error"
-
 [tool.ruff]
 exclude = [".git"]
 line-length = 100
