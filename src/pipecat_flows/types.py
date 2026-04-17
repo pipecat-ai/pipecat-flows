@@ -39,24 +39,18 @@ if TYPE_CHECKING:
 
 
 class FlowResult(TypedDict, total=False):
-    """Optional convenience type for structured function results.
+    """Optional convention TypedDict for ``status``/``error`` results.
 
-    Handlers may return any JSON-serializable value; this TypedDict is provided
-    as a documented convention for handlers that want a structured ``status`` /
-    ``error`` shape. It is not required. Aligns with Pipecat's upstream typing
-    of function-call results as ``Any``.
+    .. deprecated:: 1.x.0
+        ``FlowResult`` is no longer required or referenced by any handler type
+        in the library, and Pipecat's upstream function-call-result contract is
+        ``Any``. Define your own ``TypedDict`` if you want a structured result,
+        or return any JSON-serializable value. ``FlowResult`` will be removed
+        in 2.0.0.
 
     Parameters:
         status: Status of the function execution.
         error: Optional error message if execution failed.
-
-    Example::
-
-        {
-            "status": "success",
-            "data": {"processed": True},
-            "error": None  # Optional error message
-        }
     """
 
     status: str
