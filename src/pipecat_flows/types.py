@@ -148,6 +148,10 @@ class FlowsDirectFunction(Protocol):
 LegacyActionHandler = Callable[[dict[str, Any]], Awaitable[None]]
 """Legacy action handler type that only receives the action dictionary.
 
+.. deprecated:: 1.x.0
+    Use :data:`FlowActionHandler` (``(action, flow_manager)``) instead. Will be
+    removed in 2.0.0.
+
 Args:
     action: Dictionary containing action configuration and parameters.
 

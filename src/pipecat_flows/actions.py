@@ -25,6 +25,7 @@ Actions are used to perform side effects during conversations, such as:
 
 import asyncio
 import inspect
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -97,6 +98,7 @@ class ActionManager:
         self._ongoing_actions_count = 0
         self._ongoing_actions_finished_event = asyncio.Event()
         self._deferred_post_actions: list[ActionConfig] = []
+        self._showed_deprecation_warning_for_legacy_action_handler = False
 
         # Register built-in actions
         self._register_action("tts_say", self._handle_tts_action)
@@ -192,6 +194,15 @@ class ActionManager:
                     else:
                         handler(action, self._flow_manager)
                 else:
+                    if not self._showed_deprecation_warning_for_legacy_action_handler:
+                        self._showed_deprecation_warning_for_legacy_action_handler = True
+                        warnings.warn(
+                            "Single-argument (legacy) action handlers are deprecated "
+                            "and will be removed in 2.0.0. Update handlers to accept "
+                            "(action: dict, flow_manager: FlowManager) instead.",
+                            DeprecationWarning,
+                            stacklevel=2,
+                        )
                     if asyncio.iscoroutinefunction(handler):
                         await handler(action)
                     else:
