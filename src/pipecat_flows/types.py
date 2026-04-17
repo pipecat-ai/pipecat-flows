@@ -39,7 +39,12 @@ if TYPE_CHECKING:
 
 
 class FlowResult(TypedDict, total=False):
-    """Base type for function results.
+    """Optional convenience type for structured function results.
+
+    Handlers may return any JSON-serializable value; this TypedDict is provided
+    as a documented convention for handlers that want a structured ``status`` /
+    ``error`` shape. It is not required. Aligns with Pipecat's upstream typing
+    of function-call results as ``Any``.
 
     Parameters:
         status: Status of the function execution.
@@ -75,15 +80,20 @@ Example::
     }
 """
 
-ConsolidatedFunctionResult = tuple[FlowResult | None, "NodeConfig | None"]
+ConsolidatedFunctionResult = tuple[Any, "NodeConfig | None"]
 """Return type for "consolidated" functions.
 
 Return type for "consolidated" functions that do either or both of:
 - doing some work
 - specifying the next node to transition to after the work is done
+
+The first tuple element is the function-call result delivered to the LLM.
+Any JSON-serializable value is accepted (matching Pipecat's upstream
+``FunctionCallResultCallback`` contract). Pass ``None`` to signal a
+transition-only handler; FlowManager substitutes an acknowledgement result.
 """
 
-ZeroArgFunctionHandler = Callable[[], Awaitable[FlowResult | ConsolidatedFunctionResult]]
+ZeroArgFunctionHandler = Callable[[], Awaitable[Any]]
 """Function handler that takes no arguments.
 
 .. deprecated:: 1.x.0
@@ -91,10 +101,11 @@ ZeroArgFunctionHandler = Callable[[], Awaitable[FlowResult | ConsolidatedFunctio
     removed in 2.0.0.
 
 Returns:
-    FlowResult: Result of the function execution.
+    Any JSON-serializable value, or a :data:`ConsolidatedFunctionResult`
+    tuple to also specify the next node.
 """
 
-LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult | ConsolidatedFunctionResult]]
+LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[Any]]
 """Legacy function handler that only receives arguments.
 
 .. deprecated:: 1.x.0
@@ -105,12 +116,11 @@ Args:
     args: Dictionary of arguments from the function call.
 
 Returns:
-    FlowResult: Result of the function execution.
+    Any JSON-serializable value, or a :data:`ConsolidatedFunctionResult`
+    tuple to also specify the next node.
 """
 
-FlowFunctionHandler = Callable[
-    [FlowArgs, "FlowManager"], Awaitable[FlowResult | ConsolidatedFunctionResult]
-]
+FlowFunctionHandler = Callable[[FlowArgs, "FlowManager"], Awaitable[Any]]
 """Modern function handler that receives both arguments and flow_manager.
 
 Args:
@@ -118,7 +128,8 @@ Args:
     flow_manager: Reference to the FlowManager instance.
 
 Returns:
-    FlowResult: Result of the function execution.
+    Any JSON-serializable value, or a :data:`ConsolidatedFunctionResult`
+    tuple to also specify the next node.
 """
 
 
