@@ -189,16 +189,16 @@ async def end_quote(args: FlowArgs) -> tuple[Any, NodeConfig]:
 # Node configurations
 def create_initial_node() -> NodeConfig:
     """Create the initial node asking for age."""
-    return {
-        "name": "initial",
-        "role_message": "You are a friendly insurance agent. Your responses will be converted to audio, so avoid special characters. Always use the available functions to progress the conversation naturally.",
-        "task_messages": [
+    return NodeConfig(
+        name="initial",
+        role_message="You are a friendly insurance agent. Your responses will be converted to audio, so avoid special characters. Always use the available functions to progress the conversation naturally.",
+        task_messages=[
             {
                 "role": "developer",
                 "content": "Start by asking for the customer's age.",
             }
         ],
-        "functions": [
+        functions=[
             FlowsFunctionSchema(
                 name="collect_age",
                 description="Record customer's age",
@@ -207,20 +207,20 @@ def create_initial_node() -> NodeConfig:
                 handler=collect_age,
             )
         ],
-    }
+    )
 
 
 def create_marital_status_node() -> NodeConfig:
     """Create node for collecting marital status."""
-    return {
-        "name": "marital_status",
-        "task_messages": [
+    return NodeConfig(
+        name="marital_status",
+        task_messages=[
             {
                 "role": "developer",
                 "content": "Ask about the customer's marital status for premium calculation.",
             }
         ],
-        "functions": [
+        functions=[
             FlowsFunctionSchema(
                 name="collect_marital_status",
                 description="Record marital status after customer provides it",
@@ -229,14 +229,14 @@ def create_marital_status_node() -> NodeConfig:
                 handler=collect_marital_status,
             )
         ],
-    }
+    )
 
 
 def create_quote_calculation_node(age: int, marital_status: str) -> NodeConfig:
     """Create node for calculating initial quote."""
-    return {
-        "name": "quote_calculation",
-        "task_messages": [
+    return NodeConfig(
+        name="quote_calculation",
+        task_messages=[
             {
                 "role": "developer",
                 "content": (
@@ -246,7 +246,7 @@ def create_quote_calculation_node(age: int, marital_status: str) -> NodeConfig:
                 ),
             }
         ],
-        "functions": [
+        functions=[
             FlowsFunctionSchema(
                 name="calculate_quote",
                 description="Calculate initial insurance quote",
@@ -258,16 +258,16 @@ def create_quote_calculation_node(age: int, marital_status: str) -> NodeConfig:
                 handler=calculate_quote,
             )
         ],
-    }
+    )
 
 
 def create_quote_results_node(
     quote: QuoteCalculationResult | CoverageUpdateResult,
 ) -> NodeConfig:
     """Create node for showing quote and adjustment options."""
-    return {
-        "name": "quote_results",
-        "task_messages": [
+    return NodeConfig(
+        name="quote_results",
+        task_messages=[
             {
                 "role": "developer",
                 "content": (
@@ -283,7 +283,7 @@ def create_quote_results_node(
                 ),
             }
         ],
-        "functions": [
+        functions=[
             FlowsFunctionSchema(
                 name="update_coverage",
                 description="Recalculate quote with new coverage options",
@@ -302,14 +302,14 @@ def create_quote_results_node(
                 handler=end_quote,
             ),
         ],
-    }
+    )
 
 
 def create_end_node() -> NodeConfig:
     """Create the final node."""
-    return {
-        "name": "end",
-        "task_messages": [
+    return NodeConfig(
+        name="end",
+        task_messages=[
             {
                 "role": "developer",
                 "content": (
@@ -318,8 +318,8 @@ def create_end_node() -> NodeConfig:
                 ),
             }
         ],
-        "post_actions": [{"type": "end_conversation"}],
-    }
+        post_actions=[{"type": "end_conversation"}],
+    )
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):

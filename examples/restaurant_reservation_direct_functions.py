@@ -170,55 +170,55 @@ async def end_conversation(flow_manager: FlowManager) -> tuple[None, NodeConfig]
 # Node configurations
 def create_initial_node(wait_for_user: bool) -> NodeConfig:
     """Create initial node for party size collection."""
-    return {
-        "name": "initial",
-        "role_message": "You are a restaurant reservation assistant for La Maison, an upscale French restaurant. Be casual and friendly. This is a voice conversation, so avoid special characters and emojis.",
-        "task_messages": [
+    return NodeConfig(
+        name="initial",
+        role_message="You are a restaurant reservation assistant for La Maison, an upscale French restaurant. Be casual and friendly. This is a voice conversation, so avoid special characters and emojis.",
+        task_messages=[
             {
                 "role": "developer",
                 "content": "Warmly greet the customer and ask how many people are in their party. This is your only job for now; if the customer asks for something else, politely remind them you can't do it.",
             }
         ],
-        "functions": [collect_party_size],
-        "respond_immediately": not wait_for_user,
-    }
+        functions=[collect_party_size],
+        respond_immediately=not wait_for_user,
+    )
 
 
 def create_time_selection_node() -> NodeConfig:
     """Create node for time selection and availability check."""
     logger.debug("Creating time selection node")
-    return {
-        "name": "get_time",
-        "task_messages": [
+    return NodeConfig(
+        name="get_time",
+        task_messages=[
             {
                 "role": "developer",
                 "content": "Ask what time they'd like to dine. Restaurant is open 5 PM to 10 PM.",
             }
         ],
-        "functions": [check_availability],
-    }
+        functions=[check_availability],
+    )
 
 
 def create_confirmation_node() -> NodeConfig:
     """Create confirmation node for successful reservations."""
-    return {
-        "name": "confirm",
-        "task_messages": [
+    return NodeConfig(
+        name="confirm",
+        task_messages=[
             {
                 "role": "developer",
                 "content": "Confirm the reservation details and ask if they need anything else.",
             }
         ],
-        "functions": [end_conversation],
-    }
+        functions=[end_conversation],
+    )
 
 
 def create_no_availability_node(alternative_times: list[str]) -> NodeConfig:
     """Create node for handling no availability."""
     times_list = ", ".join(alternative_times)
-    return {
-        "name": "no_availability",
-        "task_messages": [
+    return NodeConfig(
+        name="no_availability",
+        task_messages=[
             {
                 "role": "developer",
                 "content": (
@@ -228,23 +228,23 @@ def create_no_availability_node(alternative_times: list[str]) -> NodeConfig:
                 ),
             }
         ],
-        "functions": [check_availability, end_conversation],
-    }
+        functions=[check_availability, end_conversation],
+    )
 
 
 def create_end_node() -> NodeConfig:
     """Create the final node."""
-    return {
-        "name": "end",
-        "task_messages": [
+    return NodeConfig(
+        name="end",
+        task_messages=[
             {
                 "role": "developer",
                 "content": "Thank them and end the conversation.",
             }
         ],
-        "functions": [],
-        "post_actions": [{"type": "end_conversation"}],
-    }
+        functions=[],
+        post_actions=[{"type": "end_conversation"}],
+    )
 
 
 async def run_bot(
