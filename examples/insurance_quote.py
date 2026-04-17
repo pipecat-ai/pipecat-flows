@@ -31,7 +31,7 @@ Requirements:
 """
 
 import os
-from typing import TypedDict, Union
+from typing import Any, TypedDict
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -53,7 +53,7 @@ from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from utils import create_llm
 
-from pipecat_flows import FlowArgs, FlowManager, FlowResult, FlowsFunctionSchema, NodeConfig
+from pipecat_flows import FlowArgs, FlowManager, FlowsFunctionSchema, NodeConfig
 
 load_dotenv(override=True)
 
@@ -80,19 +80,19 @@ class InsuranceQuote(TypedDict):
     deductible: int
 
 
-class AgeCollectionResult(FlowResult):
+class AgeCollectionResult(TypedDict):
     age: int
 
 
-class MaritalStatusResult(FlowResult):
+class MaritalStatusResult(TypedDict):
     marital_status: str
 
 
-class QuoteCalculationResult(FlowResult, InsuranceQuote):
+class QuoteCalculationResult(InsuranceQuote):
     pass
 
 
-class CoverageUpdateResult(FlowResult, InsuranceQuote):
+class CoverageUpdateResult(InsuranceQuote):
     pass
 
 
@@ -180,27 +180,25 @@ async def update_coverage(args: FlowArgs) -> tuple[CoverageUpdateResult, NodeCon
     return result, next_node
 
 
-async def end_quote(args: FlowArgs) -> tuple[FlowResult, NodeConfig]:
+async def end_quote(args: FlowArgs) -> tuple[Any, NodeConfig]:
     """Handle quote completion."""
     logger.debug("end_quote handler executing")
-    result = {"status": "completed"}
-    next_node = create_end_node()
-    return result, next_node
+    return {"status": "completed"}, create_end_node()
 
 
 # Node configurations
 def create_initial_node() -> NodeConfig:
     """Create the initial node asking for age."""
-    return {
-        "name": "initial",
-        "role_message": "You are a friendly insurance agent. Your responses will be converted to audio, so avoid special characters. Always use the available functions to progress the conversation naturally.",
-        "task_messages": [
+    return NodeConfig(
+        name="initial",
+        role_message="You are a friendly insurance agent. Your responses will be converted to audio, so avoid special characters. Always use the available functions to progress the conversation naturally.",
+        task_messages=[
             {
                 "role": "developer",
                 "content": "Start by asking for the customer's age.",
             }
         ],
-        "functions": [
+        functions=[
             FlowsFunctionSchema(
                 name="collect_age",
                 description="Record customer's age",
@@ -209,20 +207,20 @@ def create_initial_node() -> NodeConfig:
                 handler=collect_age,
             )
         ],
-    }
+    )
 
 
 def create_marital_status_node() -> NodeConfig:
     """Create node for collecting marital status."""
-    return {
-        "name": "marital_status",
-        "task_messages": [
+    return NodeConfig(
+        name="marital_status",
+        task_messages=[
             {
                 "role": "developer",
                 "content": "Ask about the customer's marital status for premium calculation.",
             }
         ],
-        "functions": [
+        functions=[
             FlowsFunctionSchema(
                 name="collect_marital_status",
                 description="Record marital status after customer provides it",
@@ -231,14 +229,14 @@ def create_marital_status_node() -> NodeConfig:
                 handler=collect_marital_status,
             )
         ],
-    }
+    )
 
 
 def create_quote_calculation_node(age: int, marital_status: str) -> NodeConfig:
     """Create node for calculating initial quote."""
-    return {
-        "name": "quote_calculation",
-        "task_messages": [
+    return NodeConfig(
+        name="quote_calculation",
+        task_messages=[
             {
                 "role": "developer",
                 "content": (
@@ -248,7 +246,7 @@ def create_quote_calculation_node(age: int, marital_status: str) -> NodeConfig:
                 ),
             }
         ],
-        "functions": [
+        functions=[
             FlowsFunctionSchema(
                 name="calculate_quote",
                 description="Calculate initial insurance quote",
@@ -260,16 +258,16 @@ def create_quote_calculation_node(age: int, marital_status: str) -> NodeConfig:
                 handler=calculate_quote,
             )
         ],
-    }
+    )
 
 
 def create_quote_results_node(
     quote: QuoteCalculationResult | CoverageUpdateResult,
 ) -> NodeConfig:
     """Create node for showing quote and adjustment options."""
-    return {
-        "name": "quote_results",
-        "task_messages": [
+    return NodeConfig(
+        name="quote_results",
+        task_messages=[
             {
                 "role": "developer",
                 "content": (
@@ -285,7 +283,7 @@ def create_quote_results_node(
                 ),
             }
         ],
-        "functions": [
+        functions=[
             FlowsFunctionSchema(
                 name="update_coverage",
                 description="Recalculate quote with new coverage options",
@@ -304,14 +302,14 @@ def create_quote_results_node(
                 handler=end_quote,
             ),
         ],
-    }
+    )
 
 
 def create_end_node() -> NodeConfig:
     """Create the final node."""
-    return {
-        "name": "end",
-        "task_messages": [
+    return NodeConfig(
+        name="end",
+        task_messages=[
             {
                 "role": "developer",
                 "content": (
@@ -320,15 +318,15 @@ def create_end_node() -> NodeConfig:
                 ),
             }
         ],
-        "post_actions": [{"type": "end_conversation"}],
-    }
+        post_actions=[{"type": "end_conversation"}],
+    )
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Run the insurance quote bot."""
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
     tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
+        api_key=os.getenv("CARTESIA_API_KEY", ""),
         settings=CartesiaTTSService.Settings(
             voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
         ),

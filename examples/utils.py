@@ -14,7 +14,7 @@ import os
 from typing import Any
 
 
-def create_llm(provider: str = None, model: str = None) -> Any:
+def create_llm(provider: str | None = None, model: str | None = None) -> Any:
     """Create an LLM service instance based on environment configuration.
 
     Args:

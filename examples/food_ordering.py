@@ -27,6 +27,7 @@ Requirements:
 
 import os
 from datetime import datetime, timedelta
+from typing import TypedDict
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -51,7 +52,6 @@ from utils import create_llm
 from pipecat_flows import (
     FlowArgs,
     FlowManager,
-    FlowResult,
     FlowsFunctionSchema,
     NodeConfig,
 )
@@ -75,19 +75,19 @@ transport_params = {
 
 
 # Type definitions
-class PizzaOrderResult(FlowResult):
+class PizzaOrderResult(TypedDict):
     size: str
     type: str
     price: float
 
 
-class SushiOrderResult(FlowResult):
+class SushiOrderResult(TypedDict):
     count: int
     type: str
     price: float
 
 
-class DeliveryEstimateResult(FlowResult):
+class DeliveryEstimateResult(TypedDict):
     time: str
 
 
@@ -331,9 +331,9 @@ def create_end_node() -> NodeConfig:
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Run the food ordering bot."""
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
     tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
+        api_key=os.getenv("CARTESIA_API_KEY", ""),
         settings=CartesiaTTSService.Settings(
             voice="820a3788-2b37-4d21-847a-b65d8a68c99a",  # Salesman
         ),

@@ -44,8 +44,9 @@ import asyncio
 import atexit
 import os
 import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 import aiohttp
 from dotenv import load_dotenv
@@ -70,7 +71,7 @@ from pipecat.transports.daily.utils import (
 )
 from utils import create_llm
 
-from pipecat_flows import ContextStrategyConfig, FlowManager, FlowResult, NodeConfig
+from pipecat_flows import ContextStrategyConfig, FlowManager, NodeConfig
 from pipecat_flows.types import ActionConfig, ContextStrategy, FlowArgs, FlowsFunctionSchema
 
 load_dotenv(override=True)
@@ -120,13 +121,14 @@ logger.add(sys.stderr, level="DEBUG")
 
 
 # Type definitions
-class StoreLocationAndHoursOfOperationResult(FlowResult):
+class StoreLocationAndHoursOfOperationResult(TypedDict):
+    status: str
     store_location: str
     hours_of_operation: str
 
 
-class StartOrderResult(FlowResult):
-    pass
+class StartOrderResult(TypedDict):
+    status: str
 
 
 # Function handlers
@@ -156,6 +158,7 @@ async def mute_customer(action: dict, flow_manager: FlowManager):
 
     Do it by revoking their canSnd permission, which both mutes them and ensures that they can't unmute.
     """
+    assert isinstance(flow_manager.transport, DailyTransport)
     transport: DailyTransport = flow_manager.transport
     customer_participant_id = get_customer_participant_id(transport=transport)
 
@@ -190,6 +193,7 @@ async def make_customer_hear_only_hold_music(action: dict, flow_manager: FlowMan
 
     We don't want them hearing the bot and the human agent talking.
     """
+    assert isinstance(flow_manager.transport, DailyTransport)
     transport: DailyTransport = flow_manager.transport
     customer_participant_id = get_customer_participant_id(transport=transport)
 
@@ -210,11 +214,12 @@ async def print_human_agent_join_url(action: dict, flow_manager: FlowManager):
 
 async def unmute_customer_and_make_humans_hear_each_other(action: dict, flow_manager: FlowManager):
     """Unmute the customer and make it so the customer and human agent can hear each other."""
+    assert isinstance(flow_manager.transport, DailyTransport)
     transport: DailyTransport = flow_manager.transport
     customer_participant_id = get_customer_participant_id(transport=transport)
     agent_participant_id = get_human_agent_participant_id(transport=transport)
 
-    if customer_participant_id:
+    if customer_participant_id and agent_participant_id:
         await transport.update_remote_participants(
             remote_participants={
                 customer_participant_id: {
@@ -247,7 +252,7 @@ async def end_human_agent_conversation(
 
 
 # Helpers
-def next_node_after_customer_task(result: FlowResult) -> NodeConfig:
+def next_node_after_customer_task(result: Mapping[str, Any]) -> NodeConfig:
     """Transition to either the "continued_customer_interaction" node or "transferring_to_human_agent" node, depending on the outcome of the previous customer task"""
     if result.get("status") == "success":
         return create_continued_customer_interaction_node()
@@ -448,7 +453,7 @@ def create_end_human_agent_conversation_node() -> NodeConfig:
 
 
 # Helpers
-def get_customer_participant_id(transport: DailyTransport) -> str:
+def get_customer_participant_id(transport: DailyTransport) -> str | None:
     return next(
         (
             p["id"]
@@ -459,7 +464,7 @@ def get_customer_participant_id(transport: DailyTransport) -> str:
     )
 
 
-def get_human_agent_participant_id(transport: DailyTransport) -> str:
+def get_human_agent_participant_id(transport: DailyTransport) -> str | None:
     return next(
         (
             p["id"]
@@ -604,9 +609,8 @@ async def get_token(
 async def main():
     """Main function to set up and run the bot."""
     async with aiohttp.ClientSession() as session:
-        key = os.getenv("DAILY_API_KEY")
         daily_rest_helper = DailyRESTHelper(
-            daily_api_key=key,
+            daily_api_key=os.getenv("DAILY_API_KEY", ""),
             daily_api_url=os.getenv("DAILY_API_URL", "https://api.daily.co/v1"),
             aiohttp_session=session,
         )
@@ -625,9 +629,9 @@ async def main():
                 audio_out_enabled=True,
             ),
         )
-        stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+        stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
         tts = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
+            api_key=os.getenv("CARTESIA_API_KEY", ""),
             settings=CartesiaTTSService.Settings(
                 voice="d46abd1d-2d02-43e8-819f-51fb652c1c61",  # Newsman
             ),

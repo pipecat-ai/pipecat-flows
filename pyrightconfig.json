@@ -1,0 +1,7 @@
+{
+    "include": ["src"],
+    "exclude": ["examples", "tests", "build", "**/__pycache__"],
+    "pythonVersion": "3.11",
+    "typeCheckingMode": "basic",
+    "reportMissingImports": "error"
+}

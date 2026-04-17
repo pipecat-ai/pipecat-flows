@@ -26,6 +26,7 @@ Requirements:
 
 import os
 import sys
+from typing import TypedDict
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -54,7 +55,7 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 
-from pipecat_flows import FlowManager, FlowResult, NodeConfig
+from pipecat_flows import FlowManager, NodeConfig
 from pipecat_flows.types import ContextStrategy, ContextStrategyConfig
 
 load_dotenv(override=True)
@@ -78,9 +79,10 @@ transport_params = {
 }
 
 
-class SwitchLLMResult(FlowResult):
+class SwitchLLMResult(TypedDict):
     """Result of switching the LLM service."""
 
+    status: str
     message: str
 
 
@@ -116,9 +118,10 @@ async def switch_llm(flow_manager: FlowManager, llm: str) -> tuple[SwitchLLMResu
     return SwitchLLMResult(status="success", message=f"Switched to {llm} LLM service."), None
 
 
-class WeatherResult(FlowResult):
+class WeatherResult(TypedDict):
     """Result of getting the current weather."""
 
+    status: str
     conditions: str
     temperature: int
 
@@ -169,10 +172,10 @@ def create_main_node(summarize: bool = False) -> NodeConfig:
 # Main setup
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Run the LLM switching bot."""
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
 
     tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
+        api_key=os.getenv("CARTESIA_API_KEY", ""),
         settings=CartesiaTTSService.Settings(
             voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
         ),
@@ -192,8 +195,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # LLM services
     global llm_openai, llm_google, llm_anthropic, llm_aws, llm_switcher
     llm_openai = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-    llm_google = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
-    llm_anthropic = AnthropicLLMService(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    llm_google = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY", ""))
+    llm_anthropic = AnthropicLLMService(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
     llm_aws = AWSBedrockLLMService(
         aws_region="us-west-2",
         model="us.anthropic.claude-3-5-haiku-20241022-v1:0",

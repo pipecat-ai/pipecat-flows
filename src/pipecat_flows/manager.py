@@ -31,6 +31,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from loguru import logger
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.frames.frames import (
     FunctionCallResultProperties,
     LLMMessagesAppendFrame,
@@ -41,7 +42,7 @@ from pipecat.frames.frames import (
 )
 from pipecat.pipeline.llm_switcher import LLMSwitcher
 from pipecat.pipeline.task import PipelineTask
-from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext, NotGiven
 from pipecat.services.llm_service import FunctionCallParams, LLMService
 from pipecat.services.settings import LLMSettings
 from pipecat.transports.base_transport import BaseTransport
@@ -60,12 +61,15 @@ from pipecat_flows.types import (
     ContextStrategy,
     ContextStrategyConfig,
     FlowArgs,
+    FlowFunctionHandler,
     FlowResult,
     FlowsDirectFunction,
     FlowsDirectFunctionWrapper,
     FlowsFunctionSchema,
     FunctionHandler,
+    LegacyFunctionHandler,
     NodeConfig,
+    ZeroArgFunctionHandler,
     get_or_generate_node_name,
 )
 
@@ -124,6 +128,8 @@ class FlowManager:
 
         self._showed_deprecation_warning_for_role_messages = False
         self._showed_deprecation_warning_for_reset_with_summary = False
+        self._showed_deprecation_warning_for_zero_arg_handler = False
+        self._showed_deprecation_warning_for_legacy_handler = False
 
     @property
     def state(self) -> dict[str, Any]:
@@ -367,16 +373,33 @@ class FlowManager:
         # Calculate effective parameter count
         effective_param_count = len(sig.parameters)
 
-        # Handle different function signatures
+        # Handle different function signatures. inspect.signature has already
+        # proven the shape, so each cast narrows the union to the branch we know
+        # we're in.
         if effective_param_count == 0:
-            # Function takes no args
-            return await handler()
+            if not self._showed_deprecation_warning_for_zero_arg_handler:
+                self._showed_deprecation_warning_for_zero_arg_handler = True
+                warnings.warn(
+                    "Zero-argument function handlers are deprecated and will be "
+                    "removed in 2.0.0. Update handlers to accept "
+                    "(args: FlowArgs, flow_manager: FlowManager) instead.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+            return await cast(ZeroArgFunctionHandler, handler)()
         elif effective_param_count == 1:
-            # Legacy handler with just args
-            return await handler(args)
+            if not self._showed_deprecation_warning_for_legacy_handler:
+                self._showed_deprecation_warning_for_legacy_handler = True
+                warnings.warn(
+                    "Single-argument (legacy) function handlers are deprecated "
+                    "and will be removed in 2.0.0. Update handlers to accept "
+                    "(args: FlowArgs, flow_manager: FlowManager) instead.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+            return await cast(LegacyFunctionHandler, handler)(args)
         else:
-            # Modern handler with args and flow_manager
-            return await handler(args, self)
+            return await cast(FlowFunctionHandler, handler)(args, self)
 
     async def _create_transition_func(
         self,
@@ -406,7 +429,11 @@ class FlowManager:
                     if isinstance(handler, FlowsDirectFunctionWrapper):
                         handler_response = await handler.invoke(params.arguments, self)
                     else:
-                        handler_response = await self._call_handler(handler, params.arguments)
+                        # Convert Pipecat's Mapping to a fresh dict so handlers may
+                        # mutate without touching Pipecat's internal state. (In 2.0.0
+                        # FlowArgs is planned to widen to Mapping; this conversion
+                        # can go away then.)
+                        handler_response = await self._call_handler(handler, dict(params.arguments))
                     # Support both "consolidated" handlers that return (result, next_node) and handlers
                     # that return just the result.
                     if isinstance(handler_response, tuple):
@@ -715,7 +742,7 @@ class FlowManager:
         role_message: str | None,
         role_messages: list[dict] | None,
         task_messages: list[dict],
-        functions: list[dict],
+        functions: ToolsSchema | NotGiven,
         strategy: ContextStrategyConfig | None = None,
     ) -> None:
         """Update LLM context with new messages and functions.

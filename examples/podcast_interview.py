@@ -27,6 +27,7 @@ Requirements:
 """
 
 import os
+from typing import TypedDict
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -50,7 +51,6 @@ from utils import create_llm
 from pipecat_flows import (
     FlowArgs,
     FlowManager,
-    FlowResult,
     FlowsFunctionSchema,
     NodeConfig,
 )
@@ -59,13 +59,13 @@ load_dotenv(override=True)
 
 
 # Type definitions
-class ProceedToTopicResult(FlowResult):
+class ProceedToTopicResult(TypedDict):
     """Result type for proceed_to_topic function"""
 
     guest_summary: str
 
 
-class StartInterviewResult(FlowResult):
+class StartInterviewResult(TypedDict):
     """Result type for start_interview function"""
 
     topic: str
@@ -221,10 +221,10 @@ def create_final_node() -> NodeConfig:
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     logger.info(f"Starting bot")
 
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
 
     tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
+        api_key=os.getenv("CARTESIA_API_KEY", ""),
         settings=CartesiaTTSService.Settings(
             voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
         ),

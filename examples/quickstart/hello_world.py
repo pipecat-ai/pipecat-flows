@@ -76,17 +76,17 @@ def create_initial_node() -> NodeConfig:
         properties={"color": {"type": "string"}},
     )
 
-    return {
-        "name": "initial",
-        "role_message": "You are an inquisitive child. Use very simple language. Ask simple questions. You must ALWAYS use one of the available functions to progress the conversation. Your responses will be converted to audio. Avoid outputting special characters and emojis.",
-        "task_messages": [
+    return NodeConfig(
+        name="initial",
+        role_message="You are an inquisitive child. Use very simple language. Ask simple questions. You must ALWAYS use one of the available functions to progress the conversation. Your responses will be converted to audio. Avoid outputting special characters and emojis.",
+        task_messages=[
             {
                 "role": "developer",
                 "content": "Say 'Hello world' and ask what is the user's favorite color.",
             }
         ],
-        "functions": [record_favorite_color_func],
-    }
+        functions=[record_favorite_color_func],
+    )
 
 
 async def record_favorite_color_and_set_next_node(
@@ -121,14 +121,14 @@ def create_end_node() -> NodeConfig:
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
-    stt = CartesiaSTTService(api_key=os.getenv("CARTESIA_API_KEY"))
+    stt = CartesiaSTTService(api_key=os.getenv("CARTESIA_API_KEY", ""))
     tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
+        api_key=os.getenv("CARTESIA_API_KEY", ""),
         settings=CartesiaTTSService.Settings(
             voice="32b3f3c5-7171-46aa-abe7-b598964aa793",
         ),
     )
-    llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
+    llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY", ""))
 
     context = LLMContext()
     context_aggregator = LLMContextAggregatorPair(

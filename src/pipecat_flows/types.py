@@ -24,7 +24,6 @@ from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Protocol,
     Required,
     TypedDict,
 )
@@ -39,19 +38,18 @@ if TYPE_CHECKING:
 
 
 class FlowResult(TypedDict, total=False):
-    """Base type for function results.
+    """Optional convention TypedDict for ``status``/``error`` results.
+
+    .. deprecated:: 1.x.0
+        ``FlowResult`` is no longer required or referenced by any handler type
+        in the library, and Pipecat's upstream function-call-result contract is
+        ``Any``. Define your own ``TypedDict`` if you want a structured result,
+        or return any JSON-serializable value. ``FlowResult`` will be removed
+        in 2.0.0.
 
     Parameters:
         status: Status of the function execution.
         error: Optional error message if execution failed.
-
-    Example::
-
-        {
-            "status": "success",
-            "data": {"processed": True},
-            "error": None  # Optional error message
-        }
     """
 
     status: str
@@ -60,6 +58,16 @@ class FlowResult(TypedDict, total=False):
 
 FlowArgs = dict[str, Any]
 """Type alias for function handler arguments.
+
+Each invocation gets its own dict, so handlers may mutate it freely without
+affecting Pipecat's internal state.
+
+.. note::
+
+    In 2.0.0 this alias is planned to widen to ``Mapping[str, Any]`` to align
+    with Pipecat's typing of ``FunctionCallParams.arguments``. Handlers that
+    only read args will be unaffected; handlers that mutate args will need to
+    keep the annotation as ``dict[str, Any]`` explicitly.
 
 Example::
 
@@ -70,27 +78,47 @@ Example::
     }
 """
 
-ConsolidatedFunctionResult = tuple[FlowResult | None, "NodeConfig | None"]
+ConsolidatedFunctionResult = tuple[Any, "NodeConfig | None"]
 """Return type for "consolidated" functions.
 
 Return type for "consolidated" functions that do either or both of:
 - doing some work
 - specifying the next node to transition to after the work is done
+
+The first tuple element is the function-call result delivered to the LLM.
+Any JSON-serializable value is accepted (matching Pipecat's upstream
+``FunctionCallResultCallback`` contract). Pass ``None`` to signal a
+transition-only handler; FlowManager substitutes an acknowledgement result.
 """
 
-LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult | ConsolidatedFunctionResult]]
+ZeroArgFunctionHandler = Callable[[], Awaitable[Any]]
+"""Function handler that takes no arguments.
+
+.. deprecated:: 1.x.0
+    Use :data:`FlowFunctionHandler` (``(args, flow_manager)``) instead. Will be
+    removed in 2.0.0.
+
+Returns:
+    Any JSON-serializable value, or a :data:`ConsolidatedFunctionResult`
+    tuple to also specify the next node.
+"""
+
+LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[Any]]
 """Legacy function handler that only receives arguments.
+
+.. deprecated:: 1.x.0
+    Use :data:`FlowFunctionHandler` (``(args, flow_manager)``) instead. Will be
+    removed in 2.0.0.
 
 Args:
     args: Dictionary of arguments from the function call.
 
 Returns:
-    FlowResult: Result of the function execution.
+    Any JSON-serializable value, or a :data:`ConsolidatedFunctionResult`
+    tuple to also specify the next node.
 """
 
-FlowFunctionHandler = Callable[
-    [FlowArgs, "FlowManager"], Awaitable[FlowResult | ConsolidatedFunctionResult]
-]
+FlowFunctionHandler = Callable[[FlowArgs, "FlowManager"], Awaitable[Any]]
 """Modern function handler that receives both arguments and flow_manager.
 
 Args:
@@ -98,40 +126,48 @@ Args:
     flow_manager: Reference to the FlowManager instance.
 
 Returns:
-    FlowResult: Result of the function execution.
+    Any JSON-serializable value, or a :data:`ConsolidatedFunctionResult`
+    tuple to also specify the next node.
 """
 
 
-FunctionHandler = LegacyFunctionHandler | FlowFunctionHandler
-"""Union type for function handlers supporting both legacy and modern patterns."""
+FunctionHandler = ZeroArgFunctionHandler | LegacyFunctionHandler | FlowFunctionHandler
+"""Union type for function handlers supporting 0-arg, legacy, and modern patterns."""
 
 
-class FlowsDirectFunction(Protocol):
-    """Protocol for "direct" functions with automatic metadata extraction.
+FlowsDirectFunction = Callable[..., Awaitable[ConsolidatedFunctionResult]]
+"""Type alias for "direct" functions with automatic metadata extraction.
 
-    "Direct" functions have their definition automatically extracted from the function
-    signature and docstring. This can be used in NodeConfigs directly, in lieu of a
-    FlowsFunctionSchema or function definition dict.
-    """
+"Direct" functions have their definition automatically extracted from the
+function signature and docstring. This can be used in :data:`NodeConfig`
+directly, in lieu of a :class:`FlowsFunctionSchema` or function definition
+dict.
 
-    def __call__(
-        self, flow_manager: "FlowManager", **kwargs: Any
-    ) -> Awaitable[ConsolidatedFunctionResult]:
-        """Execute the direct function.
+Expected shape:
 
-        Args:
-            flow_manager: Reference to the FlowManager instance.
-            **kwargs: Additional keyword arguments.
+.. code-block:: python
 
-        Returns:
-            Result of the function execution, which can include both a FlowResult
-            and the next node to transition to.
-        """
+    async def f(flow_manager: FlowManager, **params) -> ConsolidatedFunctionResult:
         ...
+
+where ``**params`` are any named parameters described by the function's
+docstring.
+
+This is defined as ``Callable[..., ...]`` rather than a Protocol because
+Python's Protocol system cannot express "any concrete named-parameter list"
+against ``**kwargs: Any`` — a function with named params like ``llm: str``
+is not structurally compatible with a ``**kwargs: Any`` protocol signature.
+Runtime validation of the expected shape happens in
+:meth:`FlowsDirectFunctionWrapper.validate_function`.
+"""
 
 
 LegacyActionHandler = Callable[[dict[str, Any]], Awaitable[None]]
 """Legacy action handler type that only receives the action dictionary.
+
+.. deprecated:: 1.x.0
+    Use :data:`FlowActionHandler` (``(action, flow_manager)``) instead. Will be
+    removed in 2.0.0.
 
 Args:
     action: Dictionary containing action configuration and parameters.
