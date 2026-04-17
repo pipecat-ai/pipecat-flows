@@ -158,6 +158,7 @@ async def mute_customer(action: dict, flow_manager: FlowManager):
 
     Do it by revoking their canSnd permission, which both mutes them and ensures that they can't unmute.
     """
+    assert isinstance(flow_manager.transport, DailyTransport)
     transport: DailyTransport = flow_manager.transport
     customer_participant_id = get_customer_participant_id(transport=transport)
 
@@ -192,6 +193,7 @@ async def make_customer_hear_only_hold_music(action: dict, flow_manager: FlowMan
 
     We don't want them hearing the bot and the human agent talking.
     """
+    assert isinstance(flow_manager.transport, DailyTransport)
     transport: DailyTransport = flow_manager.transport
     customer_participant_id = get_customer_participant_id(transport=transport)
 
@@ -212,11 +214,12 @@ async def print_human_agent_join_url(action: dict, flow_manager: FlowManager):
 
 async def unmute_customer_and_make_humans_hear_each_other(action: dict, flow_manager: FlowManager):
     """Unmute the customer and make it so the customer and human agent can hear each other."""
+    assert isinstance(flow_manager.transport, DailyTransport)
     transport: DailyTransport = flow_manager.transport
     customer_participant_id = get_customer_participant_id(transport=transport)
     agent_participant_id = get_human_agent_participant_id(transport=transport)
 
-    if customer_participant_id:
+    if customer_participant_id and agent_participant_id:
         await transport.update_remote_participants(
             remote_participants={
                 customer_participant_id: {
@@ -450,7 +453,7 @@ def create_end_human_agent_conversation_node() -> NodeConfig:
 
 
 # Helpers
-def get_customer_participant_id(transport: DailyTransport) -> str:
+def get_customer_participant_id(transport: DailyTransport) -> str | None:
     return next(
         (
             p["id"]
@@ -461,7 +464,7 @@ def get_customer_participant_id(transport: DailyTransport) -> str:
     )
 
 
-def get_human_agent_participant_id(transport: DailyTransport) -> str:
+def get_human_agent_participant_id(transport: DailyTransport) -> str | None:
     return next(
         (
             p["id"]
