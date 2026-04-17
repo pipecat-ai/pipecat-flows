@@ -31,7 +31,7 @@ Requirements:
 """
 
 import os
-from typing import TypedDict, Union
+from typing import Any, TypedDict
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -53,7 +53,7 @@ from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from utils import create_llm
 
-from pipecat_flows import FlowArgs, FlowManager, FlowResult, FlowsFunctionSchema, NodeConfig
+from pipecat_flows import FlowArgs, FlowManager, FlowsFunctionSchema, NodeConfig
 
 load_dotenv(override=True)
 
@@ -80,19 +80,19 @@ class InsuranceQuote(TypedDict):
     deductible: int
 
 
-class AgeCollectionResult(FlowResult):
+class AgeCollectionResult(TypedDict):
     age: int
 
 
-class MaritalStatusResult(FlowResult):
+class MaritalStatusResult(TypedDict):
     marital_status: str
 
 
-class QuoteCalculationResult(FlowResult, InsuranceQuote):
+class QuoteCalculationResult(InsuranceQuote):
     pass
 
 
-class CoverageUpdateResult(FlowResult, InsuranceQuote):
+class CoverageUpdateResult(InsuranceQuote):
     pass
 
 
@@ -180,12 +180,10 @@ async def update_coverage(args: FlowArgs) -> tuple[CoverageUpdateResult, NodeCon
     return result, next_node
 
 
-async def end_quote(args: FlowArgs) -> tuple[FlowResult, NodeConfig]:
+async def end_quote(args: FlowArgs) -> tuple[Any, NodeConfig]:
     """Handle quote completion."""
     logger.debug("end_quote handler executing")
-    result = {"status": "completed"}
-    next_node = create_end_node()
-    return result, next_node
+    return {"status": "completed"}, create_end_node()
 
 
 # Node configurations
@@ -326,9 +324,9 @@ def create_end_node() -> NodeConfig:
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Run the insurance quote bot."""
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
     tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
+        api_key=os.getenv("CARTESIA_API_KEY", ""),
         settings=CartesiaTTSService.Settings(
             voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
         ),

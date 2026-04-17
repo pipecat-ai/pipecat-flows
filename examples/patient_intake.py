@@ -55,7 +55,6 @@ from pipecat_flows import (
     ContextStrategyConfig,
     FlowArgs,
     FlowManager,
-    FlowResult,
     FlowsFunctionSchema,
     NodeConfig,
 )
@@ -97,23 +96,23 @@ class VisitReason(TypedDict):
 
 
 # Result types for each handler
-class BirthdayVerificationResult(FlowResult):
+class BirthdayVerificationResult(TypedDict):
     verified: bool
 
 
-class PrescriptionRecordResult(FlowResult):
+class PrescriptionRecordResult(TypedDict):
     count: int
 
 
-class AllergyRecordResult(FlowResult):
+class AllergyRecordResult(TypedDict):
     count: int
 
 
-class ConditionRecordResult(FlowResult):
+class ConditionRecordResult(TypedDict):
     count: int
 
 
-class VisitReasonRecordResult(FlowResult):
+class VisitReasonRecordResult(TypedDict):
     count: int
 
 
@@ -460,9 +459,9 @@ def create_end_node() -> NodeConfig:
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Run the patient intake bot."""
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
     tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
+        api_key=os.getenv("CARTESIA_API_KEY", ""),
         settings=CartesiaTTSService.Settings(
             voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
         ),

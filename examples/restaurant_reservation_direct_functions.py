@@ -30,6 +30,7 @@ Requirements:
 import asyncio
 import os
 import sys
+from typing import TypedDict
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -51,7 +52,7 @@ from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from utils import create_llm
 
-from pipecat_flows import FlowManager, FlowResult, NodeConfig
+from pipecat_flows import FlowManager, NodeConfig
 
 load_dotenv(override=True)
 
@@ -103,12 +104,12 @@ reservation_system = MockReservationSystem()
 
 
 # Type definitions for function results
-class PartySizeResult(FlowResult):
+class PartySizeResult(TypedDict):
     size: int
     status: str
 
 
-class TimeResult(FlowResult):
+class TimeResult(TypedDict):
     status: str
     time: str
     available: bool
@@ -250,9 +251,9 @@ async def run_bot(
     transport: BaseTransport, runner_args: RunnerArguments, wait_for_user: bool = False
 ):
     """Run the restaurant reservation bot with direct functions."""
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
     tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
+        api_key=os.getenv("CARTESIA_API_KEY", ""),
         settings=CartesiaTTSService.Settings(
             voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
         ),

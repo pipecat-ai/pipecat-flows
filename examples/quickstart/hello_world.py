@@ -121,14 +121,14 @@ def create_end_node() -> NodeConfig:
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
-    stt = CartesiaSTTService(api_key=os.getenv("CARTESIA_API_KEY"))
+    stt = CartesiaSTTService(api_key=os.getenv("CARTESIA_API_KEY", ""))
     tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
+        api_key=os.getenv("CARTESIA_API_KEY", ""),
         settings=CartesiaTTSService.Settings(
             voice="32b3f3c5-7171-46aa-abe7-b598964aa793",
         ),
     )
-    llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
+    llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY", ""))
 
     context = LLMContext()
     context_aggregator = LLMContextAggregatorPair(
