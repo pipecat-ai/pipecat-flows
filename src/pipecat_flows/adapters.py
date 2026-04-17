@@ -20,7 +20,12 @@ from typing import Any
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
-from pipecat.processors.aggregators.llm_context import NOT_GIVEN, LLMContext, NotGiven
+from pipecat.processors.aggregators.llm_context import (
+    NOT_GIVEN,
+    LLMContext,
+    LLMContextMessage,
+    NotGiven,
+)
 
 from pipecat_flows.types import FlowsFunctionSchema
 
@@ -101,7 +106,7 @@ class LLMAdapter:
         try:
             messages = context.get_messages()
 
-            prompt_messages = [
+            prompt_messages: list[LLMContextMessage] = [
                 {
                     "role": "developer",
                     "content": f"Conversation history: {messages}",

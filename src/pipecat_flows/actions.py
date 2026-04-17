@@ -236,7 +236,7 @@ class ActionManager:
             await self.execute_actions(actions)
 
     async def _maybe_wait_for_ongoing_actions_to_finish(
-        self, previous_action_type: str, upcoming_action_type: str | None
+        self, previous_action_type: str | None, upcoming_action_type: str | None
     ) -> None:
         """Wait for ongoing actions to finish before executing the next action if needed.
 
@@ -245,7 +245,8 @@ class ActionManager:
         the previous one is done.
 
         Args:
-            previous_action_type: Type of the previously executed action.
+            previous_action_type: Type of the previously executed action, or None
+                if this is the start of the action sequence.
             upcoming_action_type: Type of the next action to execute, or None if
                 this is the end of the action sequence.
         """

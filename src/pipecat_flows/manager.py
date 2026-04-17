@@ -31,6 +31,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from loguru import logger
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.frames.frames import (
     FunctionCallResultProperties,
     LLMMessagesAppendFrame,
@@ -41,7 +42,7 @@ from pipecat.frames.frames import (
 )
 from pipecat.pipeline.llm_switcher import LLMSwitcher
 from pipecat.pipeline.task import PipelineTask
-from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext, NotGiven
 from pipecat.services.llm_service import FunctionCallParams, LLMService
 from pipecat.services.settings import LLMSettings
 from pipecat.transports.base_transport import BaseTransport
@@ -715,7 +716,7 @@ class FlowManager:
         role_message: str | None,
         role_messages: list[dict] | None,
         task_messages: list[dict],
-        functions: list[dict],
+        functions: ToolsSchema | NotGiven,
         strategy: ContextStrategyConfig | None = None,
     ) -> None:
         """Update LLM context with new messages and functions.
