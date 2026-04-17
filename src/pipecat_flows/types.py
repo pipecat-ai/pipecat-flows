@@ -24,7 +24,6 @@ from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Protocol,
     Required,
     TypedDict,
 )
@@ -131,28 +130,31 @@ FunctionHandler = ZeroArgFunctionHandler | LegacyFunctionHandler | FlowFunctionH
 """Union type for function handlers supporting 0-arg, legacy, and modern patterns."""
 
 
-class FlowsDirectFunction(Protocol):
-    """Protocol for "direct" functions with automatic metadata extraction.
+FlowsDirectFunction = Callable[..., Awaitable[ConsolidatedFunctionResult]]
+"""Type alias for "direct" functions with automatic metadata extraction.
 
-    "Direct" functions have their definition automatically extracted from the function
-    signature and docstring. This can be used in NodeConfigs directly, in lieu of a
-    FlowsFunctionSchema or function definition dict.
-    """
+"Direct" functions have their definition automatically extracted from the
+function signature and docstring. This can be used in :data:`NodeConfig`
+directly, in lieu of a :class:`FlowsFunctionSchema` or function definition
+dict.
 
-    def __call__(
-        self, flow_manager: "FlowManager", **kwargs: Any
-    ) -> Awaitable[ConsolidatedFunctionResult]:
-        """Execute the direct function.
+Expected shape:
 
-        Args:
-            flow_manager: Reference to the FlowManager instance.
-            **kwargs: Additional keyword arguments.
+.. code-block:: python
 
-        Returns:
-            Result of the function execution, which can include both a FlowResult
-            and the next node to transition to.
-        """
+    async def f(flow_manager: FlowManager, **params) -> ConsolidatedFunctionResult:
         ...
+
+where ``**params`` are any named parameters described by the function's
+docstring.
+
+This is defined as ``Callable[..., ...]`` rather than a Protocol because
+Python's Protocol system cannot express "any concrete named-parameter list"
+against ``**kwargs: Any`` — a function with named params like ``llm: str``
+is not structurally compatible with a ``**kwargs: Any`` protocol signature.
+Runtime validation of the expected shape happens in
+:meth:`FlowsDirectFunctionWrapper.validate_function`.
+"""
 
 
 LegacyActionHandler = Callable[[dict[str, Any]], Awaitable[None]]
