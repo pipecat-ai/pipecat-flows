@@ -58,8 +58,13 @@ class FlowResult(TypedDict, total=False):
     error: str
 
 
-FlowArgs = dict[str, Any]
+FlowArgs = Mapping[str, Any]
 """Type alias for function handler arguments.
+
+Args are intended as read-only input to handlers. The concrete runtime type
+is a ``dict``, but the annotation uses ``Mapping`` so handlers treat args as
+input rather than scratch space, and so it aligns with Pipecat's typing of
+``FunctionCallParams.arguments``.
 
 Example::
 
