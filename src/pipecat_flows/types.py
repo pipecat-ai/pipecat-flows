@@ -78,8 +78,23 @@ Return type for "consolidated" functions that do either or both of:
 - specifying the next node to transition to after the work is done
 """
 
+ZeroArgFunctionHandler = Callable[[], Awaitable[FlowResult | ConsolidatedFunctionResult]]
+"""Function handler that takes no arguments.
+
+.. deprecated:: 1.x.0
+    Use :data:`FlowFunctionHandler` (``(args, flow_manager)``) instead. Will be
+    removed in 2.0.0.
+
+Returns:
+    FlowResult: Result of the function execution.
+"""
+
 LegacyFunctionHandler = Callable[[FlowArgs], Awaitable[FlowResult | ConsolidatedFunctionResult]]
 """Legacy function handler that only receives arguments.
+
+.. deprecated:: 1.x.0
+    Use :data:`FlowFunctionHandler` (``(args, flow_manager)``) instead. Will be
+    removed in 2.0.0.
 
 Args:
     args: Dictionary of arguments from the function call.
@@ -102,8 +117,8 @@ Returns:
 """
 
 
-FunctionHandler = LegacyFunctionHandler | FlowFunctionHandler
-"""Union type for function handlers supporting both legacy and modern patterns."""
+FunctionHandler = ZeroArgFunctionHandler | LegacyFunctionHandler | FlowFunctionHandler
+"""Union type for function handlers supporting 0-arg, legacy, and modern patterns."""
 
 
 class FlowsDirectFunction(Protocol):
