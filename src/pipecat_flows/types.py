@@ -56,13 +56,18 @@ class FlowResult(TypedDict, total=False):
     error: str
 
 
-FlowArgs = Mapping[str, Any]
+FlowArgs = dict[str, Any]
 """Type alias for function handler arguments.
 
-Args are intended as read-only input to handlers. The concrete runtime type
-is a ``dict``, but the annotation uses ``Mapping`` so handlers treat args as
-input rather than scratch space, and so it aligns with Pipecat's typing of
-``FunctionCallParams.arguments``.
+Each invocation gets its own dict, so handlers may mutate it freely without
+affecting Pipecat's internal state.
+
+.. note::
+
+    In 2.0.0 this alias is planned to widen to ``Mapping[str, Any]`` to align
+    with Pipecat's typing of ``FunctionCallParams.arguments``. Handlers that
+    only read args will be unaffected; handlers that mutate args will need to
+    keep the annotation as ``dict[str, Any]`` explicitly.
 
 Example::
 

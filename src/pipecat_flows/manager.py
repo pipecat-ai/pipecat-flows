@@ -429,7 +429,11 @@ class FlowManager:
                     if isinstance(handler, FlowsDirectFunctionWrapper):
                         handler_response = await handler.invoke(params.arguments, self)
                     else:
-                        handler_response = await self._call_handler(handler, params.arguments)
+                        # Convert Pipecat's Mapping to a fresh dict so handlers may
+                        # mutate without touching Pipecat's internal state. (In 2.0.0
+                        # FlowArgs is planned to widen to Mapping; this conversion
+                        # can go away then.)
+                        handler_response = await self._call_handler(handler, dict(params.arguments))
                     # Support both "consolidated" handlers that return (result, next_node) and handlers
                     # that return just the result.
                     if isinstance(handler_response, tuple):
