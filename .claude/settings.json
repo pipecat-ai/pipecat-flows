@@ -1,5 +1,10 @@
 {
   "attribution": {
     "commit": ""
+  },
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)"
+    ]
   }
 }

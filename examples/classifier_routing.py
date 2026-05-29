@@ -113,7 +113,9 @@ def _latest_user_text(context: LLMContext) -> str:
             if isinstance(content, str):
                 return content
             # Some providers use a list of content parts; join the text parts.
-            return " ".join(part.get("text", "") for part in content if isinstance(part, dict))
+            if isinstance(content, list):
+                return " ".join(part.get("text", "") for part in content if isinstance(part, dict))
+            return ""
     return ""
 
 
@@ -126,12 +128,12 @@ class ClassifierRouter(FrameProcessor):
     never runs). Anything it can't classify is passed through to the LLM.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         # Set after the FlowManager is constructed in run_bot().
         self.flow_manager: FlowManager | None = None
 
-    async def process_frame(self, frame: Frame, direction: FrameDirection):
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         await super().process_frame(frame, direction)
 
         # Only intercept the turn-end context frame while we're in the node
@@ -213,7 +215,7 @@ def create_declined_node() -> NodeConfig:
     )
 
 
-async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> None:
     stt = CartesiaSTTService(api_key=os.getenv("CARTESIA_API_KEY", ""))
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY", ""),
@@ -270,21 +272,21 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     router.flow_manager = flow_manager
 
     @transport.event_handler("on_client_connected")
-    async def on_client_connected(transport, client):
-        logger.info(f"Client connected")
+    async def on_client_connected(transport, client) -> None:
+        logger.info("Client connected")
         # Kick off the conversation.
         await flow_manager.initialize(create_verify_node())
 
     @transport.event_handler("on_client_disconnected")
-    async def on_client_disconnected(transport, client):
-        logger.info(f"Client disconnected")
+    async def on_client_disconnected(transport, client) -> None:
+        logger.info("Client disconnected")
         await task.cancel()
 
     runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
     await runner.run(task)
 
 
-async def bot(runner_args: RunnerArguments):
+async def bot(runner_args: RunnerArguments) -> None:
     """Main bot entry point compatible with Pipecat Cloud."""
     transport = await create_transport(runner_args, transport_params)
     await run_bot(transport, runner_args)
