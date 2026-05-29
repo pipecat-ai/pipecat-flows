@@ -22,6 +22,7 @@ See [quickstart/README.md](./quickstart/README.md) for a beginner-friendly intro
 - `food_ordering_direct_functions.py` - Food ordering using direct function registration
 - `restaurant_reservation_direct_functions.py` - Reservation system using direct function registration
 - `llm_switching.py` - Switching between different LLM providers during conversation
+- `classifier_routing.py` - Routing between nodes with a classifier/regex instead of the LLM (zero-latency deterministic decisions, with an LLM fallback for unmatched input)
 
 #### Advanced Features
 
