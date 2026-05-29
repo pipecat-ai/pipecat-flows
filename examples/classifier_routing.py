@@ -91,7 +91,9 @@ transport_params = {
 # apostrophes, dropped apostrophes, hedges like "I don't know") will fool them,
 # so use a real classifier in production.
 YES_PATTERN = re.compile(r"\b(yes|yeah|yep|yup|sure|correct|i\s*(?:am|'m)\s*over)\b", re.IGNORECASE)
-NO_PATTERN = re.compile(r"\b(no|nope|nah|i\s*(?:am|'m)\s*not|i\s*do\s*not|i\s*don't)\b", re.IGNORECASE)
+NO_PATTERN = re.compile(
+    r"\b(no|nope|nah|i\s*(?:am|'m)\s*not|i\s*do\s*not|i\s*don't)\b", re.IGNORECASE
+)
 
 
 def classify(text: str) -> str | None:
