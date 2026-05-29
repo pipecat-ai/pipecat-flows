@@ -841,7 +841,7 @@ class FlowManager:
             ):
                 frames.append(LLMMessagesUpdateFrame(messages=messages, run_llm=True))
             else:
-                frames.append(LLMMessagesAppendFrame(messages=messages))
+                frames.append(LLMMessagesAppendFrame(messages=messages, run_llm=True))
 
             frames.append(LLMSetToolsFrame(tools=functions))
 
