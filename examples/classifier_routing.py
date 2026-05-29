@@ -87,6 +87,9 @@ transport_params = {
 # The classifier. This is the seam to replace with regex, a rules engine, or a
 # small binary classifier model. It returns "yes", "no", or None ("not sure,
 # let the LLM handle it").
+# NOTE: these toy patterns are illustrative; real STT output (typographic
+# apostrophes, dropped apostrophes, hedges like "I don't know") will fool them,
+# so use a real classifier in production.
 YES_PATTERN = re.compile(r"\b(yes|yeah|yep|yup|sure|correct|i am|i do)\b", re.IGNORECASE)
 NO_PATTERN = re.compile(r"\b(no|nope|nah|i'm not|i am not|i don't)\b", re.IGNORECASE)
 
@@ -190,6 +193,7 @@ def create_confirmed_node() -> NodeConfig:
     return NodeConfig(
         name="confirmed",
         task_messages=[],
+        respond_immediately=False,
         pre_actions=[{"type": "end_conversation", "text": "Great, you're verified. Goodbye!"}],
     )
 
@@ -199,6 +203,7 @@ def create_declined_node() -> NodeConfig:
     return NodeConfig(
         name="declined",
         task_messages=[],
+        respond_immediately=False,
         pre_actions=[
             {
                 "type": "end_conversation",
