@@ -73,6 +73,39 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
         self.assertIn("tts_say", self.action_manager._action_handlers)
         self.assertIn("end_conversation", self.action_manager._action_handlers)
 
+    async def test_finished_event_is_set_at_construction(self):
+        """The ``_ongoing_actions_finished_event`` must start SET at
+        construction time so that the invariant ``event is set iff
+        count == 0`` holds (count starts at 0). Otherwise an immediate
+        ``_maybe_wait_for_ongoing_actions_to_finish`` blocks forever on
+        a freshly-built ActionManager — concrete trigger: a node's first
+        ``pre_action`` (e.g. ``tts_say``) early-returns without
+        incrementing the counter (empty text after templating, handler
+        raises, etc.) and there's no later decrement to set the event."""
+        self.assertEqual(self.action_manager._ongoing_actions_count, 0)
+        self.assertTrue(self.action_manager._ongoing_actions_finished_event.is_set())
+
+    async def test_tts_action_with_empty_text_does_not_hang_set_node(self):
+        """An ``tts_say`` action whose ``text`` is empty must NOT leave
+        the ongoing-actions event UNSET. ``_handle_tts_action``
+        early-returns on empty text without incrementing the counter,
+        so the invariant from the previous test is the only thing that
+        keeps the event set."""
+        # Empty text triggers the early-return path in _handle_tts_action.
+        action = {"type": "tts_say", "text": ""}
+        await self.action_manager.execute_actions([action])
+        self.assertEqual(self.action_manager._ongoing_actions_count, 0)
+        self.assertTrue(self.action_manager._ongoing_actions_finished_event.is_set())
+        # ``_maybe_wait_for_ongoing_actions_to_finish`` must return
+        # immediately rather than hanging.
+        await asyncio.wait_for(
+            self.action_manager._maybe_wait_for_ongoing_actions_to_finish(
+                previous_action_type="tts_say",
+                upcoming_action_type=None,
+            ),
+            timeout=1.0,
+        )
+
     async def test_tts_action(self):
         """Test basic TTS action execution."""
         action = {"type": "tts_say", "text": "Hello"}
