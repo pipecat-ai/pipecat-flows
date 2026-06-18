@@ -96,7 +96,7 @@ def create_end_node() -> NodeConfig:
     post-action.
     """
     return NodeConfig(
-        name="create_end_node",
+        name="end",
         task_messages=[
             {
                 "role": "developer",
