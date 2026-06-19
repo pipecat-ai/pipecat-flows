@@ -787,6 +787,10 @@ class TestFlowManager(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             settings_frames[0].delta.system_instruction, "You are a helpful assistant."
         )
+        # The frame must be scoped to this FlowManager's own LLM service
+        # so peer LLMs on the bus (multi-worker setups) don't pick up the
+        # delta and adopt this worker's system instruction.
+        self.assertIs(settings_frames[0].service, self.mock_llm)
 
         # Verify AppendFrame contains only task_messages (not role_messages)
         append_frames = [f for f in first_frames if isinstance(f, LLMMessagesAppendFrame)]
