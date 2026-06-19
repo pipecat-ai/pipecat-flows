@@ -75,6 +75,24 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
         self.assertIn("tts_say", self.action_manager._action_handlers)
         self.assertIn("end_conversation", self.action_manager._action_handlers)
 
+    async def test_ongoing_actions_finished_event_is_set_at_init(self):
+        """``_ongoing_actions_finished_event`` must be set whenever
+        ``_ongoing_actions_count == 0``. At init the count is 0, so the
+        event must be set — an immediate ``await event.wait()`` must
+        return without blocking.
+
+        Regression: ``asyncio.Event()`` defaults to clear; combined with
+        ``count=0`` this violated the invariant and made an immediate
+        wait block forever even though no action was in flight.
+        """
+        self.assertEqual(self.action_manager._ongoing_actions_count, 0)
+        self.assertTrue(self.action_manager._ongoing_actions_finished_event.is_set())
+        # The wait must return immediately, not hang.
+        await asyncio.wait_for(
+            self.action_manager._ongoing_actions_finished_event.wait(),
+            timeout=0.1,
+        )
+
     async def test_tts_action(self):
         """Test basic TTS action execution."""
         action = {"type": "tts_say", "text": "Hello"}

@@ -96,7 +96,14 @@ class ActionManager:
         self._worker = worker
         self._flow_manager = flow_manager
         self._ongoing_actions_count = 0
+        # Invariant: ``_ongoing_actions_count == 0`` ↔ event SET.
+        # ``asyncio.Event()`` defaults to clear; combined with count=0 this
+        # violates the invariant — an immediate ``await event.wait()`` blocks
+        # forever even though no action is in flight. Setting the event here
+        # restores the invariant at init time; the counter helpers keep it
+        # consistent on increment/decrement.
         self._ongoing_actions_finished_event = asyncio.Event()
+        self._ongoing_actions_finished_event.set()
         self._deferred_post_actions: list[ActionConfig] = []
         self._showed_deprecation_warning_for_legacy_action_handler = False
 
