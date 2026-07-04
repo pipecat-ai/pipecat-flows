@@ -13,6 +13,8 @@ Pipecat Flows determines conversation structure at runtime, supporting function
 calling, action execution, and seamless transitions between conversation states.
 """
 
+import warnings
+
 from .exceptions import (
     ActionError,
     FlowError,
@@ -36,6 +38,15 @@ from .types import (
     ZeroArgFunctionHandler,
     flows_direct_function,
     flows_tool_options,
+)
+
+warnings.warn(
+    "`pipecat-ai-flows` is deprecated: Pipecat Flows is now part of `pipecat-ai`. "
+    "Import from `pipecat.flows` instead (e.g. `from pipecat.flows import FlowManager`). "
+    "This standalone package is frozen at its final release and will not receive further "
+    "updates.",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
 __all__ = [

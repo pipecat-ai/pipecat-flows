@@ -1,0 +1,1 @@
+- Pipecat Flows is now part of `pipecat-ai` under the `pipecat.flows` namespace, and this standalone `pipecat-ai-flows` package is deprecated and frozen at this final release. Importing `pipecat_flows` now emits a `DeprecationWarning`; migrate by importing from `pipecat.flows` instead (the API is unchanged). See the [README](./README.md) for details.

@@ -2416,14 +2416,14 @@ docs = [
 requires-dist = [
     { name = "docstring-parser", specifier = ">=0.16,<1" },
     { name = "loguru", specifier = "~=0.7.3" },
-    { name = "pipecat-ai", specifier = ">=1.4.0,<2" },
+    { name = "pipecat-ai", specifier = ">=1.4.0,<1.5.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "build", specifier = "~=1.4.0" },
     { name = "pip-tools", specifier = "~=7.5.3" },
-    { name = "pipecat-ai", extras = ["webrtc", "websocket", "daily", "silero", "deepgram", "cartesia", "openai", "anthropic", "google", "aws", "runner", "evals"], specifier = ">=1.4.0,<2" },
+    { name = "pipecat-ai", extras = ["webrtc", "websocket", "daily", "silero", "deepgram", "cartesia", "openai", "anthropic", "google", "aws", "runner", "evals"], specifier = ">=1.4.0,<1.5.0" },
     { name = "pre-commit", specifier = "~=4.5.1" },
     { name = "pyright", specifier = ">=1.1.404,<1.2" },
     { name = "pytest", specifier = ">=9.0.0,<10" },

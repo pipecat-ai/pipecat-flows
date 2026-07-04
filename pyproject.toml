@@ -19,7 +19,13 @@ classifiers = [
     "Topic :: Multimedia :: Sound/Audio",
 ]
 dependencies = [
-    "pipecat-ai>=1.4.0,<2",
+    # Final standalone release. Pipecat Flows now lives in pipecat-ai under
+    # `pipecat.flows`; this package is frozen at this snapshot. Pin to the
+    # pre-Flows Pipecat line (< 1.5.0): this package stays the Flows provider for
+    # that era, and it deliberately cannot coexist with a pipecat-ai that already
+    # bundles `pipecat.flows`. Upgrading Pipecat past 1.4.x therefore forces
+    # dropping this package and importing `pipecat.flows` instead.
+    "pipecat-ai>=1.4.0,<1.5.0",
     "loguru~=0.7.3",
     "docstring_parser>=0.16,<1",
 ]
@@ -42,7 +48,7 @@ dev = [
     "setuptools~=78.1.1",
     "setuptools_scm~=8.3.1",
     "python-dotenv>=1.0.1,<2.0.0",
-    "pipecat-ai[webrtc,websocket,daily,silero,deepgram,cartesia,openai,anthropic,google,aws,runner,evals]>=1.4.0,<2",
+    "pipecat-ai[webrtc,websocket,daily,silero,deepgram,cartesia,openai,anthropic,google,aws,runner,evals]>=1.4.0,<1.5.0",
     "towncrier~=25.8.0",
 ]
 
