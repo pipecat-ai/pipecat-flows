@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [1.4.0] - 2026-07-05
+
+### Added
+
+- Added an audio eval suite (`evals/`) for pre-release end-to-end testing of
+  core Flows behaviors, built on Pipecat's `pipecat eval` framework. Run it
+  with `uv run pipecat eval suite evals/manifest.yaml`. The covered examples
+  now support the eval transport (`-t eval`).
+  (PR [#284](https://github.com/pipecat-ai/pipecat-flows/pull/284))
+
+### Deprecated
+
+- Pipecat Flows is now part of `pipecat-ai` under the `pipecat.flows`
+  namespace, and this standalone `pipecat-ai-flows` package is deprecated and
+  frozen at this final release. Importing `pipecat_flows` now emits a
+  `DeprecationWarning`; migrate by importing from `pipecat.flows` instead (the
+  API is unchanged). See the [README](./README.md) for details.
+  (PR [#290](https://github.com/pipecat-ai/pipecat-flows/pull/290))
+
 ## [1.3.0] - 2026-06-18
 
 ### Added
