@@ -36,6 +36,7 @@ from pipecat.frames.frames import (
     ControlFrame,
     EndFrame,
     TTSSpeakFrame,
+    UninterruptibleFrame,
 )
 from pipecat.pipeline.worker import PipelineWorker
 
@@ -47,8 +48,11 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class FunctionActionFrame(ControlFrame):
+class FunctionActionFrame(ControlFrame, UninterruptibleFrame):
     """Frame containing a function action to be executed.
+
+    This frame is uninterruptible so it survives interruption-driven queue
+    flushes and the ongoing-actions count always resyncs.
 
     Parameters:
         action: Action configuration dictionary.
@@ -60,8 +64,12 @@ class FunctionActionFrame(ControlFrame):
 
 
 @dataclass
-class ActionFinishedFrame(ControlFrame):
-    """Frame indicating that an action has completed execution."""
+class ActionFinishedFrame(ControlFrame, UninterruptibleFrame):
+    """Frame indicating that an action has completed execution.
+
+    This frame is uninterruptible so it survives interruption-driven queue
+    flushes and the ongoing-actions count always resyncs.
+    """
 
     pass
 
@@ -113,9 +121,12 @@ class ActionManager:
         @worker.event_handler("on_frame_reached_downstream")
         async def on_frame_reached_downstream(worker, frame):
             if isinstance(frame, FunctionActionFrame):
-                # Run function action
-                await frame.function(frame.action, flow_manager)
-                self._decrement_ongoing_actions_count()
+                # Run function action. Always decrement the ongoing actions count, even if
+                # the handler raises, so a raising handler can't leave the count stuck.
+                try:
+                    await frame.function(frame.action, flow_manager)
+                finally:
+                    self._decrement_ongoing_actions_count()
             elif isinstance(frame, BotStoppedSpeakingFrame):
                 # Execute deferred post-actions if the bot's turn is over.
                 # A BotStoppedSpeakingFrame only indicates that the bot's turn is over if there are

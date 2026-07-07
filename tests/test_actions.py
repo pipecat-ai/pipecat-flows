@@ -23,9 +23,12 @@ import asyncio
 import unittest
 import warnings
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
-from pipecat_flows.actions import ActionManager
+from pipecat.frames.frames import TTSSpeakFrame, UninterruptibleFrame
+from pipecat.utils.frame_queue import FrameQueue
+
+from pipecat_flows.actions import ActionFinishedFrame, ActionManager, FunctionActionFrame
 from pipecat_flows.exceptions import ActionError
 from tests.test_helpers import (
     assert_end_frame_queued,
@@ -33,6 +36,40 @@ from tests.test_helpers import (
     get_queued_tts_speak_frames,
     make_mock_task,
 )
+
+
+def make_interruptible_mock_task():
+    """Create a mock PipelineTask that simulates pipecat's FrameQueue.reset() semantics.
+
+    Once ``interrupted`` is set to True, queue_frame drops any frame that is not an
+    UninterruptibleFrame instead of delivering it downstream (mirroring what happens to a
+    real pipeline's internal queues during an interruption), while uninterruptible frames
+    are still delivered to the captured on_frame_reached_downstream handler.
+    """
+    mock_task = AsyncMock()
+    mock_task.interrupted = False
+
+    async def queue_frame(frame):
+        if mock_task.interrupted and not isinstance(frame, UninterruptibleFrame):
+            return
+        handler = getattr(mock_task, "on_frame_reached_downstream", None)
+        if handler:
+            await handler(mock_task, frame)
+
+    mock_task.queue_frame = AsyncMock(side_effect=queue_frame)
+
+    mock_task.set_reached_downstream_filter = Mock()
+
+    def mock_event_handler(event_name):
+        def decorator(func):
+            setattr(mock_task, event_name, func)
+            return func
+
+        return decorator
+
+    mock_task.event_handler = mock_event_handler
+
+    return mock_task
 
 
 class TestActionManager(unittest.IsolatedAsyncioTestCase):
@@ -288,3 +325,145 @@ class TestActionManager(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(ActionError):
             await action_manager.execute_actions([{"type": "failing_action"}])
+
+    def test_uninterruptible_frame_mixin(self):
+        """Test that ActionFinishedFrame and FunctionActionFrame are uninterruptible.
+
+        This is a regression guard for #231: these frames must survive
+        interruption-driven queue flushes (see pipecat's FrameQueue.reset()), or the
+        ongoing actions count they're responsible for decrementing gets stuck forever.
+        """
+
+        async def dummy(action, flow_manager):
+            pass
+
+        self.assertIsInstance(ActionFinishedFrame(), UninterruptibleFrame)
+        self.assertIsInstance(FunctionActionFrame(action={}, function=dummy), UninterruptibleFrame)
+
+    async def test_uninterruptible_frames_survive_frame_queue_reset(self):
+        """Test survival of ActionFinishedFrame/FunctionActionFrame in a real pipecat FrameQueue.
+
+        Exercises pipecat's actual FrameQueue.reset() (used by interruption handling) with
+        no mocks: an interruptible frame queued ahead of our completion frame must be
+        dropped, while the completion frame itself must survive.
+        """
+        # ActionFinishedFrame behind a TTSSpeakFrame
+        queue = FrameQueue()
+        tts_frame = TTSSpeakFrame(text="Hello")
+        finished_frame = ActionFinishedFrame()
+        queue.put_nowait(tts_frame)
+        queue.put_nowait(finished_frame)
+
+        queue.reset()
+
+        remaining = []
+        while not queue.empty():
+            remaining.append(queue.get_nowait())
+        self.assertEqual(remaining, [finished_frame])
+
+        # FunctionActionFrame behind a TTSSpeakFrame
+        async def dummy(action, flow_manager):
+            pass
+
+        queue = FrameQueue()
+        tts_frame = TTSSpeakFrame(text="Hello")
+        function_frame = FunctionActionFrame(action={}, function=dummy)
+        queue.put_nowait(tts_frame)
+        queue.put_nowait(function_frame)
+
+        queue.reset()
+
+        remaining = []
+        while not queue.empty():
+            remaining.append(queue.get_nowait())
+        self.assertEqual(remaining, [function_frame])
+
+    async def test_tts_action_survives_interruption(self):
+        """Test that a tts_say action completes even if interrupted.
+
+        Simulates the pipeline's queues being flushed by a user interruption (as
+        FrameQueue.reset() does) while the tts_say action's frames are in flight: the
+        TTSSpeakFrame is dropped but the ActionFinishedFrame must survive, so
+        execute_actions() doesn't hang forever and the ongoing actions count/event resync.
+        """
+        mock_task = make_interruptible_mock_task()
+        action_manager = ActionManager(mock_task, self.mock_flow_manager)
+
+        mock_task.interrupted = True
+
+        await asyncio.wait_for(
+            action_manager.execute_actions([{"type": "tts_say", "text": "Hello"}]), 1.0
+        )
+
+        self.assertEqual(action_manager._ongoing_actions_count, 0)
+        self.assertTrue(action_manager._ongoing_actions_finished_event.is_set())
+
+    async def test_function_action_survives_interruption(self):
+        """Test that a function action's handler still runs even if interrupted.
+
+        Simulates the pipeline's queues being flushed by a user interruption while the
+        function action's FunctionActionFrame is in flight. It must survive so the handler
+        still runs, execute_actions() doesn't hang forever, and the ongoing actions
+        count/event resync.
+        """
+        mock_task = make_interruptible_mock_task()
+        action_manager = ActionManager(mock_task, self.mock_flow_manager)
+
+        ran = False
+
+        async def handler(action, flow_manager):
+            nonlocal ran
+            ran = True
+
+        mock_task.interrupted = True
+
+        await asyncio.wait_for(
+            action_manager.execute_actions([{"type": "function", "handler": handler}]), 1.0
+        )
+
+        self.assertTrue(ran)
+        self.assertEqual(action_manager._ongoing_actions_count, 0)
+        self.assertTrue(action_manager._ongoing_actions_finished_event.is_set())
+
+    async def test_function_action_raising_handler_resets_count(self):
+        """Test count consistency when a raising handler's exception unwinds synchronously.
+
+        The mock task delivers frames inline, so the handler's exception propagates back
+        through execute_actions() as an ActionError (in a real pipeline the exception is
+        swallowed by pipecat's event dispatch instead — see the direct-dispatch test below).
+        The count must be back to 0 without execute_actions()'s snapshot-based guard
+        double-decrementing.
+        """
+
+        async def failing_handler(action, flow_manager):
+            raise RuntimeError("boom")
+
+        with self.assertRaises(ActionError):
+            await self.action_manager.execute_actions(
+                [{"type": "function", "handler": failing_handler}]
+            )
+
+        self.assertEqual(self.action_manager._ongoing_actions_count, 0)
+        self.assertTrue(self.action_manager._ongoing_actions_finished_event.is_set())
+
+    async def test_raising_function_handler_decrements_count_on_dispatch(self):
+        """Test that a raising handler can't leave the count stuck in real frame dispatch.
+
+        In real pipecat, on_frame_reached_downstream runs in its own task and any handler
+        exception is logged and swallowed (BaseObject._run_handler) — it never propagates
+        back to execute_actions(), so the try/finally around the handler invocation is the
+        only thing that decrements the count. Invoke the captured handler directly to
+        exercise that path in isolation.
+        """
+
+        async def failing_handler(action, flow_manager):
+            raise RuntimeError("boom")
+
+        frame = FunctionActionFrame(action={}, function=failing_handler)
+        self.action_manager._increment_ongoing_actions_count()
+
+        with self.assertRaises(RuntimeError):
+            await self.mock_task.on_frame_reached_downstream(self.mock_task, frame)
+
+        self.assertEqual(self.action_manager._ongoing_actions_count, 0)
+        self.assertTrue(self.action_manager._ongoing_actions_finished_event.is_set())
