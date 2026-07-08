@@ -97,6 +97,17 @@ class ActionManager:
         self._flow_manager = flow_manager
         self._ongoing_actions_count = 0
         self._ongoing_actions_finished_event = asyncio.Event()
+        # Invariant: the event is set iff ``_ongoing_actions_count == 0``
+        # ("no ongoing actions in flight"). At construction time the
+        # count is 0, so the event must start SET — otherwise an
+        # immediate ``await _maybe_wait_for_ongoing_actions_to_finish()``
+        # blocks forever. This bites when a node's first ``pre_action``
+        # (e.g. ``tts_say``) early-returns without incrementing the
+        # counter — empty/whitespace text after templating, a handler
+        # exception caught before ``_increment_ongoing_actions_count``,
+        # etc. — leaving the event UNSET and the next ``set_node`` to
+        # hang on the wait.
+        self._ongoing_actions_finished_event.set()
         self._deferred_post_actions: list[ActionConfig] = []
         self._showed_deprecation_warning_for_legacy_action_handler = False
 
