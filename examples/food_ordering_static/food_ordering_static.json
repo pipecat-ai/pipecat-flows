@@ -1,0 +1,131 @@
+{
+  "initial_node": "initial",
+  "nodes": {
+    "initial": {
+      "role_message": "You are an order-taking assistant. You must ALWAYS use the available functions to progress the conversation. This is a phone conversation and your responses will be converted to audio. Keep the conversation friendly, casual, and polite. Avoid outputting special characters and emojis.",
+      "task_messages": [
+        {
+          "role": "developer",
+          "content": "For this step, ask the user if they want pizza or sushi, and wait for them to use a function to choose. Start off by greeting them. Be friendly and casual; you're taking an order for food over the phone."
+        }
+      ],
+      "pre_actions": [
+        {
+          "type": "function",
+          "handler": "check_kitchen_status"
+        }
+      ],
+      "functions": [
+        {
+          "name": "choose_pizza",
+          "description": "User wants to order pizza. Let's get that order started.",
+          "transition_to": "choose_pizza"
+        },
+        {
+          "name": "choose_sushi",
+          "description": "User wants to order sushi. Let's get that order started.",
+          "transition_to": "choose_sushi"
+        }
+      ]
+    },
+    "choose_pizza": {
+      "task_messages": [
+        {
+          "role": "developer",
+          "content": "You are handling a pizza order. Use the available functions:\n- Use select_pizza_order when the user specifies both size AND type\n\nPricing:\n- Small: $10\n- Medium: $15\n- Large: $20\n\nRemember to be friendly and casual."
+        }
+      ],
+      "functions": [
+        {
+          "name": "select_pizza_order",
+          "description": "Record the pizza order details",
+          "properties": {
+            "size": {
+              "type": "string",
+              "enum": ["small", "medium", "large"],
+              "description": "Size of the pizza"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["pepperoni", "cheese", "supreme", "vegetarian"],
+              "description": "Type of pizza"
+            }
+          },
+          "required": ["size", "type"],
+          "handler": "select_pizza_order",
+          "transition_to": "confirm"
+        }
+      ]
+    },
+    "choose_sushi": {
+      "task_messages": [
+        {
+          "role": "developer",
+          "content": "You are handling a sushi order. Use the available functions:\n- Use select_sushi_order when the user specifies both count AND type\n\nPricing:\n- $8 per roll\n\nRemember to be friendly and casual."
+        }
+      ],
+      "functions": [
+        {
+          "name": "select_sushi_order",
+          "description": "Record the sushi order details",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
+              "description": "Number of rolls to order"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["california", "spicy tuna", "rainbow", "dragon"],
+              "description": "Type of sushi roll"
+            }
+          },
+          "required": ["count", "type"],
+          "handler": "select_sushi_order",
+          "transition_to": "confirm"
+        }
+      ]
+    },
+    "confirm": {
+      "task_messages": [
+        {
+          "role": "developer",
+          "content": "Read back the complete order details to the user and ask if they want anything else or if they want to make changes. Use the available functions:\n- Use complete_order when the user confirms that the order is correct and no changes are needed\n- Use revise_order if they want to change something\n\nBe friendly and clear when reading back the order details."
+        }
+      ],
+      "functions": [
+        {
+          "name": "complete_order",
+          "description": "User confirms the order is correct",
+          "transition_to": "end"
+        },
+        {
+          "name": "revise_order",
+          "description": "User wants to make changes to their order",
+          "transition_to": "initial"
+        }
+      ]
+    },
+    "end": {
+      "task_messages": [
+        {
+          "role": "developer",
+          "content": "Thank the user for their order and end the conversation politely and concisely."
+        }
+      ],
+      "post_actions": [
+        {
+          "type": "end_conversation"
+        }
+      ]
+    }
+  },
+  "global_functions": [
+    {
+      "name": "get_delivery_estimate",
+      "description": "Get a delivery estimate for the current order",
+      "handler": "get_delivery_estimate"
+    }
+  ]
+}
