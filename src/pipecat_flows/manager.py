@@ -772,8 +772,20 @@ class FlowManager:
 
             # New path: role_message as LLM system instruction (persists until changed)
             if role_message:
+                # ``service=self._llm`` scopes the delta to this FlowManager's
+                # own LLM service. Without it, ``LLMUpdateSettingsFrame``
+                # broadcasts to EVERY ``LLMService`` on the bus, so in
+                # multi-worker setups a sibling worker's LLM picks up the
+                # delta and adopts this worker's system instruction. The
+                # ``FlowManager`` always knows its own LLM (passed at the
+                # constructor and stored as ``self._llm``), so the scope is
+                # always available; the single-worker case is unchanged (the
+                # only LLM on the bus is also ``self._llm``).
                 frames.append(
-                    LLMUpdateSettingsFrame(delta=LLMSettings(system_instruction=role_message))
+                    LLMUpdateSettingsFrame(
+                        delta=LLMSettings(system_instruction=role_message),
+                        service=self._llm,
+                    )
                 )
 
             messages = []
